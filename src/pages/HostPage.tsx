@@ -129,7 +129,7 @@ export default function HostPage() {
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--navy)' }}>
       {/* Top bar */}
       <div className="flex items-center gap-4 px-4 py-3 border-b" style={{ borderColor: 'var(--navy-light)', background: 'var(--navy-mid)' }}>
-        <div className="font-display text-xl" style={{ color: 'var(--gold-bright)' }}>JEOPARDY!</div>
+        <button className="font-display text-xl" style={{ color: 'var(--gold-bright)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} onClick={() => setTab('board')}>JEOPARDY!</button>
         <div className="w-px h-5" style={{ background: 'var(--navy-light)' }} />
         <div className="flex items-center gap-2">
           <span className="font-condensed text-xs uppercase" style={{ color: '#4a5580' }}>Room</span>
