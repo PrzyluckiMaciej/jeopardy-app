@@ -1,0 +1,47 @@
+name: Link Issue to PR
+
+on:
+  pull_request:
+    types: [opened]
+
+jobs:
+  link-issue:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+
+    steps:
+      - name: Extract issue number and update PR body
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branch = context.payload.pull_request.head.ref;
+
+            // Matches: iss7, fix/iss7, feat/iss7, chore/iss7, etc.
+            const match = branch.match(/(?:^|\/|-)iss(\d+)/i);
+            if (!match) {
+              console.log(`Branch "${branch}" does not contain an issue reference. Skipping.`);
+              return;
+            }
+
+            const issueNumber = match[1];
+            const closing = `Closes #${issueNumber}`;
+            const currentBody = context.payload.pull_request.body || '';
+
+            if (currentBody.includes(closing)) {
+              console.log('PR body already contains the closing reference. Skipping.');
+              return;
+            }
+
+            const newBody = currentBody.trim()
+              ? `${currentBody.trim()}\n\n${closing}`
+              : closing;
+
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              body: newBody,
+            });
+
+            console.log(`Added "${closing}" to PR #${context.payload.pull_request.number}`);
