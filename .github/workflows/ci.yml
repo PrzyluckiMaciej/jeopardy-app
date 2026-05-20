@@ -27,7 +27,7 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Lint
-        run: npx eslint src --format json --output-file eslint-report.json || echo "LINT_FAILED=true" >> $GITHUB_ENV
+        run: npx eslint src --format json | jq '.' > eslint-report.json || echo "LINT_FAILED=true" >> $GITHUB_ENV
 
       - name: Upload lint report
         uses: actions/upload-artifact@v4
