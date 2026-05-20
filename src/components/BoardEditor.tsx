@@ -119,7 +119,7 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
         />
         <div className="flex gap-2 ml-auto">
           <button className="btn-outline text-sm" onClick={addCategory}>+ Category</button>
-          <button className="btn-gold text-sm" onClick={onClose}>✓ Done editing</button>
+          <button className="btn-gold text-sm" onClick={onClose}>Done editing</button>
         </div>
       </div>
 
@@ -191,7 +191,7 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                       <div className="w-2 h-2 rounded-full mx-auto mt-1" style={{ background: 'var(--gold)', opacity: 0.6 }} />
                     )}
                     {q.mediaId && (
-                      <div className="text-xs mt-1" style={{ color: 'var(--gold)', opacity: 0.8 }}>📎</div>
+                      <div className="w-1.5 h-1.5 rounded-full mx-auto mt-1" style={{ background: 'var(--gold)', opacity: 0.8 }} />
                     )}
                   </button>
                 )
@@ -268,7 +268,7 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                     id="media-upload"
                   />
                   <label htmlFor="media-upload" className="btn-ghost text-sm w-full block text-center py-2 cursor-pointer">
-                    📎 &nbsp; Attach image / audio / video
+                    Attach image / audio / video
                   </label>
                 </>
               )}

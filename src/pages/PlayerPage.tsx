@@ -220,7 +220,7 @@ export default function PlayerPage() {
             >
               {hasBuzzed
                 ? isMyTurn
-                  ? '🔔 YOUR TURN'
+                  ? 'YOUR TURN'
                   : `#${state.buzzQueue.indexOf(myId.current) + 1} in queue`
                 : 'BUZZ!'}
             </button>

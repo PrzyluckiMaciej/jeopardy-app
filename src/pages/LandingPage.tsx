@@ -41,7 +41,7 @@ export default function LandingPage() {
         {mode === 'pick' ? (
           <div className="flex flex-col gap-4">
             <button className="btn-gold w-full py-4 text-xl" onClick={handleHost}>
-              🎙️ &nbsp; Host a game
+              Host a game
             </button>
             <div className="flex items-center gap-3 my-1">
               <div className="flex-1 h-px" style={{ background: 'var(--navy-light)' }} />
@@ -49,7 +49,7 @@ export default function LandingPage() {
               <div className="flex-1 h-px" style={{ background: 'var(--navy-light)' }} />
             </div>
             <button className="btn-outline w-full py-4 text-xl" onClick={() => setMode('join')}>
-              🎮 &nbsp; Join a game
+              Join a game
             </button>
           </div>
         ) : (
