@@ -1,0 +1,147 @@
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+:root {
+  --navy: #060b28;
+  --navy-mid: #0d1545;
+  --navy-light: #1a2260;
+  --gold: #d4a017;
+  --gold-light: #f5c842;
+  --gold-bright: #ffe066;
+  --white: #f0f0f0;
+  --red: #c0392b;
+  --green: #27ae60;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--navy);
+  color: var(--white);
+  font-family: 'Barlow', sans-serif;
+  min-height: 100vh;
+}
+
+.font-display { font-family: 'Anton', sans-serif; }
+.font-condensed { font-family: 'Barlow Condensed', sans-serif; }
+
+/* Jeopardy board cell glow on hover */
+.board-cell {
+  background: var(--navy-mid);
+  border: 2px solid var(--navy-light);
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+.board-cell:hover:not(.answered) {
+  border-color: var(--gold);
+  box-shadow: 0 0 18px rgba(212, 160, 23, 0.35), inset 0 0 12px rgba(212, 160, 23, 0.08);
+}
+.board-cell.answered {
+  background: var(--navy);
+  border-color: var(--navy-light);
+  cursor: default;
+  opacity: 0.35;
+}
+
+/* Gold border glow for active states */
+.gold-glow {
+  box-shadow: 0 0 24px rgba(212, 160, 23, 0.5), 0 0 60px rgba(212, 160, 23, 0.2);
+}
+
+/* Animated buzz button */
+@keyframes pulseRing {
+  0% { box-shadow: 0 0 0 0 rgba(212, 160, 23, 0.6); }
+  70% { box-shadow: 0 0 0 24px rgba(212, 160, 23, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(212, 160, 23, 0); }
+}
+.buzz-btn:not(:disabled) {
+  animation: pulseRing 2s infinite;
+}
+
+/* Score animation */
+@keyframes scoreFlash {
+  0% { color: var(--gold-bright); transform: scale(1.15); }
+  100% { color: var(--white); transform: scale(1); }
+}
+.score-flash { animation: scoreFlash 0.6s ease-out forwards; }
+
+/* Card flip */
+@keyframes flipIn {
+  from { transform: rotateY(90deg) scale(0.95); opacity: 0; }
+  to   { transform: rotateY(0deg)  scale(1);    opacity: 1; }
+}
+.card-flip { animation: flipIn 0.35s ease-out forwards; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--navy); }
+::-webkit-scrollbar-thumb { background: var(--navy-light); border-radius: 3px; }
+
+input, textarea, select {
+  background: var(--navy);
+  border: 1.5px solid var(--navy-light);
+  color: var(--white);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: var(--gold);
+}
+input::placeholder, textarea::placeholder {
+  color: #4a5580;
+}
+
+button {
+  cursor: pointer;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  transition: all 0.15s ease;
+}
+
+.btn-gold {
+  background: var(--gold);
+  color: var(--navy);
+  border: none;
+  padding: 10px 24px;
+  border-radius: 6px;
+  font-size: 15px;
+  text-transform: uppercase;
+}
+.btn-gold:hover { background: var(--gold-light); }
+.btn-gold:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-outline {
+  background: transparent;
+  color: var(--gold);
+  border: 1.5px solid var(--gold);
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  text-transform: uppercase;
+}
+.btn-outline:hover { background: rgba(212,160,23,0.1); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--white);
+  border: 1.5px solid var(--navy-light);
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+.btn-ghost:hover { border-color: #4a5580; }
+
+.panel {
+  background: var(--navy-mid);
+  border: 1px solid var(--navy-light);
+  border-radius: 10px;
+  padding: 20px;
+}
+
+.tag-correct { background: rgba(39,174,96,0.2); color: #4cd98a; border: 1px solid rgba(39,174,96,0.4); padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+.tag-wrong { background: rgba(192,57,43,0.2); color: #e07070; border: 1px solid rgba(192,57,43,0.4); padding: 2px 8px; border-radius: 4px; font-size: 12px; }
