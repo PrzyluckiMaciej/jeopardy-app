@@ -169,10 +169,10 @@ export default function HostPage() {
             {!editing && (
               <div className="flex items-center gap-3 flex-wrap">
                 <button className="btn-outline text-sm" onClick={() => setShowBoardPicker(true)}>
-                  📋 Select board
+                  Select board
                 </button>
                 <button className="btn-ghost text-sm" onClick={() => { if (board) setEditing(true); else handleNewBoard() }}>
-                  ✏️ {board ? 'Edit board' : 'New board'}
+                  {board ? 'Edit board' : 'New board'}
                 </button>
                 {board && <span className="font-condensed font-bold" style={{ color: 'var(--gold)' }}>{board.name}</span>}
               </div>
@@ -297,7 +297,7 @@ function GameBoard({ board, answeredCells, onOpenCell }: {
                   ${pts}
                 </span>
                 {q.mediaId && !isAnswered && (
-                  <span className="text-xs" style={{ color: 'var(--gold)', opacity: 0.6 }}>📎</span>
+                  <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: 'var(--gold)', opacity: 0.6 }} />
                 )}
               </button>
             )

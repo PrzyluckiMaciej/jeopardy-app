@@ -101,7 +101,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
 
             {phase === 'question' && (
               <button className="btn-gold w-full py-3" onClick={handleStartBuzzing}>
-                🔔 Open for buzzing
+                Open for buzzing
               </button>
             )}
 
@@ -113,7 +113,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
 
             {phase !== 'revealed' && (
               <button className="btn-outline w-full" onClick={handleReveal}>
-                👁 Reveal answer
+                Reveal answer
               </button>
             )}
           </div>

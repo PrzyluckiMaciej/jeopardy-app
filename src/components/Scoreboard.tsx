@@ -58,7 +58,7 @@ export default function Scoreboard({ players, buzzQueue = [], highlightId }: Pro
                   border: `1px solid ${isFirst ? 'rgba(212,160,23,0.5)' : 'rgba(74,85,128,0.5)'}`,
                 }}
               >
-                {isFirst ? '🔔 BUZZED' : `#${buzzPos + 1}`}
+                {isFirst ? 'BUZZED' : `#${buzzPos + 1}`}
               </div>
             )}
           </div>
