@@ -4,7 +4,6 @@ import type { NetMessage } from '../types'
 // Trystero room reference (opaque type)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let room: any = null
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let sendMessage: ((msg: unknown, targetId?: string) => void) | null = null
 let onMessageCallback: ((msg: NetMessage, peerId: string) => void) | null = null
 let onJoinCallback: ((peerId: string) => void) | null = null
