@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useGameStore } from '../store/gameStore'
 import * as net from '../lib/network'
@@ -18,17 +18,17 @@ export default function PlayerPage() {
   const [judgeResult, setJudgeResult] = useState<'correct' | 'wrong' | null>(null)
   const [buzzCount, setBuzzCount] = useState(0)
 
-  const myId = useRef(generateId())
+  const [myId] = useState(generateId)
 
   useEffect(() => {
     if (!roomCode) { navigate('/'); return }
 
     net.joinGameRoom(roomCode)
-    setMyPlayerId(myId.current)
+    setMyPlayerId(myId)
 
     net.onPeerJoin(() => {
       setConnected(true)
-      const me: Player = { id: myId.current, name: playerName, score: 0, isConnected: true }
+      const me: Player = { id: myId, name: playerName, score: 0, isConnected: true }
       net.broadcast({ type: 'PLAYER_JOIN', player: me })
     })
 
@@ -80,7 +80,7 @@ export default function PlayerPage() {
             ? useGameStore.getState().state.buzzQueue
             : useGameStore.getState().state.buzzQueue.filter(id => id !== playerId),
         })
-        if (playerId === myId.current) {
+        if (playerId === myId) {
           setJudgeResult(correct ? 'correct' : 'wrong')
           setTimeout(() => setJudgeResult(null), 2500)
         }
@@ -103,7 +103,7 @@ export default function PlayerPage() {
         updatePlayer(msg.player)
       }
       if (msg.type === 'REMOVE_PLAYER') {
-        if (msg.playerId === myId.current) {
+        if (msg.playerId === myId) {
           alert('You have been removed from the game.')
           navigate('/')
         } else {
@@ -121,12 +121,12 @@ export default function PlayerPage() {
   function handleBuzz() {
     if (hasBuzzed || state.phase !== 'buzzing') return
     setHasBuzzed(true)
-    net.broadcast({ type: 'BUZZ', playerId: myId.current, playerName })
+    net.broadcast({ type: 'BUZZ', playerId: myId, playerName })
   }
 
-  const myPlayer = state.players.find((p) => p.id === myId.current)
+  const myPlayer = state.players.find((p) => p.id === myId)
   const myScore = myPlayer?.score ?? 0
-  const isMyTurn = state.buzzQueue[0] === myId.current
+  const isMyTurn = state.buzzQueue[0] === myId
   const activeQ = state.activeQuestion?.question
 
   if (!connected) {
@@ -221,7 +221,7 @@ export default function PlayerPage() {
               {hasBuzzed
                 ? isMyTurn
                   ? 'YOUR TURN'
-                  : `#${state.buzzQueue.indexOf(myId.current) + 1} in queue`
+                  : `#${state.buzzQueue.indexOf(myId) + 1} in queue`
                 : 'BUZZ!'}
             </button>
             {!hasBuzzed && (
@@ -248,7 +248,7 @@ export default function PlayerPage() {
             <div className="font-condensed text-xs uppercase tracking-widest mb-2" style={{ color: 'var(--gold)', opacity: 0.5 }}>
               Scoreboard
             </div>
-            <Scoreboard players={state.players} buzzQueue={state.buzzQueue} highlightId={myId.current} />
+            <Scoreboard players={state.players} buzzQueue={state.buzzQueue} highlightId={myId} />
           </div>
         )}
       </div>

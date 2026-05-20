@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import type { Board, Category, Question } from '../types'
 import { generateId } from '../lib/utils'
 import { saveMedia, deleteMedia, getMedia, blobToDataUrl } from '../lib/db'
@@ -29,9 +29,9 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
     ? board.categories.find((c) => c.id === editingCell.categoryId) ?? null
     : null
 
-  function updateBoard(patch: Partial<Board>) {
+  const updateBoard = useCallback((patch: Partial<Board>) => {
     onChange({ ...board, ...patch, updatedAt: Date.now() })
-  }
+  }, [board, onChange])
 
   function updateCategory(catId: string, patch: Partial<Category>) {
     updateBoard({
