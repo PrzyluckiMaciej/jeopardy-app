@@ -144,23 +144,19 @@ export default function HostPage() {
           {copied && <span className="text-xs" style={{ color: 'var(--green)' }}>Copied!</span>}
         </div>
         <div className="flex-1" />
-        <div className="flex" style={{ background: 'var(--navy)', border: '1px solid var(--navy-light)', borderRadius: 8, padding: 2 }}>
-          {(['board', 'settings'] as Tab[]).map((t) => (
-            <button
-              key={t}
-              className="font-condensed text-sm uppercase px-4 py-1 rounded"
-              style={{
-                background: tab === t ? 'var(--navy-light)' : 'transparent',
-                color: tab === t ? 'var(--gold)' : '#4a5580',
-                border: 'none',
-                letterSpacing: '0.05em',
-              }}
-              onClick={() => setTab(t)}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
+        <button
+          className="font-condensed text-sm uppercase px-4 py-1 rounded"
+          style={{
+            background: tab === 'settings' ? 'var(--navy-light)' : 'var(--navy)',
+            color: tab === 'settings' ? 'var(--gold)' : '#4a5580',
+            border: '1px solid var(--navy-light)',
+            borderRadius: 8,
+            letterSpacing: '0.05em',
+          }}
+          onClick={() => setTab('settings')}
+        >
+          Settings
+        </button>
       </div>
 
       <div className="flex flex-1 min-h-0">
