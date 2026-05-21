@@ -141,7 +141,7 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
         />
         <div className="flex gap-2 ml-auto">
           <button className="btn-outline text-sm" onClick={addCategory}>+ Category</button>
-          <button className="btn-gold text-sm" onClick={onClose}>Done editing</button>
+          <button className="btn-gold text-sm" onClick={onClose}>Save</button>
         </div>
       </div>
 
