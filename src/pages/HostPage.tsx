@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Settings, Trash2 } from 'lucide-react'
+import { Settings, Trash2, Pencil, Check, FolderOpen } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useGameStore, useBoardStore } from '../store/gameStore'
 import * as net from '../lib/network'
@@ -27,6 +27,13 @@ export default function HostPage() {
   const [activeBoard, setActiveBoard] = useState<Board | null>(null)
   const [showBoardPicker, setShowBoardPicker] = useState(false)
   const [copied, setCopied] = useState(false)
+
+  // Board picker group state
+  const [pickerGroup, setPickerGroup] = useState<string | null>(null)
+  const [creatingGroup, setCreatingGroup] = useState(false)
+  const [newGroupName, setNewGroupName] = useState('')
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null)
+  const [editingGroupName, setEditingGroupName] = useState('')
 
   // Maps Trystero peerId → stable clientId for every connected peer
   const peerToClient = useRef(new Map<string, string>())
@@ -121,7 +128,7 @@ export default function HostPage() {
     setActiveBoard(b)
     patchState({ board: b, answeredCells: [], phase: 'board' })
     net.broadcast({ type: 'SYNC_STATE', state: { ...useGameStore.getState().state, board: b, answeredCells: [], phase: 'board' } })
-    setShowBoardPicker(false)
+    closeBoardPicker()
     setEditing(false)
   }
 
@@ -141,7 +148,7 @@ export default function HostPage() {
     setActiveBoard(b)
     patchState({ board: b, answeredCells: [], phase: 'board' })
     setEditing(true)
-    setShowBoardPicker(false)
+    closeBoardPicker()
   }
 
   function handleBoardChange(b: Board) {
@@ -201,6 +208,51 @@ export default function HostPage() {
     setTimeout(() => setCopied(false), 1500)
   }
 
+  function openBoardPicker() {
+    setPickerGroup(null)
+    setCreatingGroup(false)
+    setNewGroupName('')
+    setEditingGroupId(null)
+    setEditingGroupName('')
+    setShowBoardPicker(true)
+  }
+
+  function closeBoardPicker() {
+    setCreatingGroup(false)
+    setNewGroupName('')
+    setEditingGroupId(null)
+    setEditingGroupName('')
+    setShowBoardPicker(false)
+  }
+
+  function commitNewGroup() {
+    const name = newGroupName.trim()
+    if (!name) return
+    boardStore.saveGroup({
+      id: crypto.randomUUID(),
+      name,
+      boardIds: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    })
+    setNewGroupName('')
+    setCreatingGroup(false)
+  }
+
+  function commitGroupRename(id: string) {
+    const name = editingGroupName.trim()
+    if (!name) return
+    const g = boardStore.groups.find((g) => g.id === id)
+    if (!g) return
+    boardStore.saveGroup({ ...g, name, updatedAt: Date.now() })
+    setEditingGroupId(null)
+  }
+
+  function handleDeleteGroup(id: string) {
+    boardStore.deleteGroup(id)
+    if (pickerGroup === id) setPickerGroup(null)
+  }
+
   const board = activeBoard ?? state.board
   const showOverlay = ['question', 'buzzing', 'revealed'].includes(state.phase) && !!state.activeQuestion
 
@@ -243,7 +295,7 @@ export default function HostPage() {
           <div className="flex-1 flex flex-col p-4 gap-4 overflow-auto">
             {!editing && (
               <div className="flex items-center gap-3 flex-wrap">
-                <button className="btn-outline text-sm" onClick={() => setShowBoardPicker(true)}>
+                <button className="btn-outline text-sm" onClick={openBoardPicker}>
                   Select board
                 </button>
                 <button className="btn-ghost text-sm" onClick={() => { if (board) setEditing(true); else handleNewBoard() }}>
@@ -269,7 +321,7 @@ export default function HostPage() {
                 <div className="flex gap-3">
                   <button className="btn-gold" onClick={handleNewBoard}>Create new board</button>
                   {boardStore.boards.length > 0 && (
-                    <button className="btn-outline" onClick={() => setShowBoardPicker(true)}>Load existing board</button>
+                    <button className="btn-outline" onClick={openBoardPicker}>Load existing board</button>
                   )}
                 </div>
               </div>
@@ -300,36 +352,228 @@ export default function HostPage() {
       {/* Board picker modal */}
       {showBoardPicker && (
         <div className="fixed inset-0 z-40 flex items-center justify-center p-4" style={{ background: 'rgba(6,11,40,0.9)' }}>
-          <div className="panel w-full max-w-md">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-condensed font-bold text-lg uppercase" style={{ color: 'var(--gold)' }}>Select board</h2>
-              <button className="btn-ghost text-sm" onClick={() => setShowBoardPicker(false)}>✕</button>
+          <div className="panel w-full max-w-2xl flex flex-col" style={{ height: '70vh' }}>
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4 flex-shrink-0">
+              <h2 className="font-condensed font-bold text-lg uppercase" style={{ color: 'var(--gold)' }}>Select Board</h2>
+              <button className="btn-ghost text-sm" onClick={closeBoardPicker}>✕</button>
             </div>
-            <div className="flex flex-col gap-2 mb-4">
-              {boardStore.boards.map((b) => (
-                <div key={b.id} className="relative group">
-                  <button
-                    className="flex items-center justify-between px-3 py-2 rounded-lg text-left w-full"
-                    style={{ background: 'var(--navy)', border: '1px solid var(--navy-light)' }}
-                    onClick={() => handleSelectBoard(b)}
-                  >
-                    <span className="font-condensed font-bold">{b.name}</span>
-                  </button>
-                  <button
-                    className="absolute top-1/2 right-2 -translate-y-1/2 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:brightness-75"
-                    style={{ background: 'var(--red)', color: '#fff', border: 'none', transition: 'opacity 150ms, filter 150ms' }}
-                    onClick={(e) => { e.stopPropagation(); handleDeleteBoard(b.id) }}
-                    title="Delete board"
-                  >
-                    <Trash2 size={11} />
-                  </button>
+
+            <div className="flex gap-4 flex-1 min-h-0 overflow-hidden">
+              {/* Left: Groups panel */}
+              <div className="w-44 flex-shrink-0 flex flex-col gap-1 overflow-auto">
+                <div className="font-condensed text-xs uppercase tracking-widest mb-1 flex-shrink-0" style={{ color: 'var(--gold)', opacity: 0.7 }}>
+                  Groups
                 </div>
-              ))}
-              {boardStore.boards.length === 0 && (
-                <div className="text-sm text-center py-2" style={{ color: '#4a5580' }}>No saved boards</div>
-              )}
+
+                {/* All boards */}
+                <button
+                  className="text-left px-3 py-2 rounded-lg font-condensed font-bold text-sm flex-shrink-0"
+                  style={{
+                    background: pickerGroup === null ? 'rgba(212,160,23,0.18)' : 'transparent',
+                    border: pickerGroup === null ? '1px solid rgba(212,160,23,0.45)' : '1px solid transparent',
+                    color: pickerGroup === null ? 'var(--gold)' : '#fff',
+                  }}
+                  onClick={() => setPickerGroup(null)}
+                >
+                  All Boards
+                  <span className="ml-1 text-xs" style={{ opacity: 0.5 }}>({boardStore.boards.length})</span>
+                </button>
+
+                {/* Group list */}
+                {boardStore.groups.map((g) =>
+                  editingGroupId === g.id ? (
+                    <div key={g.id} className="flex items-center gap-1 flex-shrink-0">
+                      <input
+                        className="flex-1 px-2 py-1 rounded text-sm font-condensed"
+                        style={{ background: 'var(--navy)', border: '1px solid var(--gold)', color: '#fff', minWidth: 0 }}
+                        value={editingGroupName}
+                        onChange={(e) => setEditingGroupName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitGroupRename(g.id)
+                          if (e.key === 'Escape') setEditingGroupId(null)
+                        }}
+                        autoFocus
+                      />
+                      <button
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--green)', padding: '2px' }}
+                        onClick={() => commitGroupRename(g.id)}
+                        title="Save"
+                      >
+                        <Check size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      key={g.id}
+                      className="group flex items-center gap-1 px-2 py-1.5 rounded-lg flex-shrink-0"
+                      style={{
+                        background: pickerGroup === g.id ? 'rgba(212,160,23,0.18)' : 'transparent',
+                        border: pickerGroup === g.id ? '1px solid rgba(212,160,23,0.45)' : '1px solid transparent',
+                      }}
+                    >
+                      <button
+                        className="flex-1 text-left font-condensed font-bold text-sm truncate"
+                        style={{ background: 'none', border: 'none', color: pickerGroup === g.id ? 'var(--gold)' : '#fff', cursor: 'pointer', minWidth: 0 }}
+                        onClick={() => setPickerGroup(g.id)}
+                      >
+                        <span className="flex items-center gap-1">
+                          <FolderOpen size={12} style={{ flexShrink: 0, opacity: 0.7 }} />
+                          <span className="truncate">{g.name}</span>
+                          <span className="text-xs flex-shrink-0" style={{ opacity: 0.5 }}>
+                            ({boardStore.boards.filter((b) => g.boardIds.includes(b.id)).length})
+                          </span>
+                        </span>
+                      </button>
+                      <button
+                        className="opacity-0 group-hover:opacity-100 flex-shrink-0"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8899cc', padding: '2px', transition: 'opacity 150ms' }}
+                        title="Rename group"
+                        onClick={() => { setEditingGroupId(g.id); setEditingGroupName(g.name) }}
+                      >
+                        <Pencil size={11} />
+                      </button>
+                      <button
+                        className="opacity-0 group-hover:opacity-100 flex-shrink-0"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)', padding: '2px', transition: 'opacity 150ms' }}
+                        title="Delete group"
+                        onClick={() => handleDeleteGroup(g.id)}
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    </div>
+                  )
+                )}
+
+                {/* New group */}
+                <div className="flex-shrink-0 mt-1">
+                  {creatingGroup ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        className="flex-1 px-2 py-1 rounded text-sm font-condensed"
+                        style={{ background: 'var(--navy)', border: '1px solid var(--gold)', color: '#fff', minWidth: 0 }}
+                        placeholder="Group name"
+                        value={newGroupName}
+                        onChange={(e) => setNewGroupName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitNewGroup()
+                          if (e.key === 'Escape') { setCreatingGroup(false); setNewGroupName('') }
+                        }}
+                        autoFocus
+                      />
+                      <button
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--green)', padding: '2px' }}
+                        onClick={commitNewGroup}
+                        title="Create"
+                      >
+                        <Check size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      className="btn-ghost text-sm w-full text-left"
+                      style={{ opacity: 0.8 }}
+                      onClick={() => setCreatingGroup(true)}
+                    >
+                      + New Group
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="w-px flex-shrink-0" style={{ background: 'var(--navy-light)' }} />
+
+              {/* Right: Boards panel */}
+              <div className="flex-1 flex flex-col min-h-0">
+                <div className="flex-1 overflow-auto flex flex-col gap-2 pr-1">
+                  {/* Boards in current view */}
+                  {(pickerGroup
+                    ? boardStore.boards.filter((b) =>
+                        boardStore.groups.find((g) => g.id === pickerGroup)?.boardIds.includes(b.id)
+                      )
+                    : boardStore.boards
+                  ).map((b) => (
+                    <div key={b.id} className="group flex items-center gap-2">
+                      <button
+                        className="flex-1 flex items-center px-3 py-2 rounded-lg text-left"
+                        style={{ background: 'var(--navy)', border: '1px solid var(--navy-light)' }}
+                        onClick={() => handleSelectBoard(b)}
+                      >
+                        <span className="font-condensed font-bold">{b.name}</span>
+                      </button>
+                      <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100" style={{ transition: 'opacity 150ms' }}>
+                        {pickerGroup && (
+                          <button
+                            className="w-6 h-6 rounded flex items-center justify-center text-sm font-bold"
+                            style={{ background: 'rgba(212,160,23,0.12)', border: '1px solid rgba(212,160,23,0.3)', color: 'var(--gold)', cursor: 'pointer' }}
+                            title="Remove from group"
+                            onClick={() => boardStore.removeBoardFromGroup(pickerGroup, b.id)}
+                          >
+                            –
+                          </button>
+                        )}
+                        <button
+                          className="w-6 h-6 rounded flex items-center justify-center"
+                          style={{ background: 'var(--red)', color: '#fff', border: 'none', cursor: 'pointer' }}
+                          title="Delete board"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteBoard(b.id) }}
+                        >
+                          <Trash2 size={11} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Empty state for current view */}
+                  {(pickerGroup
+                    ? boardStore.boards.filter((b) =>
+                        boardStore.groups.find((g) => g.id === pickerGroup)?.boardIds.includes(b.id)
+                      )
+                    : boardStore.boards
+                  ).length === 0 && (
+                    <div className="text-sm text-center py-4" style={{ color: '#4a5580' }}>
+                      {pickerGroup ? 'No boards in this group yet' : 'No saved boards'}
+                    </div>
+                  )}
+
+                  {/* Add boards to group section */}
+                  {pickerGroup && (() => {
+                    const unassigned = boardStore.boards.filter(
+                      (b) => !boardStore.groups.find((g) => g.id === pickerGroup)?.boardIds.includes(b.id)
+                    )
+                    if (unassigned.length === 0) return null
+                    return (
+                      <div className="mt-2">
+                        <div className="text-xs uppercase tracking-widest mb-2" style={{ color: '#4a5580' }}>
+                          Add to group
+                        </div>
+                        {unassigned.map((b) => (
+                          <div
+                            key={b.id}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg mb-1"
+                            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--navy-light)' }}
+                          >
+                            <span className="flex-1 font-condensed text-sm" style={{ color: '#6b7db3' }}>{b.name}</span>
+                            <button
+                              className="text-xs px-2 py-0.5 rounded"
+                              style={{ background: 'rgba(212,160,23,0.15)', border: '1px solid rgba(212,160,23,0.3)', color: 'var(--gold)', cursor: 'pointer' }}
+                              onClick={() => boardStore.addBoardToGroup(pickerGroup, b.id)}
+                            >
+                              + Add
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  })()}
+                </div>
+
+                <button className="btn-gold w-full mt-3 flex-shrink-0" onClick={handleNewBoard}>
+                  + Create New Board
+                </button>
+              </div>
             </div>
-            <button className="btn-gold w-full" onClick={handleNewBoard}>+ Create new board</button>
           </div>
         </div>
       )}

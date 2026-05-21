@@ -1,19 +1,25 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { Board, GameState, GameSettings, Player, Question } from '../types'
+import type { Board, BoardGroup, GameState, GameSettings, Player, Question } from '../types'
 
 // ---- Board editor store (persisted) ----
 interface BoardStore {
   boards: Board[]
+  groups: BoardGroup[]
   saveBoard: (board: Board) => void
   deleteBoard: (id: string) => void
   getBoard: (id: string) => Board | undefined
+  saveGroup: (group: BoardGroup) => void
+  deleteGroup: (id: string) => void
+  addBoardToGroup: (groupId: string, boardId: string) => void
+  removeBoardFromGroup: (groupId: string, boardId: string) => void
 }
 
 export const useBoardStore = create<BoardStore>()(
   persist(
     (set, get) => ({
       boards: [],
+      groups: [],
       saveBoard: (board) =>
         set((s) => {
           const idx = s.boards.findIndex((b) => b.id === board.id)
@@ -25,8 +31,42 @@ export const useBoardStore = create<BoardStore>()(
           return { boards: [...s.boards, board] }
         }),
       deleteBoard: (id) =>
-        set((s) => ({ boards: s.boards.filter((b) => b.id !== id) })),
+        set((s) => ({
+          boards: s.boards.filter((b) => b.id !== id),
+          groups: s.groups.map((g) => ({
+            ...g,
+            boardIds: g.boardIds.filter((bid) => bid !== id),
+          })),
+        })),
       getBoard: (id) => get().boards.find((b) => b.id === id),
+      saveGroup: (group) =>
+        set((s) => {
+          const idx = s.groups.findIndex((g) => g.id === group.id)
+          if (idx >= 0) {
+            const groups = [...s.groups]
+            groups[idx] = group
+            return { groups }
+          }
+          return { groups: [...s.groups, group] }
+        }),
+      deleteGroup: (id) =>
+        set((s) => ({ groups: s.groups.filter((g) => g.id !== id) })),
+      addBoardToGroup: (groupId, boardId) =>
+        set((s) => ({
+          groups: s.groups.map((g) =>
+            g.id === groupId && !g.boardIds.includes(boardId)
+              ? { ...g, boardIds: [...g.boardIds, boardId], updatedAt: Date.now() }
+              : g
+          ),
+        })),
+      removeBoardFromGroup: (groupId, boardId) =>
+        set((s) => ({
+          groups: s.groups.map((g) =>
+            g.id === groupId
+              ? { ...g, boardIds: g.boardIds.filter((id) => id !== boardId), updatedAt: Date.now() }
+              : g
+          ),
+        })),
     }),
     { name: 'jeopardy-boards' }
   )
