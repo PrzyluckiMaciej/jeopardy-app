@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Trash2, X, Check } from 'lucide-react'
 import type { Board, Category, Question } from '../types'
 import { generateId } from '../lib/utils'
 import { saveMedia, deleteMedia, getMedia, blobToDataUrl } from '../lib/db'
@@ -145,10 +145,24 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
             updateBoard({ name: e.target.value })
           }}
         />
-        <div className="flex gap-2 ml-auto">
-          <button className="btn-outline text-sm" onClick={addCategory}>+ Category</button>
-          <button className="btn-ghost text-sm" onClick={discardChanges}>Discard</button>
-          <button className="btn-gold text-sm" onClick={onClose}>Save</button>
+        <button className="btn-outline text-sm" onClick={addCategory}>+ Category</button>
+        <div className="flex-1" />
+        <div className="flex items-center gap-1">
+          <button
+            className="btn-icon"
+            onClick={discardChanges}
+            title="Discard changes"
+          >
+            <X size={22} />
+          </button>
+          <button
+            className="btn-icon"
+            style={{ color: 'var(--gold)' }}
+            onClick={onClose}
+            title="Save"
+          >
+            <Check size={22} />
+          </button>
         </div>
       </div>
 
