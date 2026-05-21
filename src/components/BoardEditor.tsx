@@ -85,7 +85,7 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
       ...cat,
       questions: cat.questions.map((q) => (q.points === oldPts ? { ...q, points: newPts } : q)),
     }))
-    onChange({ ...board, pointValues: newPointValues, categories: newCategories, updatedAt: Date.now() })
+    updateBoard({ pointValues: newPointValues, categories: newCategories })
   }
 
   async function openCell(catId: string, q: Question) {
