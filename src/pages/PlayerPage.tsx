@@ -6,6 +6,7 @@ import * as net from '../lib/network'
 import type { NetMessage, Player } from '../types'
 import { generateId, formatScore } from '../lib/utils'
 import { logEvent } from '../lib/logger'
+import GameBoard from '../components/GameBoard'
 import Scoreboard from '../components/Scoreboard'
 
 export default function PlayerPage() {
@@ -158,9 +159,12 @@ export default function PlayerPage() {
       net.send({ type: 'BUZZ', playerId: myId, playerName: myPlayer?.name ?? playerName }, hostPeerId.current)
     }
   }
+
   const myScore = myPlayer?.score ?? 0
   const isMyTurn = state.buzzQueue[0] === myId
   const activeQ = state.activeQuestion?.question
+  const categoryName = state.board?.categories.find(c => c.id === state.activeQuestion?.categoryId)?.name ?? ''
+  const showOverlay = ['question', 'buzzing', 'revealed'].includes(state.phase) && !!activeQ
 
   useEffect(() => {
     if (!hostLeft) return
@@ -232,6 +236,7 @@ export default function PlayerPage() {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--navy)' }}>
+      {/* Top bar */}
       <div className="flex items-center justify-between border-b" style={{ borderColor: 'var(--navy-light)', background: 'var(--navy-mid)', padding: '10px 24px' }}>
         <div className="font-display text-2xl" style={{ color: 'var(--gold-bright)' }}>JEOPARDY!</div>
         <div className="text-right">
@@ -242,116 +247,201 @@ export default function PlayerPage() {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center p-4 gap-6">
-        {/* Active question */}
-        {activeQ && (
-          <div className="w-full max-w-lg panel text-center card-flip">
-            <div className="font-condensed text-xs uppercase tracking-widest mb-3" style={{ color: 'var(--gold)', opacity: 0.7 }}>
-              ${activeQ.points}
-            </div>
-
-            {state.activeMedia && (
-              <div className="mb-4">
-                {state.activeMedia.type === 'image' && (
-                  <img src={state.activeMedia.dataUrl} className="max-h-40 rounded mx-auto object-contain" alt="Question media" />
-                )}
-                {state.activeMedia.type === 'audio' && (
-                  <audio controls src={state.activeMedia.dataUrl} autoPlay className="mx-auto" />
-                )}
-                {state.activeMedia.type === 'video' && (
-                  <video controls src={state.activeMedia.dataUrl} autoPlay className="max-h-40 rounded mx-auto" />
-                )}
+      {/* Board view */}
+      <div className="flex flex-1 min-h-0">
+        <div className="flex-1 flex flex-col p-4 gap-4 overflow-auto">
+          {state.board ? (
+            <GameBoard
+              board={state.board}
+              answeredCells={state.answeredCells}
+            />
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center gap-2">
+              <div className="font-display text-4xl" style={{ color: 'var(--gold)', opacity: 0.3 }}>?</div>
+              <div className="font-condensed text-lg" style={{ color: '#4a5580' }}>
+                Waiting for host to load a board…
               </div>
-            )}
-
-            <div className="font-condensed font-bold text-xl mb-4" style={{ color: 'var(--white)' }}>
-              {activeQ.question}
             </div>
+          )}
+        </div>
 
-            {state.phase === 'revealed' && (
-              <div className="font-display text-xl px-4 py-2 rounded" style={{ background: 'rgba(212,160,23,0.15)', border: '2px solid var(--gold)', color: 'var(--gold-bright)' }}>
-                {activeQ.answer}
-              </div>
-            )}
+        {/* Scoreboard sidebar */}
+        <div className="w-64 flex-shrink-0 border-l p-4 overflow-auto" style={{ borderColor: 'var(--navy-light)' }}>
+          <div className="font-condensed font-bold uppercase tracking-widest text-xs mb-3" style={{ color: 'var(--gold)', opacity: 0.7 }}>
+            Scoreboard
           </div>
-        )}
-
-        {/* Judge result */}
-        {judgeResult && (
-          <div
-            className="font-display text-4xl text-center rounded-xl card-flip"
-            style={{
-              padding: '28px 56px',
-              background: judgeResult === 'correct' ? 'rgba(39,174,96,0.2)' : 'rgba(192,57,43,0.2)',
-              border: `2px solid ${judgeResult === 'correct' ? 'var(--green)' : 'var(--red)'}`,
-              color: judgeResult === 'correct' ? '#4cd98a' : '#e07070',
-            }}
-          >
-            {judgeResult === 'correct' ? (
-              <span className="inline-flex items-center justify-center gap-3">
-                <Check size={32} aria-hidden />
-                Correct!
-              </span>
-            ) : (
-              <span className="inline-flex items-center justify-center gap-3">
-                <X size={32} aria-hidden />
-                Wrong
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Buzz button */}
-        {state.phase === 'buzzing' && !judgeResult && !(hasBuzzed && !state.buzzQueue.includes(myId)) && (
-          <div className="flex flex-col items-center gap-3">
-            <button
-              className={`w-40 h-40 rounded-full font-display transition-all ${!hasBuzzed && state.phase === 'buzzing' ? 'buzz-btn' : ''}`}
-              style={{
-                background: hasBuzzed
-                  ? isMyTurn ? 'rgba(212,160,23,0.3)' : 'rgba(74,85,128,0.2)'
-                  : 'var(--gold)',
-                border: `4px solid ${hasBuzzed ? (isMyTurn ? 'var(--gold)' : 'var(--navy-light)') : 'var(--gold-bright)'}`,
-                color: hasBuzzed ? (isMyTurn ? 'var(--gold-bright)' : '#4a5580') : 'var(--navy)',
-                fontSize: hasBuzzed ? 14 : 24,
-                cursor: hasBuzzed || state.phase !== 'buzzing' ? 'default' : 'pointer',
-              }}
-              onClick={handleBuzz}
-              disabled={hasBuzzed || state.phase !== 'buzzing'}
-            >
-              {hasBuzzed
-                ? isMyTurn
-                  ? 'YOUR TURN'
-                  : `#${state.buzzQueue.indexOf(myId) + 1} in queue`
-                : 'BUZZ!'}
-            </button>
-            {!hasBuzzed && (
-              <div className="font-condensed text-sm" style={{ color: '#4a5580' }}>
-                {state.buzzQueue.length > 0 ? `${state.buzzQueue.length} player${state.buzzQueue.length > 1 ? 's' : ''} buzzed` : 'Be first to buzz!'}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Idle */}
-        {state.phase === 'board' && !activeQ && (
-          <div className="text-center">
-            <div className="font-condensed text-lg mb-2" style={{ color: '#4a5580' }}>
-              Waiting for host to open a question…
-            </div>
-            <div className="font-display text-4xl" style={{ color: 'var(--gold)', opacity: 0.3 }}>?</div>
-          </div>
-        )}
-
-        {/* Scoreboard */}
-        {state.players.length > 0 && (
-          <div className="w-full max-w-lg">
-            <div className="font-condensed text-xs uppercase tracking-widest mb-2" style={{ color: 'var(--gold)', opacity: 0.5 }}>
-              Scoreboard
-            </div>
-            <Scoreboard players={state.players} buzzQueue={state.buzzQueue} highlightId={myId} />
-          </div>
-        )}
+          <Scoreboard players={state.players} buzzQueue={state.buzzQueue} highlightId={myId} />
+        </div>
       </div>
+
+      {/* Question overlay — mirrors QuestionOverlay layout without host controls */}
+      {showOverlay && activeQ && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col"
+          style={{ background: 'rgba(6,11,40,0.97)', backdropFilter: 'blur(4px)' }}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--navy-light)' }}>
+            <div className="font-condensed font-bold uppercase tracking-wider" style={{ color: 'var(--gold)', fontSize: 14 }}>
+              {categoryName}
+              {categoryName && <span style={{ opacity: 0.5 }}> &nbsp;·&nbsp; </span>}
+              <span className="font-display text-xl" style={{ color: 'var(--gold-bright)' }}>${activeQ.points}</span>
+            </div>
+          </div>
+
+          <div className="flex-1 flex gap-6 p-6 min-h-0">
+            {/* Main question area */}
+            <div className="flex-1 flex flex-col items-center justify-center text-center card-flip">
+              {state.activeMedia && (
+                <div className="mb-6">
+                  {state.activeMedia.type === 'image' && (
+                    <img src={state.activeMedia.dataUrl} className="max-h-48 rounded-lg object-contain mx-auto" alt="Question media" />
+                  )}
+                  {state.activeMedia.type === 'audio' && (
+                    <audio controls src={state.activeMedia.dataUrl} autoPlay className="mx-auto" />
+                  )}
+                  {state.activeMedia.type === 'video' && (
+                    <video controls src={state.activeMedia.dataUrl} autoPlay className="max-h-48 rounded-lg mx-auto" />
+                  )}
+                </div>
+              )}
+
+              <div
+                className="font-condensed font-bold text-3xl md:text-4xl leading-snug mb-6 max-w-2xl"
+                style={{ color: 'var(--white)' }}
+              >
+                {activeQ.question}
+              </div>
+
+              {state.phase === 'revealed' && (
+                <div
+                  className="font-display text-2xl md:text-3xl px-6 py-3 rounded-lg mt-2"
+                  style={{ background: 'rgba(212,160,23,0.15)', border: '2px solid var(--gold)', color: 'var(--gold-bright)' }}
+                >
+                  {activeQ.answer || '—'}
+                </div>
+              )}
+            </div>
+
+            {/* Right panel */}
+            <div className="w-72 flex-shrink-0 flex flex-col gap-4">
+              {/* Buzz button / status */}
+              <div className="panel flex flex-col items-center gap-3">
+                {state.phase === 'buzzing' && !judgeResult && !(hasBuzzed && !state.buzzQueue.includes(myId)) && (
+                  <>
+                    <button
+                      className={`w-32 h-32 rounded-full font-display transition-all ${!hasBuzzed ? 'buzz-btn' : ''}`}
+                      style={{
+                        background: hasBuzzed
+                          ? isMyTurn ? 'rgba(212,160,23,0.3)' : 'rgba(74,85,128,0.2)'
+                          : 'var(--gold)',
+                        border: `4px solid ${hasBuzzed ? (isMyTurn ? 'var(--gold)' : 'var(--navy-light)') : 'var(--gold-bright)'}`,
+                        color: hasBuzzed ? (isMyTurn ? 'var(--gold-bright)' : '#4a5580') : 'var(--navy)',
+                        fontSize: hasBuzzed ? 13 : 22,
+                        cursor: hasBuzzed ? 'default' : 'pointer',
+                      }}
+                      onClick={handleBuzz}
+                      disabled={hasBuzzed}
+                    >
+                      {hasBuzzed
+                        ? isMyTurn
+                          ? 'YOUR TURN'
+                          : `#${state.buzzQueue.indexOf(myId) + 1} in queue`
+                        : 'BUZZ!'}
+                    </button>
+                    {!hasBuzzed && (
+                      <div className="font-condensed text-sm" style={{ color: '#4a5580' }}>
+                        {state.buzzQueue.length > 0
+                          ? `${state.buzzQueue.length} player${state.buzzQueue.length > 1 ? 's' : ''} buzzed`
+                          : 'Be first to buzz!'}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {state.phase === 'question' && (
+                  <div className="font-condensed text-sm text-center" style={{ color: '#4a5580' }}>
+                    Waiting for host to open buzzing…
+                  </div>
+                )}
+
+                {state.phase === 'revealed' && (
+                  <div className="font-condensed text-sm text-center" style={{ color: '#4a5580' }}>
+                    Answer revealed
+                  </div>
+                )}
+
+                {judgeResult && (
+                  <div
+                    className="font-display text-2xl text-center rounded-xl w-full py-3 card-flip"
+                    style={{
+                      background: judgeResult === 'correct' ? 'rgba(39,174,96,0.2)' : 'rgba(192,57,43,0.2)',
+                      border: `2px solid ${judgeResult === 'correct' ? 'var(--green)' : 'var(--red)'}`,
+                      color: judgeResult === 'correct' ? '#4cd98a' : '#e07070',
+                    }}
+                  >
+                    {judgeResult === 'correct' ? (
+                      <span className="inline-flex items-center justify-center gap-2">
+                        <Check size={22} aria-hidden />
+                        Correct!
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center justify-center gap-2">
+                        <X size={22} aria-hidden />
+                        Wrong
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Buzz queue */}
+              {state.buzzQueue.length > 0 && (
+                <div className="panel flex flex-col gap-2">
+                  <div className="font-condensed text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--gold)', opacity: 0.7 }}>
+                    Buzz queue
+                  </div>
+                  {state.buzzQueue.map((pid, idx) => {
+                    const p = state.players.find((pl) => pl.id === pid)
+                    if (!p) return null
+                    return (
+                      <div key={pid} className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <div className="font-condensed font-bold text-sm" style={{ color: pid === myId ? 'var(--gold-bright)' : undefined }}>
+                            {p.name}{pid === myId ? ' (you)' : ''}
+                          </div>
+                          <div className="text-xs" style={{ color: 'var(--gold)' }}>
+                            {p.score < 0 ? `-$${Math.abs(p.score)}` : `$${p.score}`}
+                          </div>
+                        </div>
+                        <div className="text-xs" style={{ color: '#4a5580' }}>#{idx + 1}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Scores */}
+              <div className="panel flex flex-col gap-2 overflow-auto flex-1">
+                <div className="font-condensed text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--gold)', opacity: 0.7 }}>Scores</div>
+                {[...state.players].sort((a, b) => b.score - a.score).map((p) => (
+                  <div key={p.id} className="flex justify-between items-center">
+                    <span
+                      className="font-condensed text-sm truncate"
+                      style={{ color: p.id === myId ? 'var(--gold-bright)' : undefined }}
+                    >
+                      {p.name}{p.id === myId ? ' (you)' : ''}
+                    </span>
+                    <span className="font-display text-base" style={{ color: p.score < 0 ? '#e07070' : 'var(--gold-bright)' }}>
+                      {p.score < 0 ? `-$${Math.abs(p.score)}` : `$${p.score}`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

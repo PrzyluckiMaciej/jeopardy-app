@@ -8,6 +8,7 @@ import { createDefaultBoard, cellId } from '../lib/utils'
 import { getMedia, blobToDataUrl } from '../lib/db'
 import { logEvent } from '../lib/logger'
 import BoardEditor from '../components/BoardEditor'
+import GameBoard from '../components/GameBoard'
 import QuestionOverlay from '../components/QuestionOverlay'
 import SettingsPanel from '../components/SettingsPanel'
 import Scoreboard from '../components/Scoreboard'
@@ -336,55 +337,6 @@ export default function HostPage() {
           onClose={() => {}}
         />
       )}
-    </div>
-  )
-}
-
-function GameBoard({ board, answeredCells, onOpenCell }: {
-  board: Board
-  answeredCells: string[]
-  onOpenCell: (categoryId: string, q: Question) => void
-}) {
-  return (
-    <div className="overflow-auto">
-      <div
-        className="grid gap-2 min-w-max"
-        style={{ gridTemplateColumns: `repeat(${board.categories.length}, minmax(140px, 1fr))` }}
-      >
-        {board.categories.map((cat) => (
-          <div
-            key={cat.id}
-            className="flex items-center justify-center text-center px-2 py-4 rounded font-condensed font-bold uppercase"
-            style={{ background: 'var(--navy-mid)', border: '2px solid var(--navy-light)', letterSpacing: 1, fontSize: 14, minHeight: 72 }}
-          >
-            {cat.name}
-          </div>
-        ))}
-
-        {board.pointValues.map((pts) =>
-          board.categories.map((cat) => {
-            const q = cat.questions.find((q) => q.points === pts)
-            if (!q) return <div key={`${cat.id}-${pts}`} />
-            const isAnswered = answeredCells.includes(cellId(cat.id, q.id))
-            return (
-              <button
-                key={q.id}
-                className={`board-cell rounded flex flex-col items-center justify-center gap-1 ${isAnswered ? 'answered' : ''}`}
-                style={{ minHeight: 90 }}
-                onClick={() => !isAnswered && onOpenCell(cat.id, q)}
-                disabled={isAnswered}
-              >
-                <span className="font-display text-3xl" style={{ color: isAnswered ? '#4a5580' : 'var(--gold-bright)' }}>
-                  ${pts}
-                </span>
-                {q.mediaId && !isAnswered && (
-                  <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: 'var(--gold)', opacity: 0.6 }} />
-                )}
-              </button>
-            )
-          })
-        )}
-      </div>
     </div>
   )
 }
