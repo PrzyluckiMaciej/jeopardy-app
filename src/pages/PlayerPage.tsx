@@ -111,11 +111,14 @@ export default function PlayerPage() {
       }
       if (msg.type === 'DAILY_DOUBLE_ACCEPT_BET') {
         patchState({
-          phase: 'question',
+          phase: 'dailyDoubleBet',
           dailyDouble: useGameStore.getState().state.dailyDouble
             ? { ...useGameStore.getState().state.dailyDouble!, wager: msg.wager }
             : null,
         })
+      }
+      if (msg.type === 'DAILY_DOUBLE_REVEAL_CLUE') {
+        patchState({ phase: 'question' })
       }
       if (msg.type === 'START_BUZZING') {
         patchState({ phase: 'buzzing', buzzQueue: [] })
@@ -392,6 +395,21 @@ export default function PlayerPage() {
                 <div className="daily-double-title">DAILY DOUBLE!</div>
               )}
 
+              {/* DD wager submitted — waiting for host to reveal clue */}
+              {state.phase === 'dailyDoubleBet' && (
+                <div className="flex flex-col items-center gap-4">
+                  <div className="daily-double-title" style={{ fontSize: 'clamp(2rem, 5vw, 3.5rem)' }}>DAILY DOUBLE!</div>
+                  {state.dailyDouble?.wager != null && (
+                    <div className="font-condensed text-2xl" style={{ color: 'var(--gold-bright)' }}>
+                      Wager: <span className="font-display">${state.dailyDouble.wager}</span>
+                    </div>
+                  )}
+                  <div className="font-condensed text-lg animate-pulse" style={{ color: '#4a5580' }}>
+                    Waiting for host to reveal the clue…
+                  </div>
+                </div>
+              )}
+
               {/* Clue (shown in question/buzzing/revealed phases) */}
               {(state.phase === 'question' || state.phase === 'buzzing' || state.phase === 'revealed') && (
                 <>
@@ -471,6 +489,24 @@ export default function PlayerPage() {
                       Waiting for {ddPlayerInfo?.name ?? 'player'} to wager…
                     </div>
                   )
+                )}
+
+                {/* DD: bet phase — wager confirmed, waiting for host to reveal clue */}
+                {isDD && state.phase === 'dailyDoubleBet' && (
+                  <div className="w-full flex flex-col gap-2 items-center">
+                    {isDDPlayer ? (
+                      <div className="font-condensed text-sm text-center" style={{ color: 'var(--gold-bright)' }}>
+                        Wager submitted: <span className="font-display text-lg">${state.dailyDouble?.wager}</span>
+                      </div>
+                    ) : (
+                      <div className="font-condensed text-sm text-center" style={{ color: '#8899cc' }}>
+                        {ddPlayerInfo?.name} wagered <span className="font-display">${state.dailyDouble?.wager}</span>
+                      </div>
+                    )}
+                    <div className="font-condensed text-sm text-center" style={{ color: '#4a5580' }}>
+                      Waiting for host to reveal the clue…
+                    </div>
+                  </div>
                 )}
 
                 {/* DD: question phase — waiting for host to judge */}

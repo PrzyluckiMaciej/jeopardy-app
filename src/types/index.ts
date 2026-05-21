@@ -87,6 +87,7 @@ export type NetMessage =
   | { type: 'DAILY_DOUBLE_REVEAL'; playerId: string; categoryId: string; question: Question; mediaDataUrl?: string }
   | { type: 'DAILY_DOUBLE_BET'; wager: number; playerId: string }
   | { type: 'DAILY_DOUBLE_ACCEPT_BET'; wager: number }
+  | { type: 'DAILY_DOUBLE_REVEAL_CLUE' }
 
 export interface GameSettings {
   pointDeduction: boolean
