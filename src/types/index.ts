@@ -29,6 +29,14 @@ export interface Board {
   updatedAt: number
 }
 
+export interface BoardGroup {
+  id: string
+  name: string
+  boardIds: string[]
+  createdAt: number
+  updatedAt: number
+}
+
 export interface Player {
   id: string
   name: string
