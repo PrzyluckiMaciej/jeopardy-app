@@ -17,7 +17,6 @@ export default function PlayerPage() {
   const [connected, setConnected] = useState(false)
   const [hasBuzzed, setHasBuzzed] = useState(false)
   const [judgeResult, setJudgeResult] = useState<'correct' | 'wrong' | null>(null)
-  const [buzzCount, setBuzzCount] = useState(0)
   const [hostLeft, setHostLeft] = useState(false)
   const hostPeerId = useRef<string | null>(null)
 
@@ -60,7 +59,6 @@ export default function PlayerPage() {
       if (msg.type === 'OPEN_CARD') {
         setHasBuzzed(false)
         setJudgeResult(null)
-        setBuzzCount(0)
         let mediaType: 'image' | 'audio' | 'video' | undefined
         if (msg.mediaDataUrl) {
           if (msg.mediaDataUrl.startsWith('data:image')) mediaType = 'image'
@@ -85,9 +83,8 @@ export default function PlayerPage() {
         patchState({ phase: 'buzzing', buzzQueue: [] })
         setHasBuzzed(false)
       }
-      if (msg.type === 'BUZZ') {
+      if (msg.type === 'BUZZ' && peerId === hostPeerId.current) {
         addBuzz(msg.playerId)
-        setBuzzCount((c) => c + 1)
       }
       if (msg.type === 'JUDGE') {
         const { playerId, correct, pointDelta } = msg
@@ -156,7 +153,9 @@ export default function PlayerPage() {
   function handleBuzz() {
     if (hasBuzzed || state.phase !== 'buzzing') return
     setHasBuzzed(true)
-    net.broadcast({ type: 'BUZZ', playerId: myId, playerName: myPlayer?.name ?? playerName })
+    if (hostPeerId.current) {
+      net.send({ type: 'BUZZ', playerId: myId, playerName: myPlayer?.name ?? playerName }, hostPeerId.current)
+    }
   }
   const myScore = myPlayer?.score ?? 0
   const isMyTurn = state.buzzQueue[0] === myId
@@ -291,7 +290,7 @@ export default function PlayerPage() {
         )}
 
         {/* Buzz button */}
-        {(state.phase === 'buzzing' || state.phase === 'judging') && !judgeResult && (
+        {state.phase === 'buzzing' && !judgeResult && (
           <div className="flex flex-col items-center gap-3">
             <button
               className={`w-40 h-40 rounded-full font-display transition-all ${!hasBuzzed && state.phase === 'buzzing' ? 'buzz-btn' : ''}`}
@@ -315,7 +314,7 @@ export default function PlayerPage() {
             </button>
             {!hasBuzzed && (
               <div className="font-condensed text-sm" style={{ color: '#4a5580' }}>
-                {buzzCount > 0 ? `${buzzCount} player${buzzCount > 1 ? 's' : ''} buzzed` : 'Be first to buzz!'}
+                {state.buzzQueue.length > 0 ? `${state.buzzQueue.length} player${state.buzzQueue.length > 1 ? 's' : ''} buzzed` : 'Be first to buzz!'}
               </div>
             )}
           </div>

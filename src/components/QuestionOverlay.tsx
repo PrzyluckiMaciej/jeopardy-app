@@ -124,9 +124,9 @@ export default function QuestionOverlay({ state, settings }: Props) {
               </button>
             )}
 
-            {(phase === 'buzzing' || phase === 'judging') && (
+            {phase === 'buzzing' && (
               <div className="text-sm font-condensed" style={{ color: '#8899cc' }}>
-                {phase === 'buzzing' ? 'Waiting for buzzes…' : 'Judging…'}
+                {buzzQueue.length > 0 ? 'Judging…' : 'Waiting for buzzes…'}
               </div>
             )}
 
@@ -154,7 +154,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
                         {p.score < 0 ? `-$${Math.abs(p.score)}` : `$${p.score}`}
                       </div>
                     </div>
-                    {idx === 0 && phase === 'judging' && (
+                    {idx === 0 && phase === 'buzzing' && (
                       <div className="flex gap-2">
                         <button
                           className="relative group w-8 h-8 rounded flex items-center justify-center"

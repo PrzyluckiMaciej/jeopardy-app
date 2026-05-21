@@ -170,7 +170,6 @@ export const useGameStore = create<GameStore>()(
           return {
             state: {
               ...s.state,
-              phase: 'judging',
               buzzQueue: [...s.state.buzzQueue, playerId],
             },
           }
