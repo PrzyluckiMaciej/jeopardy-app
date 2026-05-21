@@ -269,7 +269,6 @@ export default function HostPage() {
                   onClick={() => handleSelectBoard(b)}
                 >
                   <span className="font-condensed font-bold">{b.name}</span>
-                  <span className="text-xs" style={{ color: '#4a5580' }}>{b.categories.length} cats</span>
                 </button>
               ))}
               {boardStore.boards.length === 0 && (
