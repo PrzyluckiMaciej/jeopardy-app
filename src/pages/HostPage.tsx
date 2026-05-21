@@ -255,7 +255,11 @@ export default function HostPage() {
 
             {editing && board ? (
               <div className="flex-1 min-h-0">
-                <BoardEditor board={board} onChange={handleBoardChange} onClose={() => setEditing(false)} />
+                <BoardEditor board={board} onChange={handleBoardChange} onClose={() => {
+                  setEditing(false)
+                  const current = useGameStore.getState().state
+                  net.broadcast({ type: 'SYNC_STATE', state: current })
+                }} />
               </div>
             ) : board ? (
               <GameBoard board={board} answeredCells={state.answeredCells} onOpenCell={handleOpenCell} />
