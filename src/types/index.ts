@@ -40,8 +40,7 @@ export type GamePhase =
   | 'lobby'       // waiting for players
   | 'board'       // main board visible
   | 'question'    // a card is open
-  | 'buzzing'     // players can buzz
-  | 'judging'     // host judging a buzz
+  | 'buzzing'     // players can buzz (host judges first in queue while others keep buzzing)
   | 'revealed'    // answer revealed
 
 export interface GameState {

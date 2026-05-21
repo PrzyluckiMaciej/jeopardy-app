@@ -201,7 +201,7 @@ export default function HostPage() {
   }
 
   const board = activeBoard ?? state.board
-  const showOverlay = ['question', 'buzzing', 'judging', 'revealed'].includes(state.phase) && !!state.activeQuestion
+  const showOverlay = ['question', 'buzzing', 'revealed'].includes(state.phase) && !!state.activeQuestion
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--navy)' }}>
