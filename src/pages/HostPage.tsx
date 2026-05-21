@@ -228,12 +228,13 @@ export default function HostPage() {
   function commitNewGroup() {
     const name = newGroupName.trim()
     if (!name) return
+    const now = Date.now()
     boardStore.saveGroup({
       id: crypto.randomUUID(),
       name,
       boardIds: [],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      createdAt: now,
+      updatedAt: now,
     })
     setNewGroupName('')
     setCreatingGroup(false)
@@ -244,7 +245,8 @@ export default function HostPage() {
     if (!name) return
     const g = boardStore.groups.find((g) => g.id === id)
     if (!g) return
-    boardStore.saveGroup({ ...g, name, updatedAt: Date.now() })
+    const updatedAt = Date.now()
+    boardStore.saveGroup({ ...g, name, updatedAt })
     setEditingGroupId(null)
   }
 
