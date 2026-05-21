@@ -19,7 +19,14 @@ export default function PlayerPage() {
   const [judgeResult, setJudgeResult] = useState<'correct' | 'wrong' | null>(null)
   const [buzzCount, setBuzzCount] = useState(0)
 
-  const [myId] = useState(generateId)
+  const [myId] = useState(() => {
+    if (!roomCode) return generateId()
+    const key = `jeopardy-player-id-${roomCode}`
+    let id = localStorage.getItem(key)
+    if (!id) { id = generateId(); localStorage.setItem(key, id) }
+    return id
+  })
+  const [nameTaken, setNameTaken] = useState(false)
   const hasLoggedJoin = useRef(false)
 
   useEffect(() => {
@@ -108,8 +115,12 @@ export default function PlayerPage() {
       if (msg.type === 'UPDATE_PLAYER') {
         updatePlayer(msg.player)
       }
+      if (msg.type === 'JOIN_REJECTED') {
+        if (msg.reason === 'NAME_TAKEN') setNameTaken(true)
+      }
       if (msg.type === 'REMOVE_PLAYER') {
         if (msg.playerId === myId) {
+          localStorage.removeItem(`jeopardy-player-id-${roomCode}`)
           alert('You have been removed from the game.')
           navigate('/')
         } else {
@@ -137,6 +148,29 @@ export default function PlayerPage() {
   const myScore = myPlayer?.score ?? 0
   const isMyTurn = state.buzzQueue[0] === myId
   const activeQ = state.activeQuestion?.question
+
+  if (nameTaken) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ background: 'var(--navy)' }}>
+        <div className="font-display text-4xl" style={{ color: 'var(--gold-bright)' }}>JEOPARDY!</div>
+        <div className="font-condensed text-xl" style={{ color: 'var(--red)' }}>
+          That name is already taken.
+        </div>
+        <div className="text-sm text-center max-w-xs" style={{ color: '#4a5580' }}>
+          Someone in room <span style={{ color: 'var(--gold)' }}>{roomCode}</span> is already using the name <span style={{ color: 'var(--white)' }}>"{playerName}"</span>. Please go back and choose a different name.
+        </div>
+        <button
+          className="btn-outline mt-2"
+          onClick={() => {
+            localStorage.removeItem(`jeopardy-player-id-${roomCode}`)
+            navigate('/')
+          }}
+        >
+          Back to home
+        </button>
+      </div>
+    )
+  }
 
   if (!connected) {
     return (
