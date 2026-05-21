@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Settings, Trash2, Pencil, Check, FolderOpen } from 'lucide-react'
+import { Settings, Trash2, Pencil, Check, FolderOpen, LogOut } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useGameStore, useBoardStore } from '../store/gameStore'
 import * as net from '../lib/network'
@@ -220,6 +220,13 @@ export default function HostPage() {
     setTimeout(() => setCopied(false), 1500)
   }
 
+  function handleExitRoom() {
+    if (!window.confirm('Exit the room? All players will be disconnected.')) return
+    net.leaveRoom()
+    store.reset()
+    navigate('/')
+  }
+
   function openBoardPicker() {
     setPickerGroup(null)
     setCreatingGroup(false)
@@ -280,17 +287,19 @@ export default function HostPage() {
         </div>
         <div className="flex-1" />
         <button
-          className="flex items-center justify-center p-1"
-          style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            color: tab === 'settings' ? 'var(--gold)' : '#4a5580',
-          }}
+          className="btn-icon"
+          style={{ color: tab === 'settings' ? 'var(--gold)' : undefined }}
           onClick={() => setTab(tab === 'settings' ? 'board' : 'settings')}
           title={tab === 'settings' ? 'Back to board' : 'Settings'}
         >
-          <Settings size={28} />
+          <Settings size={26} />
+        </button>
+        <button
+          className="btn-icon-exit"
+          onClick={handleExitRoom}
+          title="Exit room"
+        >
+          <LogOut size={22} />
         </button>
       </div>
 
