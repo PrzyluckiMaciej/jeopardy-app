@@ -23,6 +23,12 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
   const [editingRowPts, setEditingRowPts] = useState<number | null>(null)
   const [editingRowText, setEditingRowText] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+  const initialBoard = useRef<Board>(board)
+
+  function discardChanges() {
+    onChange(initialBoard.current)
+    onClose()
+  }
 
   const activeQ = editingCell
     ? board.categories.find((c) => c.id === editingCell.categoryId)
@@ -141,6 +147,7 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
         />
         <div className="flex gap-2 ml-auto">
           <button className="btn-outline text-sm" onClick={addCategory}>+ Category</button>
+          <button className="btn-ghost text-sm" onClick={discardChanges}>Discard</button>
           <button className="btn-gold text-sm" onClick={onClose}>Save</button>
         </div>
       </div>
