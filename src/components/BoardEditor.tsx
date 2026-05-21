@@ -177,7 +177,7 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                     className="board-cell rounded"
                     style={{
                       minHeight: 72,
-                      border: isActive ? '2px solid var(--gold)' : undefined,
+                      border: isActive ? '2px solid var(--gold)' : '2px solid var(--navy-light)',
                       position: 'relative',
                     }}
                     onClick={() => openCell(cat.id, q)}
