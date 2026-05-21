@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Settings } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useGameStore, useBoardStore } from '../store/gameStore'
 import * as net from '../lib/network'
@@ -181,7 +182,7 @@ export default function HostPage() {
         </div>
         <div className="flex-1" />
         <button
-          className="font-condensed text-sm uppercase px-4 py-1 rounded"
+          className="flex items-center justify-center p-2 rounded"
           style={{
             background: tab === 'settings' ? 'var(--navy-light)' : 'var(--navy)',
             color: tab === 'settings' ? 'var(--gold)' : '#4a5580',
@@ -190,8 +191,9 @@ export default function HostPage() {
             letterSpacing: '0.05em',
           }}
           onClick={() => setTab('settings')}
+          title="Settings"
         >
-          Settings
+          <Settings size={18} />
         </button>
       </div>
 
