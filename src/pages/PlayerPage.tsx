@@ -152,8 +152,8 @@ export default function PlayerPage() {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--navy)' }}>
-      <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--navy-light)', background: 'var(--navy-mid)' }}>
-        <div className="font-display text-xl" style={{ color: 'var(--gold-bright)' }}>JEOPARDY!</div>
+      <div className="flex items-center justify-between border-b" style={{ borderColor: 'var(--navy-light)', background: 'var(--navy-mid)', padding: '10px 24px' }}>
+        <div className="font-display text-2xl" style={{ color: 'var(--gold-bright)' }}>JEOPARDY!</div>
         <div className="text-right">
           <div className="font-condensed font-bold" style={{ color: 'var(--white)' }}>{playerName}</div>
           <div className="font-display text-xl" style={{ color: myScore < 0 ? '#e07070' : 'var(--gold-bright)' }}>
