@@ -74,7 +74,6 @@ const defaultState: GameState = {
 
 const defaultSettings: GameSettings = {
   negativePoints: false,
-  showScoresToPlayers: true,
 }
 
 export const useGameStore = create<GameStore>()((set) => ({

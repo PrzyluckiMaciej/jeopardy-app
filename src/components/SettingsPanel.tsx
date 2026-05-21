@@ -59,12 +59,6 @@ export default function SettingsPanel({
             value={settings.negativePoints}
             onChange={() => toggle('negativePoints')}
           />
-          <Toggle
-            label="Show scores to players"
-            description="Players can see the scoreboard"
-            value={settings.showScoresToPlayers}
-            onChange={() => toggle('showScoresToPlayers')}
-          />
         </div>
       </div>
 

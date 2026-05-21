@@ -73,5 +73,4 @@ export type NetMessage =
 
 export interface GameSettings {
   negativePoints: boolean
-  showScoresToPlayers: boolean
 }
