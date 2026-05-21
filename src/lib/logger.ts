@@ -1,3 +1,5 @@
+import { track } from '@vercel/analytics'
+
 export interface LogPayload {
   role: 'host' | 'player'
   roomCode: string
@@ -13,4 +15,9 @@ export function logEvent(payload: LogPayload): void {
     headers: { 'Content-Type': 'application/json' },
     body,
   }).catch(() => undefined)
+  track(payload.event, {
+    role: payload.role,
+    roomCode: payload.roomCode,
+    actor: payload.actor,
+  })
 }
