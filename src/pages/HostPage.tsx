@@ -287,15 +287,15 @@ export default function HostPage() {
         </div>
         <div className="flex-1" />
         <button
-          className="flex items-center justify-center p-2 rounded-lg border-none cursor-pointer bg-transparent transition-colors hover:bg-white/[0.07]"
-          style={{ color: tab === 'settings' ? 'var(--gold)' : '#4a5580' }}
+          className="btn-icon"
+          style={{ color: tab === 'settings' ? 'var(--gold)' : undefined }}
           onClick={() => setTab(tab === 'settings' ? 'board' : 'settings')}
           title={tab === 'settings' ? 'Back to board' : 'Settings'}
         >
           <Settings size={26} />
         </button>
         <button
-          className="flex items-center justify-center p-2 rounded-lg border-none cursor-pointer bg-transparent transition-colors text-[#4a5580] hover:bg-red-500/10 hover:text-red-400"
+          className="btn-icon-exit"
           onClick={handleExitRoom}
           title="Exit room"
         >
