@@ -89,7 +89,7 @@ export default function PlayerPage() {
         addBuzz(msg.playerId)
       }
       if (msg.type === 'JUDGE') {
-        const { playerId, correct, pointDelta } = msg
+        const { playerId, correct, pointDelta, boardControlId } = msg
         patchState({
           phase: correct ? 'revealed' : 'buzzing',
           players: useGameStore.getState().state.players.map(p =>
@@ -98,6 +98,7 @@ export default function PlayerPage() {
           buzzQueue: correct
             ? useGameStore.getState().state.buzzQueue
             : useGameStore.getState().state.buzzQueue.filter(id => id !== playerId),
+          ...(boardControlId != null && { boardControlId }),
         })
         if (playerId === myId) {
           setJudgeResult(correct ? 'correct' : 'wrong')
@@ -132,6 +133,9 @@ export default function PlayerPage() {
         } else {
           removePlayer(msg.playerId)
         }
+      }
+      if (msg.type === 'SET_BOARD_CONTROL') {
+        patchState({ boardControlId: msg.playerId })
       }
       if (msg.type === 'UPDATE_SETTINGS') {
         setSettings(msg.settings)
@@ -247,6 +251,18 @@ export default function PlayerPage() {
       <div className="flex items-center justify-between border-b" style={{ borderColor: 'var(--navy-light)', background: 'var(--navy-mid)', padding: '10px 24px' }}>
         <div className="font-display text-2xl" style={{ color: 'var(--gold-bright)' }}>JEOPARDY!</div>
         <div className="flex items-center gap-3">
+          {state.boardControlId === myId && (
+            <div
+              className="font-condensed text-xs px-2 py-1 rounded"
+              style={{
+                background: 'rgba(0,200,180,0.2)',
+                color: '#40e0d0',
+                border: '1px solid rgba(0,200,180,0.45)',
+              }}
+            >
+              YOUR TURN TO PICK
+            </div>
+          )}
           <div className="text-right">
             <div className="font-condensed font-bold" style={{ color: 'var(--white)' }}>{myPlayer?.name ?? playerName}</div>
             <div className="font-display text-xl" style={{ color: myScore < 0 ? '#e07070' : 'var(--gold-bright)' }}>
@@ -286,7 +302,7 @@ export default function PlayerPage() {
           <div className="font-condensed font-bold uppercase tracking-widest text-xs mb-3" style={{ color: 'var(--gold)', opacity: 0.7 }}>
             Scoreboard
           </div>
-          <Scoreboard players={state.players} buzzQueue={state.buzzQueue} highlightId={myId} />
+          <Scoreboard players={state.players} buzzQueue={state.buzzQueue} highlightId={myId} boardControlId={state.boardControlId} />
         </div>
       </div>
 

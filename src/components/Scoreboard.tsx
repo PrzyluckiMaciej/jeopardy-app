@@ -5,9 +5,10 @@ interface Props {
   players: Player[]
   buzzQueue?: string[]
   highlightId?: string
+  boardControlId?: string | null
 }
 
-export default function Scoreboard({ players, buzzQueue = [], highlightId }: Props) {
+export default function Scoreboard({ players, buzzQueue = [], highlightId, boardControlId }: Props) {
   const sorted = [...players].sort((a, b) => b.score - a.score)
 
   return (
@@ -17,6 +18,7 @@ export default function Scoreboard({ players, buzzQueue = [], highlightId }: Pro
         const isBuzzed = buzzPos >= 0
         const isFirst = buzzPos === 0
         const isHighlighted = p.id === highlightId
+        const hasControl = boardControlId != null && p.id === boardControlId
 
         return (
           <div
@@ -49,6 +51,18 @@ export default function Scoreboard({ players, buzzQueue = [], highlightId }: Pro
                 {formatScore(p.score)}
               </div>
             </div>
+            {hasControl && (
+              <div
+                className="font-condensed text-xs px-2 py-1 rounded"
+                style={{
+                  background: 'rgba(0,200,180,0.2)',
+                  color: '#40e0d0',
+                  border: '1px solid rgba(0,200,180,0.45)',
+                }}
+              >
+                BOARD
+              </div>
+            )}
             {isBuzzed && (
               <div
                 className="font-condensed text-xs px-2 py-1 rounded"

@@ -35,7 +35,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
       pointDelta = Math.max(pointDelta, -player.score)
     }
     store.judgeAnswer(playerId, correct, pointDelta)
-    net.broadcast({ type: 'JUDGE', playerId, correct, pointDelta })
+    net.broadcast({ type: 'JUDGE', playerId, correct, pointDelta, ...(correct && { boardControlId: playerId }) })
     const playerName = player?.name ?? playerId
     const newScore = (player?.score ?? 0) + pointDelta
     const pointLabel = pointDelta === 0

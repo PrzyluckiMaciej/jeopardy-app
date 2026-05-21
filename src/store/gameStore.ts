@@ -98,6 +98,7 @@ interface GameStore {
   removePlayer: (id: string) => void
   updatePlayer: (player: Player) => void
   setPlayerConnected: (id: string, connected: boolean) => void
+  setBoardControl: (id: string | null) => void
   openCard: (categoryId: string, question: Question, mediaDataUrl?: string) => void
   closeCard: () => void
   startBuzzing: () => void
@@ -118,6 +119,7 @@ const defaultState: GameState = {
   activeQuestion: null,
   buzzQueue: [],
   activeMedia: null,
+  boardControlId: null,
 }
 
 const defaultSettings: GameSettings = {
@@ -177,6 +179,9 @@ export const useGameStore = create<GameStore>()(
             ),
           },
         })),
+
+      setBoardControl: (id) =>
+        set((s) => ({ state: { ...s.state, boardControlId: id } })),
 
       openCard: (categoryId, question, mediaDataUrl) =>
         set((s) => {
@@ -238,6 +243,7 @@ export const useGameStore = create<GameStore>()(
             buzzQueue: correct
               ? s.state.buzzQueue
               : s.state.buzzQueue.filter((id) => id !== playerId),
+            ...(correct && { boardControlId: playerId }),
           },
         })),
 
@@ -266,6 +272,7 @@ export const useGameStore = create<GameStore>()(
             activeQuestion: null,
             buzzQueue: [],
             activeMedia: null,
+            boardControlId: null,
           },
         })),
 
