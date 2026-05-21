@@ -2,6 +2,7 @@ import type { GameState, GameSettings } from '../types'
 import { cellId } from '../lib/utils'
 import * as net from '../lib/network'
 import { useGameStore } from '../store/gameStore'
+import { logEvent } from '../lib/logger'
 
 interface Props {
   state: GameState
@@ -12,6 +13,7 @@ interface Props {
 export default function QuestionOverlay({ state, settings }: Props) {
   const { activeQuestion, phase, buzzQueue, players, activeMedia } = state
   const store = useGameStore()
+  const roomCode = useGameStore(s => s.roomCode) ?? ''
 
   if (!activeQuestion) return null
   const { question, categoryId } = activeQuestion
@@ -29,6 +31,22 @@ export default function QuestionOverlay({ state, settings }: Props) {
       : 0
     store.judgeAnswer(playerId, correct, pointDelta)
     net.broadcast({ type: 'JUDGE', playerId, correct, pointDelta })
+
+    const player = players.find(p => p.id === playerId)
+    const playerName = player?.name ?? playerId
+    const newScore = (player?.score ?? 0) + pointDelta
+    const pointLabel = pointDelta === 0
+      ? 'no penalty'
+      : pointDelta > 0
+      ? `+$${pointDelta}`
+      : `-$${Math.abs(pointDelta)}`
+    const verdict = correct ? 'answered correctly' : 'answered incorrectly'
+    logEvent({
+      role: 'host',
+      roomCode,
+      actor: 'host',
+      event: `${playerName} ${verdict} — ${pointLabel} (score: $${newScore}) | question: "${question.question}" ($${question.points})`,
+    })
   }
 
   function handleReveal() {
