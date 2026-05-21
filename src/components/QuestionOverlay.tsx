@@ -186,20 +186,22 @@ export default function QuestionOverlay({ state, settings }: Props) {
                 </div>
                 <div className="flex gap-2">
                   <button
-                    className="relative group flex-1 h-10 rounded flex items-center justify-center gap-2"
+                    className="relative group w-8 h-8 rounded flex items-center justify-center"
                     style={{ background: 'rgba(39,174,96,0.2)', border: '1px solid var(--green)', color: '#4cd98a' }}
                     onClick={() => handleJudge(ddPlayer.id, true)}
+                    aria-label="Accept answer"
                   >
                     <Check size={16} />
-                    <span className="font-condensed font-bold text-sm">Correct</span>
+                    <span className="judge-tooltip judge-tooltip--accept" role="tooltip">Accept</span>
                   </button>
                   <button
-                    className="relative group flex-1 h-10 rounded flex items-center justify-center gap-2"
+                    className="relative group w-8 h-8 rounded flex items-center justify-center"
                     style={{ background: 'rgba(192,57,43,0.2)', border: '1px solid var(--red)', color: '#e07070' }}
                     onClick={() => handleJudge(ddPlayer.id, false)}
+                    aria-label="Decline answer"
                   >
                     <X size={16} />
-                    <span className="font-condensed font-bold text-sm">Wrong</span>
+                    <span className="judge-tooltip judge-tooltip--decline" role="tooltip">Decline</span>
                   </button>
                 </div>
               </div>
