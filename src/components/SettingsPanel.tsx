@@ -45,10 +45,17 @@ export default function SettingsPanel({
         </div>
         <div className="flex flex-col gap-3">
           <Toggle
-            label="Negative points"
+            label="Point deduction"
             description="Wrong answers deduct the question value"
-            value={settings.negativePoints}
-            onChange={() => toggle('negativePoints')}
+            value={settings.pointDeduction}
+            onChange={() => toggle('pointDeduction')}
+          />
+          <Toggle
+            label="Negative points"
+            description="Deductions can reduce a score below zero"
+            value={settings.allowNegativeScore}
+            onChange={() => toggle('allowNegativeScore')}
+            disabled={!settings.pointDeduction}
           />
         </div>
       </div>
@@ -124,17 +131,23 @@ export default function SettingsPanel({
   )
 }
 
-function Toggle({ label, description, value, onChange }: {
+function Toggle({ label, description, value, onChange, disabled }: {
   label: string
   description: string
   value: boolean
   onChange: () => void
+  disabled?: boolean
 }) {
   return (
     <div
-      className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer"
-      style={{ background: 'var(--navy)', border: '1px solid var(--navy-light)' }}
-      onClick={onChange}
+      className="flex items-center gap-3 px-3 py-2 rounded-lg"
+      style={{
+        background: 'var(--navy)',
+        border: '1px solid var(--navy-light)',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.45 : 1,
+      }}
+      onClick={disabled ? undefined : onChange}
     >
       <div className="flex-1">
         <div className="font-condensed font-bold text-sm">{label}</div>

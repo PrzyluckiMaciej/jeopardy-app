@@ -72,5 +72,6 @@ export type NetMessage =
   | { type: 'JOIN_REJECTED'; reason: 'NAME_TAKEN' }
 
 export interface GameSettings {
-  negativePoints: boolean
+  pointDeduction: boolean
+  allowNegativeScore: boolean
 }

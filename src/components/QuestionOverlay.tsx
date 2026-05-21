@@ -25,15 +25,17 @@ export default function QuestionOverlay({ state, settings }: Props) {
   }
 
   function handleJudge(playerId: string, correct: boolean) {
-    const pointDelta = correct
+    const player = players.find(p => p.id === playerId)
+    let pointDelta = correct
       ? question.points
-      : settings.negativePoints
+      : settings.pointDeduction
       ? -question.points
       : 0
+    if (!correct && settings.pointDeduction && !settings.allowNegativeScore && player) {
+      pointDelta = Math.max(pointDelta, -player.score)
+    }
     store.judgeAnswer(playerId, correct, pointDelta)
     net.broadcast({ type: 'JUDGE', playerId, correct, pointDelta })
-
-    const player = players.find(p => p.id === playerId)
     const playerName = player?.name ?? playerId
     const newScore = (player?.score ?? 0) + pointDelta
     const pointLabel = pointDelta === 0
