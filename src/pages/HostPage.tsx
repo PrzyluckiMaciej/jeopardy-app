@@ -19,7 +19,7 @@ export default function HostPage() {
   const navigate = useNavigate()
   const store = useGameStore()
   const { state, settings, roomCode, setSettings, addPlayer, removePlayer, updatePlayer,
-    openCard, patchState, setPlayerConnected, addBuzz } = store
+    openCard, patchState, setPlayerConnected, addBuzz, resetBoard } = store
   const boardStore = useBoardStore()
 
   const [tab, setTab] = useState<Tab>('board')
@@ -202,6 +202,18 @@ export default function HostPage() {
     })
   }
 
+  function handleResetBoard() {
+    if (!window.confirm('Reset the board? This will mark all questions as unanswered and set all scores to 0.')) return
+    resetBoard()
+    net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+    logEvent({
+      role: 'host',
+      roomCode: roomCode ?? '',
+      actor: 'host',
+      event: 'Board reset: all questions cleared and scores zeroed',
+    })
+  }
+
   function copyCode() {
     navigator.clipboard.writeText(roomCode ?? '')
     setCopied(true)
@@ -294,6 +306,16 @@ export default function HostPage() {
                   {board ? 'Edit board' : 'New board'}
                 </button>
                 {board && <span className="font-condensed font-bold" style={{ color: 'var(--gold)' }}>{board.name}</span>}
+                {board && (
+                  <button
+                    className="btn-ghost text-sm"
+                    style={{ color: 'var(--red)', borderColor: 'var(--red)' }}
+                    onClick={handleResetBoard}
+                    title="Mark all questions as unanswered and reset all scores to 0"
+                  >
+                    Reset board
+                  </button>
+                )}
               </div>
             )}
 
