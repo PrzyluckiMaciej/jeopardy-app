@@ -145,3 +145,73 @@ button {
 
 .tag-correct { background: rgba(39,174,96,0.2); color: #4cd98a; border: 1px solid rgba(39,174,96,0.4); padding: 2px 8px; border-radius: 4px; font-size: 12px; }
 .tag-wrong { background: rgba(192,57,43,0.2); color: #e07070; border: 1px solid rgba(192,57,43,0.4); padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+
+/* Judge accept/decline speech-bubble tooltips */
+.judge-tooltip {
+  --tooltip-arrow: 7px;
+  position: absolute;
+  bottom: calc(100% + 14px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px) scale(0.94);
+  padding: 7px 14px 8px;
+  border-radius: 999px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+  z-index: 10;
+}
+.judge-tooltip::before,
+.judge-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: var(--tooltip-arrow) solid transparent;
+  border-right: var(--tooltip-arrow) solid transparent;
+}
+.judge-tooltip::before {
+  border-top: calc(var(--tooltip-arrow) + 2px) solid var(--tooltip-border);
+  margin-top: -1px;
+}
+.judge-tooltip::after {
+  border-top: var(--tooltip-arrow) solid var(--tooltip-bg);
+}
+.group:hover .judge-tooltip,
+.group:focus-visible .judge-tooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0) scale(1);
+}
+.judge-tooltip--accept {
+  --tooltip-bg: #143528;
+  --tooltip-border: rgba(76, 217, 138, 0.55);
+  background: linear-gradient(165deg, #1a4532 0%, #0f261c 100%);
+  color: #7ee8a8;
+  border: 1.5px solid var(--tooltip-border);
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, 0.45),
+    0 0 16px rgba(39, 174, 96, 0.22),
+    0 0 0 1px rgba(126, 232, 168, 0.08) inset;
+}
+.judge-tooltip--decline {
+  --tooltip-bg: #3a1518;
+  --tooltip-border: rgba(224, 112, 112, 0.55);
+  background: linear-gradient(165deg, #4a1c20 0%, #2a0e10 100%);
+  color: #f0a0a0;
+  border: 1.5px solid var(--tooltip-border);
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, 0.45),
+    0 0 16px rgba(192, 57, 43, 0.22),
+    0 0 0 1px rgba(240, 160, 160, 0.08) inset;
+}

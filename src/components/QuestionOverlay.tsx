@@ -160,9 +160,10 @@ export default function QuestionOverlay({ state, settings }: Props) {
                           className="relative group w-8 h-8 rounded flex items-center justify-center"
                           style={{ background: 'rgba(39,174,96,0.2)', border: '1px solid var(--green)', color: '#4cd98a' }}
                           onClick={() => handleJudge(pid, true)}
+                          aria-label="Accept answer"
                         >
                           <Check size={16} />
-                          <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-0.5 rounded text-xs font-sans font-normal whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ background: 'rgba(0,0,0,0.85)', color: '#fff' }}>
+                          <span className="judge-tooltip judge-tooltip--accept" role="tooltip">
                             Accept
                           </span>
                         </button>
@@ -170,9 +171,10 @@ export default function QuestionOverlay({ state, settings }: Props) {
                           className="relative group w-8 h-8 rounded flex items-center justify-center"
                           style={{ background: 'rgba(192,57,43,0.2)', border: '1px solid var(--red)', color: '#e07070' }}
                           onClick={() => handleJudge(pid, false)}
+                          aria-label="Decline answer"
                         >
                           <X size={16} />
-                          <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-0.5 rounded text-xs font-sans font-normal whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ background: 'rgba(0,0,0,0.85)', color: '#fff' }}>
+                          <span className="judge-tooltip judge-tooltip--decline" role="tooltip">
                             Decline
                           </span>
                         </button>
