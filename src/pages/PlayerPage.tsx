@@ -20,11 +20,9 @@ export default function PlayerPage() {
   const [buzzCount, setBuzzCount] = useState(0)
 
   const [myId] = useState(() => {
-    if (!roomCode) return generateId()
-    const key = `jeopardy-player-id-${roomCode}`
-    let id = localStorage.getItem(key)
-    if (!id) { id = generateId(); localStorage.setItem(key, id) }
-    return id
+    const existing = useGameStore.getState().myPlayerId
+    if (existing) return existing
+    return generateId()
   })
   const [nameTaken, setNameTaken] = useState(false)
   const hasLoggedJoin = useRef(false)
@@ -120,7 +118,7 @@ export default function PlayerPage() {
       }
       if (msg.type === 'REMOVE_PLAYER') {
         if (msg.playerId === myId) {
-          localStorage.removeItem(`jeopardy-player-id-${roomCode}`)
+          setMyPlayerId(null)
           alert('You have been removed from the game.')
           navigate('/')
         } else {
@@ -162,7 +160,7 @@ export default function PlayerPage() {
         <button
           className="btn-outline mt-2"
           onClick={() => {
-            localStorage.removeItem(`jeopardy-player-id-${roomCode}`)
+            setMyPlayerId(null)
             navigate('/')
           }}
         >

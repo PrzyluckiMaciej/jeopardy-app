@@ -58,6 +58,13 @@ export default function HostPage() {
     net.onMessage((msg: NetMessage, peerId: string) => {
       if (msg.type === 'PLAYER_JOIN') {
         const clientId = msg.player.id
+
+        // Remove any stale peer mapping for this clientId (e.g. from a pre-refresh connection)
+        for (const [oldPeerId, cid] of peerToClient.current.entries()) {
+          if (cid === clientId && oldPeerId !== peerId) {
+            peerToClient.current.delete(oldPeerId)
+          }
+        }
         peerToClient.current.set(peerId, clientId)
 
         const existing = useGameStore.getState().state.players.find(p => p.id === clientId)
