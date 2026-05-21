@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Settings, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useGameStore, useBoardStore } from '../store/gameStore'
@@ -27,6 +27,9 @@ export default function HostPage() {
   const [showBoardPicker, setShowBoardPicker] = useState(false)
   const [copied, setCopied] = useState(false)
 
+  // Maps Trystero peerId → stable clientId for every connected peer
+  const peerToClient = useRef(new Map<string, string>())
+
   useEffect(() => {
     if (!roomCode) { navigate('/'); return }
 
@@ -38,19 +41,51 @@ export default function HostPage() {
     })
 
     net.onPeerLeave((peerId) => {
-      setPlayerConnected(peerId, false)
-      const leavingPlayer = useGameStore.getState().state.players.find(p => p.id === peerId)
-      logEvent({
-        role: 'host',
-        roomCode: roomCode ?? '',
-        actor: 'host',
-        event: `Player disconnected: ${leavingPlayer?.name ?? peerId}`,
-      })
+      const clientId = peerToClient.current.get(peerId)
+      if (clientId) {
+        setPlayerConnected(clientId, false)
+        const leavingPlayer = useGameStore.getState().state.players.find(p => p.id === clientId)
+        logEvent({
+          role: 'host',
+          roomCode: roomCode ?? '',
+          actor: 'host',
+          event: `Player disconnected: ${leavingPlayer?.name ?? clientId}`,
+        })
+        peerToClient.current.delete(peerId)
+      }
     })
 
     net.onMessage((msg: NetMessage, peerId: string) => {
       if (msg.type === 'PLAYER_JOIN') {
-        const player: Player = { ...msg.player, id: peerId, isConnected: true }
+        const clientId = msg.player.id
+        peerToClient.current.set(peerId, clientId)
+
+        const existing = useGameStore.getState().state.players.find(p => p.id === clientId)
+        if (existing) {
+          // Reconnect: restore the player's slot with their existing score
+          setPlayerConnected(clientId, true)
+          logEvent({
+            role: 'host',
+            roomCode: roomCode ?? '',
+            actor: 'host',
+            event: `Player reconnected: ${existing.name}`,
+          })
+          setTimeout(() => {
+            net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+          }, 100)
+          return
+        }
+
+        // New join: reject if name is already taken by a connected player
+        const nameTaken = useGameStore.getState().state.players.some(
+          p => p.name === msg.player.name && p.isConnected
+        )
+        if (nameTaken) {
+          net.send({ type: 'JOIN_REJECTED', reason: 'NAME_TAKEN' }, peerId)
+          return
+        }
+
+        const player: Player = { ...msg.player, id: clientId, isConnected: true }
         addPlayer(player)
         logEvent({
           role: 'host',
@@ -63,8 +98,10 @@ export default function HostPage() {
         }, 100)
       }
       if (msg.type === 'BUZZ') {
-        addBuzz(peerId)
-        net.broadcast({ type: 'BUZZ', playerId: peerId, playerName: msg.playerName })
+        const clientId = peerToClient.current.get(peerId)
+        if (!clientId) return
+        addBuzz(clientId)
+        net.broadcast({ type: 'BUZZ', playerId: clientId, playerName: msg.playerName })
       }
     })
 

@@ -70,6 +70,7 @@ export type NetMessage =
   | { type: 'REMOVE_PLAYER'; playerId: string }
   | { type: 'UPDATE_SETTINGS'; settings: GameSettings }
   | { type: 'MEDIA_CHUNK'; mediaId: string; chunk: string; index: number; total: number; mimeType: string }
+  | { type: 'JOIN_REJECTED'; reason: 'NAME_TAKEN' }
 
 export interface GameSettings {
   negativePoints: boolean
