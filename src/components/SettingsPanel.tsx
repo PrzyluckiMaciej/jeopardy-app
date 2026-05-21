@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { GameSettings, Player } from '../types'
-import { formatScore, generateId } from '../lib/utils'
+import { formatScore } from '../lib/utils'
 
 interface Props {
   settings: GameSettings
@@ -8,7 +8,6 @@ interface Props {
   onSettingsChange: (s: GameSettings) => void
   onUpdatePlayer: (p: Player) => void
   onRemovePlayer: (id: string) => void
-  onAddPlayer: (p: Player) => void
 }
 
 export default function SettingsPanel({
@@ -17,21 +16,13 @@ export default function SettingsPanel({
   onSettingsChange,
   onUpdatePlayer,
   onRemovePlayer,
-  onAddPlayer,
 }: Props) {
-  const [newName, setNewName] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [editScore, setEditScore] = useState('')
 
   function toggle(key: keyof GameSettings) {
     onSettingsChange({ ...settings, [key]: !settings[key] })
-  }
-
-  function addPlayer() {
-    if (!newName.trim()) return
-    onAddPlayer({ id: generateId(), name: newName.trim(), score: 0, isConnected: false })
-    setNewName('')
   }
 
   function startEdit(p: Player) {
@@ -66,18 +57,6 @@ export default function SettingsPanel({
       <div>
         <div className="font-condensed font-bold uppercase tracking-widest text-xs mb-3" style={{ color: 'var(--gold)', opacity: 0.7 }}>
           Players
-        </div>
-        <div className="flex gap-2 mb-3">
-          <input
-            className="flex-1"
-            placeholder="Add player by name"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && addPlayer()}
-          />
-          <button className="btn-gold text-sm px-4" onClick={addPlayer} disabled={!newName.trim()}>
-            Add
-          </button>
         </div>
         <div className="flex flex-col gap-2">
           {players.map((p) =>
@@ -136,7 +115,7 @@ export default function SettingsPanel({
           )}
           {players.length === 0 && (
             <div className="text-sm text-center py-2" style={{ color: '#4a5580' }}>
-              Players appear here when they join with a room code, or add them manually above.
+              Players appear here when they join with a room code.
             </div>
           )}
         </div>
