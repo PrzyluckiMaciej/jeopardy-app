@@ -189,8 +189,8 @@ export default function HostPage() {
             cursor: 'pointer',
             color: tab === 'settings' ? 'var(--gold)' : '#4a5580',
           }}
-          onClick={() => setTab('settings')}
-          title="Settings"
+          onClick={() => setTab(tab === 'settings' ? 'board' : 'settings')}
+          title={tab === 'settings' ? 'Back to board' : 'Settings'}
         >
           <Settings size={28} />
         </button>
