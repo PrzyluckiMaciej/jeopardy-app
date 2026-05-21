@@ -124,12 +124,12 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
         </div>
       </div>
 
-      <div className="flex gap-5 flex-1 min-h-0">
+      <div className="flex gap-5 flex-1 min-h-0 items-start">
         {/* Grid */}
-        <div className="flex-1 overflow-auto">
+        <div className="overflow-auto min-w-0 flex-1">
           <div
-            className="grid gap-2"
-            style={{ gridTemplateColumns: `repeat(${board.categories.length}, minmax(120px, 1fr))` }}
+            className="grid gap-2 min-w-max"
+            style={{ gridTemplateColumns: `repeat(${board.categories.length}, minmax(140px, 1fr))` }}
           >
             {/* Category headers */}
             {board.categories.map((cat) => (
