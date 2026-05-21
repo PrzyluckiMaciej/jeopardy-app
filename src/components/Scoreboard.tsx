@@ -43,7 +43,7 @@ export default function Scoreboard({ players, buzzQueue = [], highlightId }: Pro
             <div className="flex-1 min-w-0">
               <div className="font-condensed font-bold text-sm truncate" style={{ color: 'var(--white)' }}>
                 {p.name}
-                {!p.isConnected && <span className="ml-1 text-xs" style={{ color: '#4a5580' }}>(offline)</span>}
+                {!p.isConnected && <span className="ml-1 text-xs" style={{ color: '#4a5580' }}> (offline)</span>}
               </div>
               <div className="font-display text-lg leading-none" style={{ color: p.score < 0 ? '#e07070' : 'var(--gold-bright)' }}>
                 {formatScore(p.score)}
