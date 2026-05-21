@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import type { Board, GameState, GameSettings, Player, Question } from '../types'
 
 // ---- Board editor store (persisted) ----
@@ -32,7 +32,7 @@ export const useBoardStore = create<BoardStore>()(
   )
 )
 
-// ---- Live game store (not persisted) ----
+// ---- Live game store (session-persisted: roomCode, isHost, myPlayerId only) ----
 interface GameStore {
   state: GameState
   settings: GameSettings
@@ -76,141 +76,154 @@ const defaultSettings: GameSettings = {
   negativePoints: false,
 }
 
-export const useGameStore = create<GameStore>()((set) => ({
-  state: defaultState,
-  settings: defaultSettings,
-  isHost: false,
-  roomCode: null,
-  myPlayerId: null,
-
-  setIsHost: (v) => set({ isHost: v }),
-  setRoomCode: (code) => set({ roomCode: code }),
-  setMyPlayerId: (id) => set({ myPlayerId: id }),
-  setState: (state) => set({ state }),
-  setSettings: (settings) => set({ settings }),
-  patchState: (patch) => set((s) => ({ state: { ...s.state, ...patch } })),
-
-  addPlayer: (player) =>
-    set((s) => ({
-      state: {
-        ...s.state,
-        players: s.state.players.some((p) => p.id === player.id)
-          ? s.state.players
-          : [...s.state.players, player],
-      },
-    })),
-
-  removePlayer: (id) =>
-    set((s) => ({
-      state: {
-        ...s.state,
-        players: s.state.players.filter((p) => p.id !== id),
-        buzzQueue: s.state.buzzQueue.filter((pid) => pid !== id),
-      },
-    })),
-
-  updatePlayer: (player) =>
-    set((s) => ({
-      state: {
-        ...s.state,
-        players: s.state.players.map((p) => (p.id === player.id ? player : p)),
-      },
-    })),
-
-  setPlayerConnected: (id, connected) =>
-    set((s) => ({
-      state: {
-        ...s.state,
-        players: s.state.players.map((p) =>
-          p.id === id ? { ...p, isConnected: connected } : p
-        ),
-      },
-    })),
-
-  openCard: (categoryId, question, mediaDataUrl) =>
-    set((s) => {
-      let mediaType: 'image' | 'audio' | 'video' | undefined
-      if (mediaDataUrl) {
-        if (mediaDataUrl.startsWith('data:image')) mediaType = 'image'
-        else if (mediaDataUrl.startsWith('data:audio')) mediaType = 'audio'
-        else if (mediaDataUrl.startsWith('data:video')) mediaType = 'video'
-      }
-      return {
-        state: {
-          ...s.state,
-          phase: 'question',
-          activeQuestion: { categoryId, question },
-          buzzQueue: [],
-          activeMedia: mediaDataUrl && mediaType
-            ? { type: mediaType, dataUrl: mediaDataUrl }
-            : null,
-        },
-      }
-    }),
-
-  closeCard: () =>
-    set((s) => ({
-      state: {
-        ...s.state,
-        phase: 'board',
-        activeQuestion: null,
-        buzzQueue: [],
-        activeMedia: null,
-      },
-    })),
-
-  startBuzzing: () =>
-    set((s) => ({ state: { ...s.state, phase: 'buzzing', buzzQueue: [] } })),
-
-  addBuzz: (playerId) =>
-    set((s) => {
-      if (s.state.buzzQueue.includes(playerId)) return s
-      return {
-        state: {
-          ...s.state,
-          phase: 'judging',
-          buzzQueue: [...s.state.buzzQueue, playerId],
-        },
-      }
-    }),
-
-  clearBuzzQueue: () =>
-    set((s) => ({ state: { ...s.state, buzzQueue: [], phase: 'buzzing' } })),
-
-  judgeAnswer: (playerId, correct, pointDelta) =>
-    set((s) => ({
-      state: {
-        ...s.state,
-        phase: correct ? 'revealed' : 'buzzing',
-        players: s.state.players.map((p) =>
-          p.id === playerId ? { ...p, score: p.score + pointDelta } : p
-        ),
-        buzzQueue: correct
-          ? s.state.buzzQueue
-          : s.state.buzzQueue.filter((id) => id !== playerId),
-      },
-    })),
-
-  revealAnswer: () =>
-    set((s) => ({ state: { ...s.state, phase: 'revealed' } })),
-
-  markAnswered: (cellId) =>
-    set((s) => ({
-      state: {
-        ...s.state,
-        answeredCells: [...s.state.answeredCells, cellId],
-        phase: 'board',
-        activeQuestion: null,
-        buzzQueue: [],
-        activeMedia: null,
-      },
-    })),
-
-  reset: () =>
-    set({
+export const useGameStore = create<GameStore>()(
+  persist(
+    (set) => ({
       state: defaultState,
+      settings: defaultSettings,
       isHost: false,
       roomCode: null,
       myPlayerId: null,
+
+      setIsHost: (v) => set({ isHost: v }),
+      setRoomCode: (code) => set({ roomCode: code }),
+      setMyPlayerId: (id) => set({ myPlayerId: id }),
+      setState: (state) => set({ state }),
+      setSettings: (settings) => set({ settings }),
+      patchState: (patch) => set((s) => ({ state: { ...s.state, ...patch } })),
+
+      addPlayer: (player) =>
+        set((s) => ({
+          state: {
+            ...s.state,
+            players: s.state.players.some((p) => p.id === player.id)
+              ? s.state.players
+              : [...s.state.players, player],
+          },
+        })),
+
+      removePlayer: (id) =>
+        set((s) => ({
+          state: {
+            ...s.state,
+            players: s.state.players.filter((p) => p.id !== id),
+            buzzQueue: s.state.buzzQueue.filter((pid) => pid !== id),
+          },
+        })),
+
+      updatePlayer: (player) =>
+        set((s) => ({
+          state: {
+            ...s.state,
+            players: s.state.players.map((p) => (p.id === player.id ? player : p)),
+          },
+        })),
+
+      setPlayerConnected: (id, connected) =>
+        set((s) => ({
+          state: {
+            ...s.state,
+            players: s.state.players.map((p) =>
+              p.id === id ? { ...p, isConnected: connected } : p
+            ),
+          },
+        })),
+
+      openCard: (categoryId, question, mediaDataUrl) =>
+        set((s) => {
+          let mediaType: 'image' | 'audio' | 'video' | undefined
+          if (mediaDataUrl) {
+            if (mediaDataUrl.startsWith('data:image')) mediaType = 'image'
+            else if (mediaDataUrl.startsWith('data:audio')) mediaType = 'audio'
+            else if (mediaDataUrl.startsWith('data:video')) mediaType = 'video'
+          }
+          return {
+            state: {
+              ...s.state,
+              phase: 'question',
+              activeQuestion: { categoryId, question },
+              buzzQueue: [],
+              activeMedia: mediaDataUrl && mediaType
+                ? { type: mediaType, dataUrl: mediaDataUrl }
+                : null,
+            },
+          }
+        }),
+
+      closeCard: () =>
+        set((s) => ({
+          state: {
+            ...s.state,
+            phase: 'board',
+            activeQuestion: null,
+            buzzQueue: [],
+            activeMedia: null,
+          },
+        })),
+
+      startBuzzing: () =>
+        set((s) => ({ state: { ...s.state, phase: 'buzzing', buzzQueue: [] } })),
+
+      addBuzz: (playerId) =>
+        set((s) => {
+          if (s.state.buzzQueue.includes(playerId)) return s
+          return {
+            state: {
+              ...s.state,
+              phase: 'judging',
+              buzzQueue: [...s.state.buzzQueue, playerId],
+            },
+          }
+        }),
+
+      clearBuzzQueue: () =>
+        set((s) => ({ state: { ...s.state, buzzQueue: [], phase: 'buzzing' } })),
+
+      judgeAnswer: (playerId, correct, pointDelta) =>
+        set((s) => ({
+          state: {
+            ...s.state,
+            phase: correct ? 'revealed' : 'buzzing',
+            players: s.state.players.map((p) =>
+              p.id === playerId ? { ...p, score: p.score + pointDelta } : p
+            ),
+            buzzQueue: correct
+              ? s.state.buzzQueue
+              : s.state.buzzQueue.filter((id) => id !== playerId),
+          },
+        })),
+
+      revealAnswer: () =>
+        set((s) => ({ state: { ...s.state, phase: 'revealed' } })),
+
+      markAnswered: (cellId) =>
+        set((s) => ({
+          state: {
+            ...s.state,
+            answeredCells: [...s.state.answeredCells, cellId],
+            phase: 'board',
+            activeQuestion: null,
+            buzzQueue: [],
+            activeMedia: null,
+          },
+        })),
+
+      reset: () =>
+        set({
+          state: defaultState,
+          isHost: false,
+          roomCode: null,
+          myPlayerId: null,
+        }),
     }),
-}))
+    {
+      name: 'jeopardy-session',
+      storage: createJSONStorage(() => sessionStorage),
+      partialize: (s) => ({
+        roomCode: s.roomCode,
+        isHost: s.isHost,
+        myPlayerId: s.myPlayerId,
+      }),
+    }
+  )
+)
