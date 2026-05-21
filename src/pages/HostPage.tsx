@@ -15,6 +15,10 @@ import Scoreboard from '../components/Scoreboard'
 
 type Tab = 'board' | 'settings'
 
+function pickRandom<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)]
+}
+
 export default function HostPage() {
   const navigate = useNavigate()
   const store = useGameStore()
@@ -127,9 +131,7 @@ export default function HostPage() {
     const b = { ...board }
     setActiveBoard(b)
     const connectedPlayers = useGameStore.getState().state.players.filter(p => p.isConnected)
-    const randomControl = connectedPlayers.length > 0
-      ? connectedPlayers[Math.floor(Math.random() * connectedPlayers.length)].id
-      : null
+    const randomControl = connectedPlayers.length > 0 ? pickRandom(connectedPlayers).id : null
     patchState({ board: b, answeredCells: [], phase: 'board', boardControlId: randomControl })
     net.broadcast({ type: 'SYNC_STATE', state: { ...useGameStore.getState().state, board: b, answeredCells: [], phase: 'board', boardControlId: randomControl } })
     closeBoardPicker()
@@ -385,7 +387,7 @@ export default function HostPage() {
                 onClick={() => {
                   const connected = state.players.filter(p => p.isConnected)
                   if (connected.length === 0) return
-                  const pick = connected[Math.floor(Math.random() * connected.length)]
+                  const pick = pickRandom(connected)
                   setBoardControl(pick.id)
                   net.broadcast({ type: 'SET_BOARD_CONTROL', playerId: pick.id })
                 }}
