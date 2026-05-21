@@ -59,6 +59,7 @@ export interface GameState {
   activeQuestion: { categoryId: string; question: Question } | null
   buzzQueue: string[] // player ids in order
   activeMedia: { type: 'image' | 'audio' | 'video'; dataUrl: string } | null
+  boardControlId: string | null // player id of the player with board control
 }
 
 // ---- Network messages ----
@@ -70,11 +71,12 @@ export type NetMessage =
   | { type: 'CLOSE_CARD' }
   | { type: 'START_BUZZING' }
   | { type: 'BUZZ'; playerId: string; playerName: string }
-  | { type: 'JUDGE'; playerId: string; correct: boolean; pointDelta: number }
+  | { type: 'JUDGE'; playerId: string; correct: boolean; pointDelta: number; boardControlId?: string }
   | { type: 'REVEAL_ANSWER' }
   | { type: 'MARK_ANSWERED'; cellId: string }
   | { type: 'UPDATE_PLAYER'; player: Player }
   | { type: 'REMOVE_PLAYER'; playerId: string }
+  | { type: 'SET_BOARD_CONTROL'; playerId: string | null }
   | { type: 'UPDATE_SETTINGS'; settings: GameSettings }
   | { type: 'MEDIA_CHUNK'; mediaId: string; chunk: string; index: number; total: number; mimeType: string }
   | { type: 'JOIN_REJECTED'; reason: 'NAME_TAKEN' }

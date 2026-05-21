@@ -15,11 +15,15 @@ import Scoreboard from '../components/Scoreboard'
 
 type Tab = 'board' | 'settings'
 
+function pickRandom<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)]
+}
+
 export default function HostPage() {
   const navigate = useNavigate()
   const store = useGameStore()
   const { state, settings, roomCode, setSettings, addPlayer, removePlayer, updatePlayer,
-    openCard, patchState, setPlayerConnected, addBuzz, resetBoard } = store
+    openCard, patchState, setPlayerConnected, addBuzz, resetBoard, setBoardControl } = store
   const boardStore = useBoardStore()
 
   const [tab, setTab] = useState<Tab>('board')
@@ -126,8 +130,10 @@ export default function HostPage() {
   function handleSelectBoard(board: Board) {
     const b = { ...board }
     setActiveBoard(b)
-    patchState({ board: b, answeredCells: [], phase: 'board' })
-    net.broadcast({ type: 'SYNC_STATE', state: { ...useGameStore.getState().state, board: b, answeredCells: [], phase: 'board' } })
+    const connectedPlayers = useGameStore.getState().state.players.filter(p => p.isConnected)
+    const randomControl = connectedPlayers.length > 0 ? pickRandom(connectedPlayers).id : null
+    patchState({ board: b, answeredCells: [], phase: 'board', boardControlId: randomControl })
+    net.broadcast({ type: 'SYNC_STATE', state: { ...useGameStore.getState().state, board: b, answeredCells: [], phase: 'board', boardControlId: randomControl } })
     closeBoardPicker()
     setEditing(false)
   }
@@ -365,10 +371,32 @@ export default function HostPage() {
         )}
 
         <div className="w-64 flex-shrink-0 border-l p-4 overflow-auto" style={{ borderColor: 'var(--navy-light)' }}>
-          <div className="font-condensed font-bold uppercase tracking-widest text-xs mb-3" style={{ color: 'var(--gold)', opacity: 0.7 }}>
-            Scoreboard
+          <div className="flex items-center justify-between mb-3">
+            <div className="font-condensed font-bold uppercase tracking-widest text-xs" style={{ color: 'var(--gold)', opacity: 0.7 }}>
+              Scoreboard
+            </div>
+            {state.players.some(p => p.isConnected) && (
+              <button
+                className="font-condensed text-xs px-2 py-1 rounded"
+                style={{
+                  background: 'rgba(0,200,180,0.15)',
+                  color: '#40e0d0',
+                  border: '1px solid rgba(0,200,180,0.35)',
+                }}
+                title="Randomly select a player to have board control"
+                onClick={() => {
+                  const connected = state.players.filter(p => p.isConnected)
+                  if (connected.length === 0) return
+                  const pick = pickRandom(connected)
+                  setBoardControl(pick.id)
+                  net.broadcast({ type: 'SET_BOARD_CONTROL', playerId: pick.id })
+                }}
+              >
+                Randomize
+              </button>
+            )}
           </div>
-          <Scoreboard players={state.players} buzzQueue={state.buzzQueue} />
+          <Scoreboard players={state.players} buzzQueue={state.buzzQueue} boardControlId={state.boardControlId} />
         </div>
       </div>
 
