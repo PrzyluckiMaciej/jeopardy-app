@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
+import { Trash2 } from 'lucide-react'
 import type { Board, Category, Question } from '../types'
 import { generateId } from '../lib/utils'
 import { saveMedia, deleteMedia, getMedia, blobToDataUrl } from '../lib/db'
@@ -154,11 +155,11 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                   </div>
                 )}
                 <button
-                  className="absolute -top-2 -right-2 w-5 h-5 rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                  style={{ background: 'var(--red)', color: '#fff', border: 'none', lineHeight: '20px' }}
+                  className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:brightness-75"
+                  style={{ background: 'var(--red)', color: '#fff', border: 'none', transition: 'opacity 150ms, filter 150ms' }}
                   onClick={() => removeCategory(cat.id)}
                 >
-                  ×
+                  <Trash2 size={11} />
                 </button>
               </div>
             ))}
