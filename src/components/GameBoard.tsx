@@ -5,9 +5,10 @@ interface GameBoardProps {
   board: Board
   answeredCells: string[]
   onOpenCell?: (categoryId: string, q: Question) => void
+  dailyDoubleQuestionId?: string
 }
 
-export default function GameBoard({ board, answeredCells, onOpenCell }: GameBoardProps) {
+export default function GameBoard({ board, answeredCells, onOpenCell, dailyDoubleQuestionId }: GameBoardProps) {
   return (
     <div className="overflow-auto">
       <div
@@ -47,6 +48,9 @@ export default function GameBoard({ board, answeredCells, onOpenCell }: GameBoar
                 </span>
                 {q.mediaId && !isAnswered && (
                   <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: 'var(--gold)', opacity: 0.6 }} />
+                )}
+                {dailyDoubleQuestionId === q.id && !isAnswered && (
+                  <div className="dd-badge">DD</div>
                 )}
               </button>
             )

@@ -23,7 +23,8 @@ export default function HostPage() {
   const navigate = useNavigate()
   const store = useGameStore()
   const { state, settings, roomCode, setSettings, addPlayer, removePlayer, updatePlayer,
-    openCard, patchState, setPlayerConnected, addBuzz, resetBoard, setBoardControl } = store
+    openCard, patchState, setPlayerConnected, addBuzz, resetBoard, setBoardControl,
+    startDailyDouble, setDailyDoubleBet } = store
   const boardStore = useBoardStore()
 
   const [tab, setTab] = useState<Tab>('board')
@@ -122,6 +123,19 @@ export default function HostPage() {
         addBuzz(clientId)
         net.broadcast({ type: 'BUZZ', playerId: clientId, playerName: msg.playerName })
       }
+      if (msg.type === 'DAILY_DOUBLE_BET') {
+        const clientId = peerToClient.current.get(peerId)
+        if (!clientId) return
+        const gs = useGameStore.getState()
+        if (!gs.state.dailyDouble || gs.state.dailyDouble.playerId !== clientId) return
+        const player = gs.state.players.find(p => p.id === clientId)
+        if (!player) return
+        const maxPointValue = Math.max(...(gs.state.board?.pointValues ?? [0]))
+        const maxWager = player.score > maxPointValue ? player.score : maxPointValue
+        const wager = Math.max(1, Math.min(msg.wager, maxWager))
+        setDailyDoubleBet(wager)
+        net.broadcast({ type: 'DAILY_DOUBLE_ACCEPT_BET', wager })
+      }
     })
 
     return () => net.leaveRoom()
@@ -173,8 +187,19 @@ export default function HostPage() {
       if (rec) mediaDataUrl = await blobToDataUrl(rec.blob)
     }
 
-    openCard(categoryId, question, mediaDataUrl)
-    net.broadcast({ type: 'OPEN_CARD', categoryId, question, mediaDataUrl })
+    const currentBoard = useGameStore.getState().state.board
+    const isDailyDouble = currentBoard?.dailyDoubleQuestionId === question.id
+
+    if (isDailyDouble) {
+      const ddPlayerId = useGameStore.getState().state.boardControlId
+      if (!ddPlayerId) return
+      openCard(categoryId, question, mediaDataUrl)
+      startDailyDouble(ddPlayerId)
+      net.broadcast({ type: 'DAILY_DOUBLE_REVEAL', playerId: ddPlayerId, categoryId, question, mediaDataUrl })
+    } else {
+      openCard(categoryId, question, mediaDataUrl)
+      net.broadcast({ type: 'OPEN_CARD', categoryId, question, mediaDataUrl })
+    }
   }
 
   function handleSettingsChange(s: GameSettings) {
@@ -271,7 +296,7 @@ export default function HostPage() {
   }
 
   const board = activeBoard ?? state.board
-  const showOverlay = ['question', 'buzzing', 'revealed'].includes(state.phase) && !!state.activeQuestion
+  const showOverlay = ['question', 'buzzing', 'revealed', 'dailyDouble', 'dailyDoubleBet'].includes(state.phase) && !!state.activeQuestion
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--navy)' }}>
@@ -343,7 +368,7 @@ export default function HostPage() {
                 }} />
               </div>
             ) : board ? (
-              <GameBoard board={board} answeredCells={state.answeredCells} onOpenCell={handleOpenCell} />
+              <GameBoard board={board} answeredCells={state.answeredCells} onOpenCell={handleOpenCell} dailyDoubleQuestionId={board.dailyDoubleQuestionId} />
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center gap-4">
                 <div className="font-condensed text-lg" style={{ color: '#4a5580' }}>No board loaded</div>
