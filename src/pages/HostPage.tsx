@@ -165,35 +165,34 @@ export default function HostPage() {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--navy)' }}>
       {/* Top bar */}
-      <div className="flex items-center gap-4 px-4 py-3 border-b" style={{ borderColor: 'var(--navy-light)', background: 'var(--navy-mid)' }}>
-        <button className="font-display text-xl" style={{ color: 'var(--gold-bright)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} onClick={() => setTab('board')}>JEOPARDY!</button>
-        <div className="w-px h-5" style={{ background: 'var(--navy-light)' }} />
-        <div className="flex items-center gap-2">
-          <span className="font-condensed text-xs uppercase" style={{ color: '#4a5580' }}>Room</span>
+      <div className="flex items-center gap-5 border-b" style={{ borderColor: 'var(--navy-light)', background: 'var(--navy-mid)', padding: '10px 24px' }}>
+        <button className="font-display text-2xl" style={{ color: 'var(--gold-bright)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} onClick={() => setTab('board')}>JEOPARDY!</button>
+        <div className="w-px h-6" style={{ background: 'var(--navy-light)' }} />
+        <div className="flex items-center gap-3">
+          <span className="font-condensed text-sm uppercase" style={{ color: '#4a5580' }}>Room</span>
           <button
-            className="font-display text-lg tracking-widest px-2 py-0.5 rounded"
+            className="font-display text-xl tracking-widest px-3 py-1 rounded"
             style={{ background: 'rgba(212,160,23,0.1)', border: '1px solid rgba(212,160,23,0.3)', color: 'var(--gold-bright)' }}
             onClick={copyCode}
             title="Click to copy"
           >
             {roomCode}
           </button>
-          {copied && <span className="text-xs" style={{ color: 'var(--green)' }}>Copied!</span>}
+          {copied && <span className="text-sm" style={{ color: 'var(--green)' }}>Copied!</span>}
         </div>
         <div className="flex-1" />
         <button
-          className="flex items-center justify-center p-2 rounded"
+          className="flex items-center justify-center p-1"
           style={{
-            background: tab === 'settings' ? 'var(--navy-light)' : 'var(--navy)',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
             color: tab === 'settings' ? 'var(--gold)' : '#4a5580',
-            border: '1px solid var(--navy-light)',
-            borderRadius: 8,
-            letterSpacing: '0.05em',
           }}
           onClick={() => setTab('settings')}
           title="Settings"
         >
-          <Settings size={18} />
+          <Settings size={28} />
         </button>
       </div>
 
