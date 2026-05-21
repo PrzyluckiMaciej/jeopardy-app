@@ -217,8 +217,8 @@ export default function PlayerPage() {
   const categoryName = state.board?.categories.find(c => c.id === state.activeQuestion?.categoryId)?.name ?? ''
   const showOverlay = ['question', 'buzzing', 'revealed', 'dailyDouble', 'dailyDoubleBet'].includes(state.phase) && !!activeQ
   const isDD = state.dailyDouble !== null
-  const isDDPlayer = isDD && state.dailyDouble.playerId === myId
-  const ddPlayerInfo = isDD ? state.players.find(p => p.id === state.dailyDouble!.playerId) : null
+  const isDDPlayer = state.dailyDouble?.playerId === myId
+  const ddPlayerInfo = state.dailyDouble ? state.players.find(p => p.id === state.dailyDouble!.playerId) : null
 
   function handleSubmitWager() {
     const wager = parseInt(ddWagerInput, 10)
