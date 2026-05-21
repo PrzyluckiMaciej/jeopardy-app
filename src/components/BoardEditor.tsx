@@ -20,6 +20,8 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
   const [boardName, setBoardName] = useState(board.name)
   const [mediaPreview, setMediaPreview] = useState<string | null>(null)
+  const [editingRowPts, setEditingRowPts] = useState<number | null>(null)
+  const [editingRowText, setEditingRowText] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   const activeQ = editingCell
@@ -65,6 +67,25 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
   function removeCategory(catId: string) {
     updateBoard({ categories: board.categories.filter((c) => c.id !== catId) })
     if (editingCell?.categoryId === catId) setEditingCell(null)
+  }
+
+  function startEditingRowPts(pts: number) {
+    setEditingRowPts(pts)
+    setEditingRowText(String(pts))
+  }
+
+  function commitRowPointValue(oldPts: number) {
+    setEditingRowPts(null)
+    const newPts = parseInt(editingRowText, 10)
+    if (isNaN(newPts) || newPts <= 0 || newPts === oldPts) return
+    if (board.pointValues.some((v) => v !== oldPts && v === newPts)) return
+
+    const newPointValues = board.pointValues.map((v) => (v === oldPts ? newPts : v)).sort((a, b) => a - b)
+    const newCategories = board.categories.map((cat) => ({
+      ...cat,
+      questions: cat.questions.map((q) => (q.points === oldPts ? { ...q, points: newPts } : q)),
+    }))
+    updateBoard({ pointValues: newPointValues, categories: newCategories })
   }
 
   async function openCell(catId: string, q: Question) {
@@ -129,8 +150,11 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
         <div className="overflow-auto min-w-0 flex-1">
           <div
             className="grid gap-2 min-w-max"
-            style={{ gridTemplateColumns: `repeat(${board.categories.length}, minmax(140px, 1fr))` }}
+            style={{ gridTemplateColumns: `72px repeat(${board.categories.length}, minmax(140px, 1fr))` }}
           >
+            {/* Row label column spacer for header row */}
+            <div />
+
             {/* Category headers */}
             {board.categories.map((cat) => (
               <div key={cat.id} className="relative group">
@@ -164,9 +188,53 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
               </div>
             ))}
 
-            {/* Question cells */}
-            {board.pointValues.map((pts) =>
-              board.categories.map((cat) => {
+            {/* Question cells with editable row point value labels */}
+            {board.pointValues.map((pts) => [
+              /* Row label */
+              editingRowPts === pts ? (
+                <input
+                  key={`label-${pts}`}
+                  autoFocus
+                  className="text-center font-display text-lg"
+                  style={{
+                    background: 'var(--navy-mid)',
+                    border: '2px solid var(--gold)',
+                    borderRadius: 6,
+                    color: 'var(--gold-bright)',
+                    width: '100%',
+                    padding: '4px 0',
+                  }}
+                  value={editingRowText}
+                  onChange={(e) => setEditingRowText(e.target.value)}
+                  onBlur={() => commitRowPointValue(pts)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commitRowPointValue(pts)
+                    if (e.key === 'Escape') setEditingRowPts(null)
+                  }}
+                />
+              ) : (
+                <button
+                  key={`label-${pts}`}
+                  className="font-display text-lg rounded"
+                  style={{
+                    background: 'var(--navy-mid)',
+                    border: '2px solid var(--navy-light)',
+                    color: 'var(--gold-bright)',
+                    minHeight: 72,
+                    width: '100%',
+                    cursor: 'pointer',
+                    transition: 'border-color 150ms',
+                  }}
+                  title="Click to edit point value"
+                  onClick={() => startEditingRowPts(pts)}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.borderColor = 'var(--gold)')}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.borderColor = 'var(--navy-light)')}
+                >
+                  ${pts}
+                </button>
+              ),
+              /* Question cells for this row */
+              ...board.categories.map((cat) => {
                 const q = cat.questions.find((q) => q.points === pts)
                 if (!q) return <div key={`${cat.id}-${pts}`} />
                 const isActive = editingCell?.questionId === q.id
@@ -196,8 +264,8 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                     )}
                   </button>
                 )
-              })
-            )}
+              }),
+            ])}
           </div>
         </div>
 
