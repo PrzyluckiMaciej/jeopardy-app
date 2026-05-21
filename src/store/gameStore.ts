@@ -106,6 +106,7 @@ interface GameStore {
   judgeAnswer: (playerId: string, correct: boolean, pointDelta: number) => void
   revealAnswer: () => void
   markAnswered: (cellId: string) => void
+  resetBoard: () => void
   reset: () => void
 }
 
@@ -248,6 +249,19 @@ export const useGameStore = create<GameStore>()(
           state: {
             ...s.state,
             answeredCells: [...s.state.answeredCells, cellId],
+            phase: 'board',
+            activeQuestion: null,
+            buzzQueue: [],
+            activeMedia: null,
+          },
+        })),
+
+      resetBoard: () =>
+        set((s) => ({
+          state: {
+            ...s.state,
+            answeredCells: [],
+            players: s.state.players.map((p) => ({ ...p, score: 0 })),
             phase: 'board',
             activeQuestion: null,
             buzzQueue: [],
