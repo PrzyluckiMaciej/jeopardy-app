@@ -9,7 +9,8 @@ interface BoardStore {
   saveBoard: (board: Board) => void
   deleteBoard: (id: string) => void
   getBoard: (id: string) => Board | undefined
-  saveGroup: (group: BoardGroup) => void
+  createGroup: (name: string) => void
+  renameGroup: (id: string, name: string) => void
   deleteGroup: (id: string) => void
   addBoardToGroup: (groupId: string, boardId: string) => void
   removeBoardFromGroup: (groupId: string, boardId: string) => void
@@ -39,16 +40,22 @@ export const useBoardStore = create<BoardStore>()(
           })),
         })),
       getBoard: (id) => get().boards.find((b) => b.id === id),
-      saveGroup: (group) =>
+      createGroup: (name) =>
         set((s) => {
-          const idx = s.groups.findIndex((g) => g.id === group.id)
-          if (idx >= 0) {
-            const groups = [...s.groups]
-            groups[idx] = group
-            return { groups }
+          const now = Date.now()
+          return {
+            groups: [
+              ...s.groups,
+              { id: crypto.randomUUID(), name, boardIds: [], createdAt: now, updatedAt: now },
+            ],
           }
-          return { groups: [...s.groups, group] }
         }),
+      renameGroup: (id, name) =>
+        set((s) => ({
+          groups: s.groups.map((g) =>
+            g.id === id ? { ...g, name, updatedAt: Date.now() } : g
+          ),
+        })),
       deleteGroup: (id) =>
         set((s) => ({ groups: s.groups.filter((g) => g.id !== id) })),
       addBoardToGroup: (groupId, boardId) =>
