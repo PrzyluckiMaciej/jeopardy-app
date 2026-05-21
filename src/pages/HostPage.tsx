@@ -150,19 +150,6 @@ export default function HostPage() {
     })
   }
 
-  function handleAddPlayer(p: Player) {
-    addPlayer(p)
-    logEvent({
-      role: 'host',
-      roomCode: roomCode ?? '',
-      actor: 'host',
-      event: `Player manually added: ${p.name}`,
-    })
-    setTimeout(() => {
-      net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
-    }, 100)
-  }
-
   function copyCode() {
     navigator.clipboard.writeText(roomCode ?? '')
     setCopied(true)
@@ -249,7 +236,6 @@ export default function HostPage() {
               onSettingsChange={handleSettingsChange}
               onUpdatePlayer={handleUpdatePlayer}
               onRemovePlayer={handleRemovePlayer}
-              onAddPlayer={handleAddPlayer}
             />
           </div>
         )}
