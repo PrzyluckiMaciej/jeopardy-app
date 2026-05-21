@@ -57,6 +57,11 @@ export default function QuestionOverlay({ state, settings }: Props) {
     net.broadcast({ type: 'REVEAL_ANSWER' })
   }
 
+  function handleDismiss() {
+    store.closeCard()
+    net.broadcast({ type: 'CLOSE_CARD' })
+  }
+
   function handleClose() {
     const cId = cellId(categoryId, question.id)
     store.markAnswered(cId)
@@ -76,7 +81,14 @@ export default function QuestionOverlay({ state, settings }: Props) {
           {categoryName && <span style={{ opacity: 0.5 }}> &nbsp;·&nbsp; </span>}
           <span className="font-display text-xl" style={{ color: 'var(--gold-bright)' }}>${question.points}</span>
         </div>
-        <button className="btn-ghost text-sm" onClick={handleClose}>✕ Close &amp; mark answered</button>
+        <div className="flex items-center gap-2">
+          <button className="btn-ghost text-sm" onClick={handleDismiss} title="Return to board without marking this question as used">
+            Dismiss
+          </button>
+          <button className="btn-ghost text-sm" style={{ color: 'var(--gold)' }} onClick={handleClose} title="Return to board and mark this question as answered">
+            Mark answered
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 flex gap-6 p-6 min-h-0">
