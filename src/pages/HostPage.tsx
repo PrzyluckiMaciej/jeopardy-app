@@ -32,6 +32,7 @@ export default function HostPage() {
   const [activeBoard, setActiveBoard] = useState<Board | null>(null)
   const [showBoardPicker, setShowBoardPicker] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [showDdNoControlAlert, setShowDdNoControlAlert] = useState(false)
 
   // Board picker group state
   const [pickerGroup, setPickerGroup] = useState<string | null>(null)
@@ -192,7 +193,10 @@ export default function HostPage() {
 
     if (isDailyDouble) {
       const ddPlayerId = useGameStore.getState().state.boardControlId
-      if (!ddPlayerId) return
+      if (!ddPlayerId) {
+        setShowDdNoControlAlert(true)
+        return
+      }
       openCard(categoryId, question, mediaDataUrl)
       startDailyDouble(ddPlayerId)
       net.broadcast({ type: 'DAILY_DOUBLE_REVEAL', playerId: ddPlayerId, categoryId, question, mediaDataUrl })
@@ -660,6 +664,23 @@ export default function HostPage() {
           settings={settings}
           onClose={() => {}}
         />
+      )}
+
+      {showDdNoControlAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(6,11,40,0.85)' }}>
+          <div className="panel flex flex-col gap-4 max-w-sm w-full text-center">
+            <div className="font-display text-2xl" style={{ color: 'var(--gold-bright)' }}>DAILY DOUBLE</div>
+            <div className="font-condensed text-base" style={{ color: 'var(--white)' }}>
+              No player has board control.
+            </div>
+            <div className="text-sm" style={{ color: '#4a5580' }}>
+              Assign board control to a player before opening a Daily Double question. Use the <span style={{ color: 'var(--gold)' }}>Randomize</span> button or click a player's name in the scoreboard settings.
+            </div>
+            <button className="btn-gold w-full" onClick={() => setShowDdNoControlAlert(false)}>
+              OK
+            </button>
+          </div>
+        </div>
       )}
     </div>
   )
