@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useGameStore } from '../store/gameStore'
 import * as net from '../lib/network'
 import type { NetMessage, Player } from '../types'
 import { generateId, formatScore } from '../lib/utils'
+import { logEvent } from '../lib/logger'
 import Scoreboard from '../components/Scoreboard'
 
 export default function PlayerPage() {
@@ -19,6 +20,7 @@ export default function PlayerPage() {
   const [buzzCount, setBuzzCount] = useState(0)
 
   const [myId] = useState(generateId)
+  const hasLoggedJoin = useRef(false)
 
   useEffect(() => {
     if (!roomCode) { navigate('/'); return }
@@ -36,6 +38,10 @@ export default function PlayerPage() {
       if (msg.type === 'SYNC_STATE') {
         setState(msg.state)
         setConnected(true)
+        if (!hasLoggedJoin.current) {
+          hasLoggedJoin.current = true
+          logEvent({ role: 'player', roomCode, actor: playerName, event: 'Joined room successfully' })
+        }
       }
       if (msg.type === 'OPEN_CARD') {
         setHasBuzzed(false)
@@ -115,7 +121,10 @@ export default function PlayerPage() {
       }
     })
 
-    return () => net.leaveRoom()
+    return () => {
+      net.leaveRoom()
+      logEvent({ role: 'player', roomCode, actor: playerName, event: 'Left room' })
+    }
   }, [roomCode]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleBuzz() {

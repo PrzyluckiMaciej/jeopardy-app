@@ -5,6 +5,7 @@ import * as net from '../lib/network'
 import type { Board, Player, NetMessage, Question, GameSettings } from '../types'
 import { createDefaultBoard, cellId } from '../lib/utils'
 import { getMedia, blobToDataUrl } from '../lib/db'
+import { logEvent } from '../lib/logger'
 import BoardEditor from '../components/BoardEditor'
 import QuestionOverlay from '../components/QuestionOverlay'
 import SettingsPanel from '../components/SettingsPanel'
@@ -37,12 +38,25 @@ export default function HostPage() {
 
     net.onPeerLeave((peerId) => {
       setPlayerConnected(peerId, false)
+      const leavingPlayer = useGameStore.getState().state.players.find(p => p.id === peerId)
+      logEvent({
+        role: 'host',
+        roomCode: roomCode ?? '',
+        actor: 'host',
+        event: `Player disconnected: ${leavingPlayer?.name ?? peerId}`,
+      })
     })
 
     net.onMessage((msg: NetMessage, peerId: string) => {
       if (msg.type === 'PLAYER_JOIN') {
         const player: Player = { ...msg.player, id: peerId, isConnected: true }
         addPlayer(player)
+        logEvent({
+          role: 'host',
+          roomCode: roomCode ?? '',
+          actor: 'host',
+          event: `Player joined: ${player.name}`,
+        })
         setTimeout(() => {
           net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
         }, 100)
@@ -100,17 +114,39 @@ export default function HostPage() {
   }
 
   function handleUpdatePlayer(p: Player) {
+    const prev = state.players.find(pl => pl.id === p.id)
     updatePlayer(p)
     net.broadcast({ type: 'UPDATE_PLAYER', player: p })
+    if (prev && prev.score !== p.score) {
+      logEvent({
+        role: 'host',
+        roomCode: roomCode ?? '',
+        actor: 'host',
+        event: `Score updated for ${p.name}: $${prev.score} → $${p.score}`,
+      })
+    }
   }
 
   function handleRemovePlayer(id: string) {
+    const target = state.players.find(p => p.id === id)
     removePlayer(id)
     net.broadcast({ type: 'REMOVE_PLAYER', playerId: id })
+    logEvent({
+      role: 'host',
+      roomCode: roomCode ?? '',
+      actor: 'host',
+      event: `Player removed: ${target?.name ?? id}`,
+    })
   }
 
   function handleAddPlayer(p: Player) {
     addPlayer(p)
+    logEvent({
+      role: 'host',
+      roomCode: roomCode ?? '',
+      actor: 'host',
+      event: `Player manually added: ${p.name}`,
+    })
     setTimeout(() => {
       net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
     }, 100)

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { generateRoomCode } from '../lib/utils'
 import { useGameStore } from '../store/gameStore'
+import { logEvent } from '../lib/logger'
 
 export default function LandingPage() {
   const navigate = useNavigate()
@@ -14,14 +15,18 @@ export default function LandingPage() {
     const code = generateRoomCode()
     setIsHost(true)
     setRoomCode(code)
+    logEvent({ role: 'host', roomCode: code, actor: 'host', event: 'Room created' })
     navigate('/host')
   }
 
   function handleJoin() {
     if (!joinCode.trim() || !playerName.trim()) return
+    const code = joinCode.trim().toUpperCase()
+    const name = playerName.trim()
     setIsHost(false)
-    setRoomCode(joinCode.trim().toUpperCase())
-    navigate(`/play?name=${encodeURIComponent(playerName.trim())}`)
+    setRoomCode(code)
+    logEvent({ role: 'player', roomCode: code, actor: name, event: `Attempting to join room` })
+    navigate(`/play?name=${encodeURIComponent(name)}`)
   }
 
   return (
