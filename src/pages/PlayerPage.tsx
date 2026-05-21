@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Check, X } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useGameStore } from '../store/gameStore'
 import * as net from '../lib/network'
@@ -285,7 +286,17 @@ export default function PlayerPage() {
               color: judgeResult === 'correct' ? '#4cd98a' : '#e07070',
             }}
           >
-            {judgeResult === 'correct' ? '✓ Correct!' : '✗ Wrong'}
+            {judgeResult === 'correct' ? (
+              <span className="inline-flex items-center justify-center gap-3">
+                <Check size={32} aria-hidden />
+                Correct!
+              </span>
+            ) : (
+              <span className="inline-flex items-center justify-center gap-3">
+                <X size={32} aria-hidden />
+                Wrong
+              </span>
+            )}
           </div>
         )}
 
