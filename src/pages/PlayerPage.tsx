@@ -302,7 +302,7 @@ export default function PlayerPage() {
         )}
 
         {/* Buzz button */}
-        {state.phase === 'buzzing' && !judgeResult && (
+        {state.phase === 'buzzing' && !judgeResult && !(hasBuzzed && !state.buzzQueue.includes(myId)) && (
           <div className="flex flex-col items-center gap-3">
             <button
               className={`w-40 h-40 rounded-full font-display transition-all ${!hasBuzzed && state.phase === 'buzzing' ? 'buzz-btn' : ''}`}
