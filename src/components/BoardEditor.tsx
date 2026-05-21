@@ -21,6 +21,7 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
   const [boardName, setBoardName] = useState(board.name)
   const [mediaPreview, setMediaPreview] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const pendingCellRef = useRef<string | null>(null)
 
   const activeQ = editingCell
     ? board.categories.find((c) => c.id === editingCell.categoryId)
@@ -68,12 +69,16 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
   }
 
   async function openCell(catId: string, q: Question) {
+    const cellKey = `${catId}:${q.id}`
+    pendingCellRef.current = cellKey
     setEditingCell({ categoryId: catId, questionId: q.id })
     setMediaPreview(null)
     if (q.mediaId) {
       const rec = await getMedia(q.mediaId)
+      if (pendingCellRef.current !== cellKey) return
       if (rec) {
         const url = await blobToDataUrl(rec.blob)
+        if (pendingCellRef.current !== cellKey) return
         setMediaPreview(url)
       }
     }
@@ -169,7 +174,7 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
               board.categories.map((cat) => {
                 const q = cat.questions.find((q) => q.points === pts)
                 if (!q) return <div key={`${cat.id}-${pts}`} />
-                const isActive = editingCell?.questionId === q.id
+                const isActive = editingCell?.questionId === q.id && editingCell?.categoryId === cat.id
                 const hasContent = q.question.trim() || q.answer.trim()
                 return (
                   <button
@@ -203,7 +208,7 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
 
         {/* Question editor panel */}
         {editingCell && activeQ && activeCategory && (
-          <div className="panel w-80 flex-shrink-0 flex flex-col gap-4 overflow-auto">
+          <div key={`${editingCell.categoryId}:${editingCell.questionId}`} className="panel w-80 flex-shrink-0 flex flex-col gap-4 overflow-auto">
             <div className="flex items-center justify-between">
               <span className="font-condensed font-bold uppercase text-sm" style={{ color: 'var(--gold)' }}>
                 {activeCategory.name} · ${activeQ.points}

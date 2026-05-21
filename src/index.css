@@ -29,7 +29,7 @@ body {
 .board-cell {
   background: var(--navy-mid);
   border: 2px solid var(--navy-light);
-  transition: all 0.15s ease;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
   cursor: pointer;
 }
 .board-cell:hover:not(.answered) {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Settings } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useGameStore, useBoardStore } from '../store/gameStore'
@@ -89,11 +89,11 @@ export default function HostPage() {
     setShowBoardPicker(false)
   }
 
-  function handleBoardChange(b: Board) {
+  const handleBoardChange = useCallback((b: Board) => {
     boardStore.saveBoard(b)
     setActiveBoard(b)
     patchState({ board: b })
-  }
+  }, [boardStore, patchState])
 
   async function handleOpenCell(categoryId: string, question: Question) {
     const cId = cellId(categoryId, question.id)
