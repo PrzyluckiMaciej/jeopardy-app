@@ -11,7 +11,7 @@ export default function PlayerPage() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const playerName = params.get('name') || 'Player'
-  const { roomCode, state, settings, setState, setMyPlayerId,
+  const { roomCode, state, setState, setMyPlayerId,
     addBuzz, patchState, updatePlayer, removePlayer, setSettings } = useGameStore()
 
   const [connected, setConnected] = useState(false)
@@ -252,7 +252,7 @@ export default function PlayerPage() {
         )}
 
         {/* Scoreboard */}
-        {settings.showScoresToPlayers && state.players.length > 0 && (
+        {state.players.length > 0 && (
           <div className="w-full max-w-lg">
             <div className="font-condensed text-xs uppercase tracking-widest mb-2" style={{ color: 'var(--gold)', opacity: 0.5 }}>
               Scoreboard
