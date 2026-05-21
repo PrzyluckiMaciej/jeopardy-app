@@ -8,7 +8,7 @@ export interface LogPayload {
 }
 
 export function logEvent(payload: LogPayload): void {
-  const body = JSON.stringify({ ...payload, timestamp: new Date().toISOString() })
+  const body = JSON.stringify(payload)
   // Fire-and-forget; silently swallow errors so logging never disrupts gameplay
   fetch('/api/log', {
     method: 'POST',

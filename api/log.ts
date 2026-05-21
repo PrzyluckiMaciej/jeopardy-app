@@ -5,10 +5,10 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).end()
   }
 
-  const { timestamp, role, roomCode, actor, event } = req.body ?? {}
+  const { role, roomCode, actor, event } = req.body ?? {}
 
   const roleTag = String(role ?? 'unknown').toUpperCase().padEnd(6)
-  const line = `[${timestamp ?? new Date().toISOString()}] [${roleTag}] [room:${roomCode ?? '?'}] [${actor ?? '?'}] ${event ?? ''}`
+  const line = `[${roleTag}] [room:${roomCode ?? '?'}] [${actor ?? '?'}] ${event ?? ''}`
 
   console.log(line)
 
