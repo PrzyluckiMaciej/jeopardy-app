@@ -98,10 +98,6 @@ export default function LandingPage() {
           </div>
         )}
       </div>
-
-      <p className="mt-8 text-center text-sm" style={{ color: '#4a5580' }}>
-        No account needed · Fully peer-to-peer · No data leaves your browser
-      </p>
     </div>
   )
 }
