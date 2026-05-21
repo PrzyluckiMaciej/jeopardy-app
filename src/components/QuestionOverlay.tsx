@@ -66,7 +66,6 @@ export default function QuestionOverlay({ state, settings }: Props) {
 
   function handleRevealDailyDoubleClue() {
     store.revealDailyDoubleClue()
-    net.broadcast({ type: 'REVEAL_ANSWER' })
   }
 
   function handleReveal() {
