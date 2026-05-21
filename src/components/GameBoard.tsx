@@ -39,6 +39,7 @@ export default function GameBoard({ board, answeredCells, onOpenCell, dailyDoubl
                   minHeight: 90,
                   cursor: interactive ? 'pointer' : 'default',
                   pointerEvents: onOpenCell ? undefined : 'none',
+                  position: 'relative',
                 }}
                 onClick={() => interactive && onOpenCell(cat.id, q)}
                 disabled={isAnswered || !onOpenCell}
