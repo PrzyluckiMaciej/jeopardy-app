@@ -9,7 +9,7 @@ import Scoreboard from '../components/Scoreboard'
 
 export default function PlayerPage() {
   const navigate = useNavigate()
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const playerName = params.get('name') || 'Player'
   const { roomCode, state, setState, setMyPlayerId,
     addBuzz, patchState, updatePlayer, removePlayer, setSettings } = useGameStore()
@@ -136,13 +136,19 @@ export default function PlayerPage() {
     }
   }, [roomCode]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const myPlayer = state.players.find((p) => p.id === myId)
+
+  useEffect(() => {
+    if (myPlayer && myPlayer.name !== params.get('name')) {
+      setParams({ name: myPlayer.name }, { replace: true })
+    }
+  }, [myPlayer?.name]) // eslint-disable-line react-hooks/exhaustive-deps
+
   function handleBuzz() {
     if (hasBuzzed || state.phase !== 'buzzing') return
     setHasBuzzed(true)
-    net.broadcast({ type: 'BUZZ', playerId: myId, playerName })
+    net.broadcast({ type: 'BUZZ', playerId: myId, playerName: myPlayer?.name ?? playerName })
   }
-
-  const myPlayer = state.players.find((p) => p.id === myId)
   const myScore = myPlayer?.score ?? 0
   const isMyTurn = state.buzzQueue[0] === myId
   const activeQ = state.activeQuestion?.question
@@ -187,7 +193,7 @@ export default function PlayerPage() {
       <div className="flex items-center justify-between border-b" style={{ borderColor: 'var(--navy-light)', background: 'var(--navy-mid)', padding: '10px 24px' }}>
         <div className="font-display text-2xl" style={{ color: 'var(--gold-bright)' }}>JEOPARDY!</div>
         <div className="text-right">
-          <div className="font-condensed font-bold" style={{ color: 'var(--white)' }}>{playerName}</div>
+          <div className="font-condensed font-bold" style={{ color: 'var(--white)' }}>{myPlayer?.name ?? playerName}</div>
           <div className="font-display text-xl" style={{ color: myScore < 0 ? '#e07070' : 'var(--gold-bright)' }}>
             {formatScore(myScore)}
           </div>
