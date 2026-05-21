@@ -12,12 +12,14 @@ interface Props {
 }
 
 export default function QuestionOverlay({ state, settings }: Props) {
-  const { activeQuestion, phase, buzzQueue, players, activeMedia } = state
+  const { activeQuestion, phase, buzzQueue, players, activeMedia, dailyDouble } = state
   const store = useGameStore()
   const roomCode = useGameStore(s => s.roomCode) ?? ''
 
   if (!activeQuestion) return null
   const { question, categoryId } = activeQuestion
+  const isDD = dailyDouble !== null
+  const ddPlayer = isDD ? players.find(p => p.id === dailyDouble.playerId) : null
 
   function handleStartBuzzing() {
     store.startBuzzing()
@@ -26,14 +28,24 @@ export default function QuestionOverlay({ state, settings }: Props) {
 
   function handleJudge(playerId: string, correct: boolean) {
     const player = players.find(p => p.id === playerId)
-    let pointDelta = correct
-      ? question.points
-      : settings.pointDeduction
-      ? -question.points
-      : 0
-    if (!correct && settings.pointDeduction && !settings.allowNegativeScore && player) {
-      pointDelta = Math.max(pointDelta, -player.score)
+    let pointDelta: number
+
+    if (isDD && dailyDouble.wager != null) {
+      pointDelta = correct ? dailyDouble.wager : -dailyDouble.wager
+      if (!correct && !settings.allowNegativeScore && player) {
+        pointDelta = Math.max(pointDelta, -player.score)
+      }
+    } else {
+      pointDelta = correct
+        ? question.points
+        : settings.pointDeduction
+        ? -question.points
+        : 0
+      if (!correct && settings.pointDeduction && !settings.allowNegativeScore && player) {
+        pointDelta = Math.max(pointDelta, -player.score)
+      }
     }
+
     store.judgeAnswer(playerId, correct, pointDelta)
     net.broadcast({ type: 'JUDGE', playerId, correct, pointDelta, ...(correct && { boardControlId: playerId }) })
     const playerName = player?.name ?? playerId
@@ -48,8 +60,13 @@ export default function QuestionOverlay({ state, settings }: Props) {
       role: 'host',
       roomCode,
       actor: 'host',
-      event: `${playerName} ${verdict} — ${pointLabel} (score: $${newScore}) | question: "${question.question}" ($${question.points})`,
+      event: `${playerName} ${verdict} — ${pointLabel} (score: $${newScore}) | question: "${question.question}" ($${question.points})${isDD ? ' [Daily Double]' : ''}`,
     })
+  }
+
+  function handleRevealDailyDoubleClue() {
+    store.revealDailyDoubleClue()
+    net.broadcast({ type: 'DAILY_DOUBLE_REVEAL_CLUE' })
   }
 
   function handleReveal() {
@@ -69,6 +86,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
   }
 
   const categoryName = state.board?.categories.find(c => c.id === categoryId)?.name ?? ''
+  const showClue = phase === 'question' || phase === 'buzzing' || phase === 'revealed'
 
   return (
     <div
@@ -80,6 +98,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
           {categoryName}
           {categoryName && <span style={{ opacity: 0.5 }}> &nbsp;·&nbsp; </span>}
           <span className="font-display text-xl" style={{ color: 'var(--gold-bright)' }}>${question.points}</span>
+          {isDD && <span style={{ color: 'var(--gold-bright)', marginLeft: 8 }}>DAILY DOUBLE</span>}
         </div>
         <div className="flex items-center gap-2">
           <button className="btn-ghost text-sm" onClick={handleDismiss} title="Return to board without marking this question as used">
@@ -92,36 +111,44 @@ export default function QuestionOverlay({ state, settings }: Props) {
       </div>
 
       <div className="flex-1 flex gap-6 p-6 min-h-0">
-        {/* Main question area */}
+        {/* Main area */}
         <div className="flex-1 flex flex-col items-center justify-center text-center card-flip">
-          {activeMedia && (
-            <div className="mb-6">
-              {activeMedia.type === 'image' && (
-                <img src={activeMedia.dataUrl} className="max-h-48 rounded-lg object-contain mx-auto" />
-              )}
-              {activeMedia.type === 'audio' && (
-                <audio controls src={activeMedia.dataUrl} autoPlay className="mx-auto" />
-              )}
-              {activeMedia.type === 'video' && (
-                <video controls src={activeMedia.dataUrl} autoPlay className="max-h-48 rounded-lg mx-auto" />
-              )}
-            </div>
+          {(phase === 'dailyDouble' || phase === 'dailyDoubleBet') && (
+            <div className="daily-double-title">DAILY DOUBLE!</div>
           )}
 
-          <div
-            className="font-condensed font-bold text-3xl md:text-4xl leading-snug mb-6 max-w-2xl"
-            style={{ color: 'var(--white)' }}
-          >
-            {question.question || <span style={{ color: '#4a5580' }}>No question text</span>}
-          </div>
+          {showClue && (
+            <>
+              {activeMedia && (
+                <div className="mb-6">
+                  {activeMedia.type === 'image' && (
+                    <img src={activeMedia.dataUrl} className="max-h-48 rounded-lg object-contain mx-auto" />
+                  )}
+                  {activeMedia.type === 'audio' && (
+                    <audio controls src={activeMedia.dataUrl} autoPlay className="mx-auto" />
+                  )}
+                  {activeMedia.type === 'video' && (
+                    <video controls src={activeMedia.dataUrl} autoPlay className="max-h-48 rounded-lg mx-auto" />
+                  )}
+                </div>
+              )}
 
-          {phase === 'revealed' && (
-            <div
-              className="font-display text-2xl md:text-3xl px-6 py-3 rounded-lg mt-2"
-              style={{ background: 'rgba(212,160,23,0.15)', border: '2px solid var(--gold)', color: 'var(--gold-bright)' }}
-            >
-              {question.answer || '—'}
-            </div>
+              <div
+                className="font-condensed font-bold text-3xl md:text-4xl leading-snug mb-6 max-w-2xl"
+                style={{ color: 'var(--white)' }}
+              >
+                {question.question || <span style={{ color: '#4a5580' }}>No question text</span>}
+              </div>
+
+              {phase === 'revealed' && (
+                <div
+                  className="font-display text-2xl md:text-3xl px-6 py-3 rounded-lg mt-2"
+                  style={{ background: 'rgba(212,160,23,0.15)', border: '2px solid var(--gold)', color: 'var(--gold-bright)' }}
+                >
+                  {question.answer || '—'}
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -132,27 +159,77 @@ export default function QuestionOverlay({ state, settings }: Props) {
               Controls
             </div>
 
-            {phase === 'question' && (
+            {/* DD: title phase — waiting for wager */}
+            {isDD && phase === 'dailyDouble' && (
+              <div className="text-sm font-condensed" style={{ color: '#8899cc' }}>
+                Waiting for {ddPlayer?.name ?? 'player'} to wager…
+              </div>
+            )}
+
+            {/* DD: bet received — host can reveal clue */}
+            {isDD && phase === 'dailyDoubleBet' && dailyDouble.wager != null && (
+              <>
+                <div className="font-condensed text-sm" style={{ color: 'var(--gold-bright)' }}>
+                  {ddPlayer?.name} wagered <span className="font-display text-lg">${dailyDouble.wager}</span>
+                </div>
+                <button className="btn-gold w-full py-3" onClick={handleRevealDailyDoubleClue}>
+                  Reveal clue
+                </button>
+              </>
+            )}
+
+            {/* DD: question phase — judge the DD player directly */}
+            {isDD && phase === 'question' && ddPlayer && (
+              <div className="flex flex-col gap-2">
+                <div className="font-condensed text-sm" style={{ color: 'var(--gold-bright)' }}>
+                  {ddPlayer.name} wagered <span className="font-display">${dailyDouble.wager}</span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    className="relative group w-8 h-8 rounded flex items-center justify-center"
+                    style={{ background: 'rgba(39,174,96,0.2)', border: '1px solid var(--green)', color: '#4cd98a' }}
+                    onClick={() => handleJudge(ddPlayer.id, true)}
+                    aria-label="Accept answer"
+                  >
+                    <Check size={16} />
+                    <span className="judge-tooltip judge-tooltip--accept" role="tooltip">Accept</span>
+                  </button>
+                  <button
+                    className="relative group w-8 h-8 rounded flex items-center justify-center"
+                    style={{ background: 'rgba(192,57,43,0.2)', border: '1px solid var(--red)', color: '#e07070' }}
+                    onClick={() => handleJudge(ddPlayer.id, false)}
+                    aria-label="Decline answer"
+                  >
+                    <X size={16} />
+                    <span className="judge-tooltip judge-tooltip--decline" role="tooltip">Decline</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Normal: question phase — open for buzzing */}
+            {!isDD && phase === 'question' && (
               <button className="btn-gold w-full py-3" onClick={handleStartBuzzing}>
                 Open for buzzing
               </button>
             )}
 
-            {phase === 'buzzing' && (
+            {/* Normal: buzzing phase */}
+            {!isDD && phase === 'buzzing' && (
               <div className="text-sm font-condensed" style={{ color: '#8899cc' }}>
                 {buzzQueue.length > 0 ? 'Judging…' : 'Waiting for buzzes…'}
               </div>
             )}
 
-            {phase !== 'revealed' && (
+            {phase !== 'revealed' && phase !== 'dailyDouble' && phase !== 'dailyDoubleBet' && (
               <button className="btn-outline w-full" onClick={handleReveal}>
                 Reveal answer
               </button>
             )}
           </div>
 
-          {/* Buzz queue */}
-          {buzzQueue.length > 0 && (
+          {/* Buzz queue (hidden during DD) */}
+          {!isDD && buzzQueue.length > 0 && (
             <div className="panel flex flex-col gap-2">
               <div className="font-condensed text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--gold)', opacity: 0.7 }}>
                 Buzz queue

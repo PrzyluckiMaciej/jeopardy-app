@@ -23,7 +23,8 @@ export default function HostPage() {
   const navigate = useNavigate()
   const store = useGameStore()
   const { state, settings, roomCode, setSettings, addPlayer, removePlayer, updatePlayer,
-    openCard, patchState, setPlayerConnected, addBuzz, resetBoard, setBoardControl } = store
+    openCard, patchState, setPlayerConnected, addBuzz, resetBoard, setBoardControl,
+    startDailyDouble, setDailyDoubleBet } = store
   const boardStore = useBoardStore()
 
   const [tab, setTab] = useState<Tab>('board')
@@ -31,6 +32,7 @@ export default function HostPage() {
   const [activeBoard, setActiveBoard] = useState<Board | null>(null)
   const [showBoardPicker, setShowBoardPicker] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [showDdNoControlAlert, setShowDdNoControlAlert] = useState(false)
 
   // Board picker group state
   const [pickerGroup, setPickerGroup] = useState<string | null>(null)
@@ -122,6 +124,19 @@ export default function HostPage() {
         addBuzz(clientId)
         net.broadcast({ type: 'BUZZ', playerId: clientId, playerName: msg.playerName })
       }
+      if (msg.type === 'DAILY_DOUBLE_BET') {
+        const clientId = peerToClient.current.get(peerId)
+        if (!clientId) return
+        const gs = useGameStore.getState()
+        if (!gs.state.dailyDouble || gs.state.dailyDouble.playerId !== clientId) return
+        const player = gs.state.players.find(p => p.id === clientId)
+        if (!player) return
+        const maxPointValue = Math.max(...(gs.state.board?.pointValues ?? [0]))
+        const maxWager = player.score > maxPointValue ? player.score : maxPointValue
+        const wager = Math.max(1, Math.min(msg.wager, maxWager))
+        setDailyDoubleBet(wager)
+        net.broadcast({ type: 'DAILY_DOUBLE_ACCEPT_BET', wager })
+      }
     })
 
     return () => net.leaveRoom()
@@ -173,8 +188,22 @@ export default function HostPage() {
       if (rec) mediaDataUrl = await blobToDataUrl(rec.blob)
     }
 
-    openCard(categoryId, question, mediaDataUrl)
-    net.broadcast({ type: 'OPEN_CARD', categoryId, question, mediaDataUrl })
+    const currentBoard = useGameStore.getState().state.board
+    const isDailyDouble = currentBoard?.dailyDoubleQuestionId === question.id
+
+    if (isDailyDouble) {
+      const ddPlayerId = useGameStore.getState().state.boardControlId
+      if (!ddPlayerId) {
+        setShowDdNoControlAlert(true)
+        return
+      }
+      openCard(categoryId, question, mediaDataUrl)
+      startDailyDouble(ddPlayerId)
+      net.broadcast({ type: 'DAILY_DOUBLE_REVEAL', playerId: ddPlayerId, categoryId, question, mediaDataUrl })
+    } else {
+      openCard(categoryId, question, mediaDataUrl)
+      net.broadcast({ type: 'OPEN_CARD', categoryId, question, mediaDataUrl })
+    }
   }
 
   function handleSettingsChange(s: GameSettings) {
@@ -271,7 +300,7 @@ export default function HostPage() {
   }
 
   const board = activeBoard ?? state.board
-  const showOverlay = ['question', 'buzzing', 'revealed'].includes(state.phase) && !!state.activeQuestion
+  const showOverlay = ['question', 'buzzing', 'revealed', 'dailyDouble', 'dailyDoubleBet'].includes(state.phase) && !!state.activeQuestion
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--navy)' }}>
@@ -343,7 +372,7 @@ export default function HostPage() {
                 }} />
               </div>
             ) : board ? (
-              <GameBoard board={board} answeredCells={state.answeredCells} onOpenCell={handleOpenCell} />
+              <GameBoard board={board} answeredCells={state.answeredCells} onOpenCell={handleOpenCell} dailyDoubleQuestionId={board.dailyDoubleQuestionId} />
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center gap-4">
                 <div className="font-condensed text-lg" style={{ color: '#4a5580' }}>No board loaded</div>
@@ -635,6 +664,23 @@ export default function HostPage() {
           settings={settings}
           onClose={() => {}}
         />
+      )}
+
+      {showDdNoControlAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(6,11,40,0.85)' }}>
+          <div className="panel flex flex-col gap-4 max-w-sm w-full text-center">
+            <div className="font-display text-2xl" style={{ color: 'var(--gold-bright)' }}>DAILY DOUBLE</div>
+            <div className="font-condensed text-base" style={{ color: 'var(--white)' }}>
+              No player has board control.
+            </div>
+            <div className="text-sm" style={{ color: '#4a5580' }}>
+              Assign board control to a player before opening a Daily Double question. Use the <span style={{ color: 'var(--gold)' }}>Randomize</span> button or click a player's name in the scoreboard settings.
+            </div>
+            <button className="btn-gold w-full" onClick={() => setShowDdNoControlAlert(false)}>
+              OK
+            </button>
+          </div>
+        </div>
       )}
     </div>
   )

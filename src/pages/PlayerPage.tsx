@@ -20,6 +20,9 @@ export default function PlayerPage() {
   const [hasBuzzed, setHasBuzzed] = useState(false)
   const [judgeResult, setJudgeResult] = useState<'correct' | 'wrong' | null>(null)
   const [hostLeft, setHostLeft] = useState(false)
+  const [ddWagerInput, setDdWagerInput] = useState('')
+  const [ddWagerError, setDdWagerError] = useState('')
+  const [ddWagerSubmitted, setDdWagerSubmitted] = useState(false)
   const hostPeerId = useRef<string | null>(null)
 
   const [myId] = useState(() => {
@@ -77,9 +80,45 @@ export default function PlayerPage() {
         })
       }
       if (msg.type === 'CLOSE_CARD') {
-        patchState({ phase: 'board', activeQuestion: null, buzzQueue: [], activeMedia: null })
+        patchState({ phase: 'board', activeQuestion: null, buzzQueue: [], activeMedia: null, dailyDouble: null })
         setHasBuzzed(false)
         setJudgeResult(null)
+        setDdWagerInput('')
+        setDdWagerError('')
+        setDdWagerSubmitted(false)
+      }
+      if (msg.type === 'DAILY_DOUBLE_REVEAL') {
+        setHasBuzzed(false)
+        setJudgeResult(null)
+        setDdWagerInput('')
+        setDdWagerError('')
+        setDdWagerSubmitted(false)
+        let mediaType: 'image' | 'audio' | 'video' | undefined
+        if (msg.mediaDataUrl) {
+          if (msg.mediaDataUrl.startsWith('data:image')) mediaType = 'image'
+          else if (msg.mediaDataUrl.startsWith('data:audio')) mediaType = 'audio'
+          else if (msg.mediaDataUrl.startsWith('data:video')) mediaType = 'video'
+        }
+        patchState({
+          phase: 'dailyDouble',
+          activeQuestion: { categoryId: msg.categoryId, question: msg.question },
+          buzzQueue: [],
+          dailyDouble: { playerId: msg.playerId, wager: null },
+          activeMedia: msg.mediaDataUrl && mediaType
+            ? { type: mediaType, dataUrl: msg.mediaDataUrl }
+            : null,
+        })
+      }
+      if (msg.type === 'DAILY_DOUBLE_ACCEPT_BET') {
+        patchState({
+          phase: 'dailyDoubleBet',
+          dailyDouble: useGameStore.getState().state.dailyDouble
+            ? { ...useGameStore.getState().state.dailyDouble!, wager: msg.wager }
+            : null,
+        })
+      }
+      if (msg.type === 'DAILY_DOUBLE_REVEAL_CLUE') {
+        patchState({ phase: 'question' })
       }
       if (msg.type === 'START_BUZZING') {
         patchState({ phase: 'buzzing', buzzQueue: [] })
@@ -115,9 +154,13 @@ export default function PlayerPage() {
           activeQuestion: null,
           buzzQueue: [],
           activeMedia: null,
+          dailyDouble: null,
         })
         setHasBuzzed(false)
         setJudgeResult(null)
+        setDdWagerInput('')
+        setDdWagerError('')
+        setDdWagerSubmitted(false)
       }
       if (msg.type === 'UPDATE_PLAYER') {
         updatePlayer(msg.player)
@@ -175,7 +218,29 @@ export default function PlayerPage() {
   const isMyTurn = state.buzzQueue[0] === myId
   const activeQ = state.activeQuestion?.question
   const categoryName = state.board?.categories.find(c => c.id === state.activeQuestion?.categoryId)?.name ?? ''
-  const showOverlay = ['question', 'buzzing', 'revealed'].includes(state.phase) && !!activeQ
+  const showOverlay = ['question', 'buzzing', 'revealed', 'dailyDouble', 'dailyDoubleBet'].includes(state.phase) && !!activeQ
+  const isDD = state.dailyDouble !== null
+  const isDDPlayer = state.dailyDouble?.playerId === myId
+  const ddPlayerInfo = state.dailyDouble ? state.players.find(p => p.id === state.dailyDouble!.playerId) : null
+
+  function handleSubmitWager() {
+    const wager = parseInt(ddWagerInput, 10)
+    if (isNaN(wager) || wager < 1) {
+      setDdWagerError('Minimum wager is $1')
+      return
+    }
+    const maxPointValue = Math.max(...(state.board?.pointValues ?? [0]))
+    const maxWager = myScore > maxPointValue ? myScore : maxPointValue
+    if (wager > maxWager) {
+      setDdWagerError(`Maximum wager is $${maxWager}`)
+      return
+    }
+    setDdWagerError('')
+    setDdWagerSubmitted(true)
+    if (hostPeerId.current) {
+      net.send({ type: 'DAILY_DOUBLE_BET', wager, playerId: myId }, hostPeerId.current)
+    }
+  }
 
   useEffect(() => {
     if (!hostLeft) return
@@ -318,48 +383,148 @@ export default function PlayerPage() {
               {categoryName}
               {categoryName && <span style={{ opacity: 0.5 }}> &nbsp;·&nbsp; </span>}
               <span className="font-display text-xl" style={{ color: 'var(--gold-bright)' }}>${activeQ.points}</span>
+              {isDD && <span style={{ color: 'var(--gold-bright)', marginLeft: 8 }}>DAILY DOUBLE</span>}
             </div>
           </div>
 
           <div className="flex-1 flex gap-6 p-6 min-h-0">
-            {/* Main question area */}
+            {/* Main area */}
             <div className="flex-1 flex flex-col items-center justify-center text-center card-flip">
-              {state.activeMedia && (
-                <div className="mb-6">
-                  {state.activeMedia.type === 'image' && (
-                    <img src={state.activeMedia.dataUrl} className="max-h-48 rounded-lg object-contain mx-auto" alt="Question media" />
+              {/* DD title splash */}
+              {state.phase === 'dailyDouble' && (
+                <div className="daily-double-title">DAILY DOUBLE!</div>
+              )}
+
+              {/* DD wager submitted — waiting for host to reveal clue */}
+              {state.phase === 'dailyDoubleBet' && (
+                <div className="flex flex-col items-center gap-4">
+                  <div className="daily-double-title" style={{ fontSize: 'clamp(2rem, 5vw, 3.5rem)' }}>DAILY DOUBLE!</div>
+                  {state.dailyDouble?.wager != null && (
+                    <div className="font-condensed text-2xl" style={{ color: 'var(--gold-bright)' }}>
+                      Wager: <span className="font-display">${state.dailyDouble.wager}</span>
+                    </div>
                   )}
-                  {state.activeMedia.type === 'audio' && (
-                    <audio controls src={state.activeMedia.dataUrl} autoPlay className="mx-auto" />
-                  )}
-                  {state.activeMedia.type === 'video' && (
-                    <video controls src={state.activeMedia.dataUrl} autoPlay className="max-h-48 rounded-lg mx-auto" />
-                  )}
+                  <div className="font-condensed text-lg animate-pulse" style={{ color: '#4a5580' }}>
+                    Waiting for host to reveal the clue…
+                  </div>
                 </div>
               )}
 
-              <div
-                className="font-condensed font-bold text-3xl md:text-4xl leading-snug mb-6 max-w-2xl"
-                style={{ color: 'var(--white)' }}
-              >
-                {activeQ.question}
-              </div>
+              {/* Clue (shown in question/buzzing/revealed phases) */}
+              {(state.phase === 'question' || state.phase === 'buzzing' || state.phase === 'revealed') && (
+                <>
+                  {state.activeMedia && (
+                    <div className="mb-6">
+                      {state.activeMedia.type === 'image' && (
+                        <img src={state.activeMedia.dataUrl} className="max-h-48 rounded-lg object-contain mx-auto" alt="Question media" />
+                      )}
+                      {state.activeMedia.type === 'audio' && (
+                        <audio controls src={state.activeMedia.dataUrl} autoPlay className="mx-auto" />
+                      )}
+                      {state.activeMedia.type === 'video' && (
+                        <video controls src={state.activeMedia.dataUrl} autoPlay className="max-h-48 rounded-lg mx-auto" />
+                      )}
+                    </div>
+                  )}
 
-              {state.phase === 'revealed' && (
-                <div
-                  className="font-display text-2xl md:text-3xl px-6 py-3 rounded-lg mt-2"
-                  style={{ background: 'rgba(212,160,23,0.15)', border: '2px solid var(--gold)', color: 'var(--gold-bright)' }}
-                >
-                  {activeQ.answer || '—'}
-                </div>
+                  <div
+                    className="font-condensed font-bold text-3xl md:text-4xl leading-snug mb-6 max-w-2xl"
+                    style={{ color: 'var(--white)' }}
+                  >
+                    {activeQ.question}
+                  </div>
+
+                  {state.phase === 'revealed' && (
+                    <div
+                      className="font-display text-2xl md:text-3xl px-6 py-3 rounded-lg mt-2"
+                      style={{ background: 'rgba(212,160,23,0.15)', border: '2px solid var(--gold)', color: 'var(--gold-bright)' }}
+                    >
+                      {activeQ.answer || '—'}
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
             {/* Right panel */}
             <div className="w-72 flex-shrink-0 flex flex-col gap-4">
-              {/* Buzz button / status */}
               <div className="panel flex flex-col items-center gap-3">
-                {state.phase === 'buzzing' && !judgeResult && !(hasBuzzed && !state.buzzQueue.includes(myId)) && (
+                {/* DD: title phase — wager input for DD player, waiting message for others */}
+                {state.phase === 'dailyDouble' && (
+                  isDDPlayer ? (
+                    <div className="w-full flex flex-col gap-3">
+                      <div className="font-condensed font-bold text-sm text-center" style={{ color: 'var(--gold-bright)' }}>
+                        Enter your wager
+                      </div>
+                      <div className="text-xs text-center" style={{ color: '#4a5580' }}>
+                        Min: $1 &middot; Max: ${(() => {
+                          const maxPV = Math.max(...(state.board?.pointValues ?? [0]))
+                          return myScore > maxPV ? myScore : maxPV
+                        })()}
+                      </div>
+                      <input
+                        type="number"
+                        min={1}
+                        className="w-full text-center font-display text-xl"
+                        placeholder="Wager amount"
+                        value={ddWagerInput}
+                        onChange={(e) => { setDdWagerInput(e.target.value); setDdWagerError('') }}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSubmitWager()}
+                        disabled={ddWagerSubmitted}
+                        autoFocus
+                      />
+                      {ddWagerError && (
+                        <div className="text-xs text-center" style={{ color: 'var(--red)' }}>{ddWagerError}</div>
+                      )}
+                      <button
+                        className="btn-gold w-full py-3"
+                        onClick={handleSubmitWager}
+                        disabled={ddWagerSubmitted}
+                      >
+                        {ddWagerSubmitted ? 'Wager submitted' : 'Submit wager'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="font-condensed text-sm text-center" style={{ color: '#4a5580' }}>
+                      Waiting for {ddPlayerInfo?.name ?? 'player'} to wager…
+                    </div>
+                  )
+                )}
+
+                {/* DD: bet phase — wager confirmed, waiting for host to reveal clue */}
+                {isDD && state.phase === 'dailyDoubleBet' && (
+                  <div className="w-full flex flex-col gap-2 items-center">
+                    {isDDPlayer ? (
+                      <div className="font-condensed text-sm text-center" style={{ color: 'var(--gold-bright)' }}>
+                        Wager submitted: <span className="font-display text-lg">${state.dailyDouble?.wager}</span>
+                      </div>
+                    ) : (
+                      <div className="font-condensed text-sm text-center" style={{ color: '#8899cc' }}>
+                        {ddPlayerInfo?.name} wagered <span className="font-display">${state.dailyDouble?.wager}</span>
+                      </div>
+                    )}
+                    <div className="font-condensed text-sm text-center" style={{ color: '#4a5580' }}>
+                      Waiting for host to reveal the clue…
+                    </div>
+                  </div>
+                )}
+
+                {/* DD: question phase — waiting for host to judge */}
+                {isDD && state.phase === 'question' && (
+                  <div className="w-full flex flex-col gap-2 items-center">
+                    {state.dailyDouble?.wager != null && (
+                      <div className="font-condensed text-sm" style={{ color: 'var(--gold-bright)' }}>
+                        {isDDPlayer ? 'Your' : `${ddPlayerInfo?.name}'s`} wager: <span className="font-display text-lg">${state.dailyDouble.wager}</span>
+                      </div>
+                    )}
+                    <div className="font-condensed text-sm text-center" style={{ color: '#4a5580' }}>
+                      Waiting for host to judge…
+                    </div>
+                  </div>
+                )}
+
+                {/* Normal: buzzing phase */}
+                {!isDD && state.phase === 'buzzing' && !judgeResult && !(hasBuzzed && !state.buzzQueue.includes(myId)) && (
                   <>
                     <button
                       className={`w-32 h-32 rounded-full font-display transition-all ${!hasBuzzed ? 'buzz-btn' : ''}`}
@@ -391,7 +556,8 @@ export default function PlayerPage() {
                   </>
                 )}
 
-                {state.phase === 'question' && (
+                {/* Normal: question phase — waiting for buzzing */}
+                {!isDD && state.phase === 'question' && (
                   <div className="font-condensed text-sm text-center" style={{ color: '#4a5580' }}>
                     Waiting for host to open buzzing…
                   </div>
@@ -427,8 +593,8 @@ export default function PlayerPage() {
                 )}
               </div>
 
-              {/* Buzz queue */}
-              {state.buzzQueue.length > 0 && (
+              {/* Buzz queue (hidden during DD) */}
+              {!isDD && state.buzzQueue.length > 0 && (
                 <div className="panel flex flex-col gap-2">
                   <div className="font-condensed text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--gold)', opacity: 0.7 }}>
                     Buzz queue

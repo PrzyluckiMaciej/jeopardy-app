@@ -283,6 +283,9 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                     {q.mediaId && (
                       <div className="w-1.5 h-1.5 rounded-full mx-auto mt-1" style={{ background: 'var(--gold)', opacity: 0.8 }} />
                     )}
+                    {board.dailyDoubleQuestionId === q.id && (
+                      <div className="dd-badge">DD</div>
+                    )}
                   </button>
                 )
               }),
@@ -362,6 +365,36 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                   </label>
                 </>
               )}
+            </div>
+
+            <div
+              className="flex items-center gap-3 px-3 py-2 rounded-lg"
+              style={{
+                background: board.dailyDoubleQuestionId === activeQ.id ? 'rgba(212,160,23,0.15)' : 'var(--navy)',
+                border: `1px solid ${board.dailyDoubleQuestionId === activeQ.id ? 'rgba(212,160,23,0.45)' : 'var(--navy-light)'}`,
+                cursor: 'pointer',
+              }}
+              onClick={() => {
+                const isDD = board.dailyDoubleQuestionId === activeQ.id
+                updateBoard({ dailyDoubleQuestionId: isDD ? undefined : activeQ.id })
+              }}
+            >
+              <div className="flex-1">
+                <div className="font-condensed font-bold text-sm">Daily Double</div>
+                <div className="text-xs" style={{ color: '#4a5580' }}>Mark this question as the daily double</div>
+              </div>
+              <div
+                className="w-11 h-6 rounded-full relative transition-colors flex-shrink-0"
+                style={{ background: board.dailyDoubleQuestionId === activeQ.id ? 'var(--gold)' : 'var(--navy-light)' }}
+              >
+                <div
+                  className="absolute top-0.5 w-5 h-5 rounded-full transition-transform"
+                  style={{
+                    background: 'var(--navy-mid)',
+                    left: board.dailyDoubleQuestionId === activeQ.id ? 'calc(100% - 22px)' : '2px',
+                  }}
+                />
+              </div>
             </div>
           </div>
         )}

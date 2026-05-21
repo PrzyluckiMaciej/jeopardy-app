@@ -25,6 +25,7 @@ export interface Board {
   name: string
   categories: Category[]
   pointValues: number[] // e.g. [200, 400, 600, 800, 1000]
+  dailyDoubleQuestionId?: string
   createdAt: number
   updatedAt: number
 }
@@ -45,11 +46,13 @@ export interface Player {
 }
 
 export type GamePhase =
-  | 'lobby'       // waiting for players
-  | 'board'       // main board visible
-  | 'question'    // a card is open
-  | 'buzzing'     // players can buzz (host judges first in queue while others keep buzzing)
-  | 'revealed'    // answer revealed
+  | 'lobby'            // waiting for players
+  | 'board'            // main board visible
+  | 'question'         // a card is open
+  | 'buzzing'          // players can buzz (host judges first in queue while others keep buzzing)
+  | 'revealed'         // answer revealed
+  | 'dailyDouble'      // daily double title splash
+  | 'dailyDoubleBet'   // player is inputting their wager
 
 export interface GameState {
   phase: GamePhase
@@ -60,6 +63,7 @@ export interface GameState {
   buzzQueue: string[] // player ids in order
   activeMedia: { type: 'image' | 'audio' | 'video'; dataUrl: string } | null
   boardControlId: string | null // player id of the player with board control
+  dailyDouble: { playerId: string; wager: number | null } | null
 }
 
 // ---- Network messages ----
@@ -80,6 +84,10 @@ export type NetMessage =
   | { type: 'UPDATE_SETTINGS'; settings: GameSettings }
   | { type: 'MEDIA_CHUNK'; mediaId: string; chunk: string; index: number; total: number; mimeType: string }
   | { type: 'JOIN_REJECTED'; reason: 'NAME_TAKEN' }
+  | { type: 'DAILY_DOUBLE_REVEAL'; playerId: string; categoryId: string; question: Question; mediaDataUrl?: string }
+  | { type: 'DAILY_DOUBLE_BET'; wager: number; playerId: string }
+  | { type: 'DAILY_DOUBLE_ACCEPT_BET'; wager: number }
+  | { type: 'DAILY_DOUBLE_REVEAL_CLUE' }
 
 export interface GameSettings {
   pointDeduction: boolean

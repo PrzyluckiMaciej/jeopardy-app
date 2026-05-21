@@ -107,6 +107,9 @@ interface GameStore {
   judgeAnswer: (playerId: string, correct: boolean, pointDelta: number) => void
   revealAnswer: () => void
   markAnswered: (cellId: string) => void
+  startDailyDouble: (playerId: string) => void
+  setDailyDoubleBet: (wager: number) => void
+  revealDailyDoubleClue: () => void
   resetBoard: () => void
   reset: () => void
 }
@@ -120,6 +123,7 @@ const defaultState: GameState = {
   buzzQueue: [],
   activeMedia: null,
   boardControlId: null,
+  dailyDouble: null,
 }
 
 const defaultSettings: GameSettings = {
@@ -212,6 +216,7 @@ export const useGameStore = create<GameStore>()(
             activeQuestion: null,
             buzzQueue: [],
             activeMedia: null,
+            dailyDouble: null,
           },
         })),
 
@@ -259,7 +264,33 @@ export const useGameStore = create<GameStore>()(
             activeQuestion: null,
             buzzQueue: [],
             activeMedia: null,
+            dailyDouble: null,
           },
+        })),
+
+      startDailyDouble: (playerId) =>
+        set((s) => ({
+          state: {
+            ...s.state,
+            phase: 'dailyDouble',
+            dailyDouble: { playerId, wager: null },
+          },
+        })),
+
+      setDailyDoubleBet: (wager) =>
+        set((s) => ({
+          state: {
+            ...s.state,
+            phase: 'dailyDoubleBet',
+            dailyDouble: s.state.dailyDouble
+              ? { ...s.state.dailyDouble, wager }
+              : null,
+          },
+        })),
+
+      revealDailyDoubleClue: () =>
+        set((s) => ({
+          state: { ...s.state, phase: 'question' },
         })),
 
       resetBoard: () =>
@@ -273,6 +304,7 @@ export const useGameStore = create<GameStore>()(
             buzzQueue: [],
             activeMedia: null,
             boardControlId: null,
+            dailyDouble: null,
           },
         })),
 
