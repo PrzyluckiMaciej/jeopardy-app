@@ -18,6 +18,8 @@ export default function PlayerPage() {
   const [hasBuzzed, setHasBuzzed] = useState(false)
   const [judgeResult, setJudgeResult] = useState<'correct' | 'wrong' | null>(null)
   const [buzzCount, setBuzzCount] = useState(0)
+  const [hostLeft, setHostLeft] = useState(false)
+  const hostPeerId = useRef<string | null>(null)
 
   const [myId] = useState(() => {
     const existing = useGameStore.getState().myPlayerId
@@ -39,8 +41,15 @@ export default function PlayerPage() {
       net.broadcast({ type: 'PLAYER_JOIN', player: me })
     })
 
-    net.onMessage((msg: NetMessage) => {
+    net.onPeerLeave((peerId) => {
+      if (peerId === hostPeerId.current) {
+        setHostLeft(true)
+      }
+    })
+
+    net.onMessage((msg: NetMessage, peerId: string) => {
       if (msg.type === 'SYNC_STATE') {
+        if (!hostPeerId.current) hostPeerId.current = peerId
         setState(msg.state)
         setConnected(true)
         if (!hasLoggedJoin.current) {
@@ -152,6 +161,39 @@ export default function PlayerPage() {
   const myScore = myPlayer?.score ?? 0
   const isMyTurn = state.buzzQueue[0] === myId
   const activeQ = state.activeQuestion?.question
+
+  useEffect(() => {
+    if (!hostLeft) return
+    logEvent({ role: 'player', roomCode: roomCode ?? '', actor: playerName, event: 'Host left the room' })
+    const t = setTimeout(() => {
+      net.leaveRoom()
+      navigate('/')
+    }, 3000)
+    return () => clearTimeout(t)
+  }, [hostLeft]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (hostLeft) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ background: 'var(--navy)' }}>
+        <div className="font-display text-4xl" style={{ color: 'var(--gold-bright)' }}>JEOPARDY!</div>
+        <div className="font-condensed text-xl" style={{ color: 'var(--red)' }}>
+          Host has left the room.
+        </div>
+        <div className="text-sm text-center max-w-xs" style={{ color: '#4a5580' }}>
+          The game session ended because the host disconnected. Returning to home…
+        </div>
+        <button
+          className="btn-outline mt-2"
+          onClick={() => {
+            net.leaveRoom()
+            navigate('/')
+          }}
+        >
+          Back to home
+        </button>
+      </div>
+    )
+  }
 
   if (nameTaken) {
     return (
