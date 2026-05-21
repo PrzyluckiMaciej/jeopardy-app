@@ -279,7 +279,7 @@ export default function PlayerPage() {
         {/* Judge result */}
         {judgeResult && (
           <div
-            className="font-display text-4xl text-center px-8 py-4 rounded-xl card-flip"
+            className="font-display text-4xl text-center px-12 py-6 rounded-xl card-flip"
             style={{
               background: judgeResult === 'correct' ? 'rgba(39,174,96,0.2)' : 'rgba(192,57,43,0.2)',
               border: `2px solid ${judgeResult === 'correct' ? 'var(--green)' : 'var(--red)'}`,
