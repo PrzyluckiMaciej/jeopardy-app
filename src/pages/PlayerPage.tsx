@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, X } from 'lucide-react'
+import { Check, X, LogOut } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useGameStore } from '../store/gameStore'
 import * as net from '../lib/network'
@@ -160,6 +160,13 @@ export default function PlayerPage() {
     }
   }
 
+  function handleExitRoom() {
+    net.leaveRoom()
+    logEvent({ role: 'player', roomCode: roomCode ?? '', actor: playerName, event: 'Left room voluntarily' })
+    useGameStore.getState().reset()
+    navigate('/')
+  }
+
   const myScore = myPlayer?.score ?? 0
   const isMyTurn = state.buzzQueue[0] === myId
   const activeQ = state.activeQuestion?.question
@@ -238,7 +245,16 @@ export default function PlayerPage() {
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--navy)' }}>
       {/* Top bar */}
       <div className="flex items-center justify-between border-b" style={{ borderColor: 'var(--navy-light)', background: 'var(--navy-mid)', padding: '10px 24px' }}>
-        <div className="font-display text-2xl" style={{ color: 'var(--gold-bright)' }}>JEOPARDY!</div>
+        <div className="flex items-center gap-3">
+          <div className="font-display text-2xl" style={{ color: 'var(--gold-bright)' }}>JEOPARDY!</div>
+          <button
+            className="flex items-center justify-center p-2 rounded-lg border-none cursor-pointer bg-transparent transition-colors text-[#4a5580] hover:bg-red-500/10 hover:text-red-400"
+            onClick={handleExitRoom}
+            title="Exit room"
+          >
+            <LogOut size={22} />
+          </button>
+        </div>
         <div className="text-right">
           <div className="font-condensed font-bold" style={{ color: 'var(--white)' }}>{myPlayer?.name ?? playerName}</div>
           <div className="font-display text-xl" style={{ color: myScore < 0 ? '#e07070' : 'var(--gold-bright)' }}>
