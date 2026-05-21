@@ -1,3 +1,4 @@
+import { Check, X } from 'lucide-react'
 import type { GameState, GameSettings } from '../types'
 import { cellId } from '../lib/utils'
 import * as net from '../lib/network'
@@ -156,20 +157,24 @@ export default function QuestionOverlay({ state, settings }: Props) {
                     {idx === 0 && phase === 'judging' && (
                       <div className="flex gap-2">
                         <button
-                          className="w-8 h-8 rounded font-bold text-lg"
+                          className="relative group w-8 h-8 rounded flex items-center justify-center"
                           style={{ background: 'rgba(39,174,96,0.2)', border: '1px solid var(--green)', color: '#4cd98a' }}
                           onClick={() => handleJudge(pid, true)}
-                          title="Correct"
                         >
-                          ✓
+                          <Check size={16} />
+                          <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-0.5 rounded text-xs font-sans font-normal whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ background: 'rgba(0,0,0,0.85)', color: '#fff' }}>
+                            Accept
+                          </span>
                         </button>
                         <button
-                          className="w-8 h-8 rounded font-bold text-lg"
+                          className="relative group w-8 h-8 rounded flex items-center justify-center"
                           style={{ background: 'rgba(192,57,43,0.2)', border: '1px solid var(--red)', color: '#e07070' }}
                           onClick={() => handleJudge(pid, false)}
-                          title="Wrong"
                         >
-                          ✗
+                          <X size={16} />
+                          <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-0.5 rounded text-xs font-sans font-normal whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ background: 'rgba(0,0,0,0.85)', color: '#fff' }}>
+                            Decline
+                          </span>
                         </button>
                       </div>
                     )}
