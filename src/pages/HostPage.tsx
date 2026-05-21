@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Settings } from 'lucide-react'
+import { Settings, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useGameStore, useBoardStore } from '../store/gameStore'
 import * as net from '../lib/network'
@@ -78,6 +78,16 @@ export default function HostPage() {
     net.broadcast({ type: 'SYNC_STATE', state: { ...useGameStore.getState().state, board: b, answeredCells: [], phase: 'board' } })
     setShowBoardPicker(false)
     setEditing(false)
+  }
+
+  function handleDeleteBoard(id: string) {
+    boardStore.deleteBoard(id)
+    if (activeBoard?.id === id) {
+      setActiveBoard(null)
+      setEditing(false)
+      patchState({ board: null, answeredCells: [], phase: 'lobby' })
+      net.broadcast({ type: 'SYNC_STATE', state: { ...useGameStore.getState().state, board: null, answeredCells: [], phase: 'lobby' } })
+    }
   }
 
   function handleNewBoard() {
@@ -262,14 +272,23 @@ export default function HostPage() {
             </div>
             <div className="flex flex-col gap-2 mb-4">
               {boardStore.boards.map((b) => (
-                <button
-                  key={b.id}
-                  className="flex items-center justify-between px-3 py-2 rounded-lg text-left w-full"
-                  style={{ background: 'var(--navy)', border: '1px solid var(--navy-light)' }}
-                  onClick={() => handleSelectBoard(b)}
-                >
-                  <span className="font-condensed font-bold">{b.name}</span>
-                </button>
+                <div key={b.id} className="relative group">
+                  <button
+                    className="flex items-center justify-between px-3 py-2 rounded-lg text-left w-full"
+                    style={{ background: 'var(--navy)', border: '1px solid var(--navy-light)' }}
+                    onClick={() => handleSelectBoard(b)}
+                  >
+                    <span className="font-condensed font-bold">{b.name}</span>
+                  </button>
+                  <button
+                    className="absolute top-1/2 right-2 -translate-y-1/2 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:brightness-75"
+                    style={{ background: 'var(--red)', color: '#fff', border: 'none', transition: 'opacity 150ms, filter 150ms' }}
+                    onClick={(e) => { e.stopPropagation(); handleDeleteBoard(b.id) }}
+                    title="Delete board"
+                  >
+                    <Trash2 size={11} />
+                  </button>
+                </div>
               ))}
               {boardStore.boards.length === 0 && (
                 <div className="text-sm text-center py-2" style={{ color: '#4a5580' }}>No saved boards</div>
