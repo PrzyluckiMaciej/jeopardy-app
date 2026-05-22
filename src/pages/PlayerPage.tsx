@@ -210,7 +210,7 @@ export default function PlayerPage() {
   function handleExitRoom() {
     net.leaveRoom()
     logEvent({ role: 'player', roomCode: roomCode ?? '', actor: playerName, event: 'Left room voluntarily' })
-    useGameStore.getState().reset()
+    useGameStore.getState().leaveRoom()
     navigate('/')
   }
 
