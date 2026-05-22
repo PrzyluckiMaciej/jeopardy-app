@@ -112,6 +112,7 @@ interface GameStore {
   revealDailyDoubleClue: () => void
   resetBoard: () => void
   reset: () => void
+  leaveRoom: () => void
 }
 
 const defaultState: GameState = {
@@ -318,6 +319,13 @@ export const useGameStore = create<GameStore>()(
           isHost: false,
           roomCode: null,
           myPlayerId: null,
+        }),
+
+      leaveRoom: () =>
+        set({
+          state: defaultState,
+          isHost: false,
+          roomCode: null,
         }),
     }),
     {
