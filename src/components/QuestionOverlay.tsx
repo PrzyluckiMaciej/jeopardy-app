@@ -135,14 +135,14 @@ export default function QuestionOverlay({ state, settings }: Props) {
         }
       }}
     >
-      <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--navy-light)' }}>
-        <div className="font-condensed font-bold uppercase tracking-wider" style={{ color: 'var(--gold)', fontSize: 14 }}>
+      <header className="question-overlay-header">
+        <div className="font-condensed font-bold uppercase tracking-wider min-w-0" style={{ color: 'var(--gold)', fontSize: 14 }}>
           {categoryName}
           {categoryName && <span style={{ opacity: 0.5 }}> &nbsp;·&nbsp; </span>}
           <span className="font-display text-xl" style={{ color: 'var(--gold-bright)' }}>${question.points}</span>
           {isDD && <span style={{ color: 'var(--gold-bright)', marginLeft: 8 }}>DAILY DOUBLE</span>}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="question-overlay-header__actions">
           <button
             className="btn-ghost text-sm btn-with-icon"
             onClick={handleDismiss}
@@ -161,11 +161,10 @@ export default function QuestionOverlay({ state, settings }: Props) {
             <span>Answered</span>
           </button>
         </div>
-      </div>
+      </header>
 
-      <div className="flex-1 flex gap-6 p-6 min-h-0">
-        {/* Main area */}
-        <div className={`flex-1 flex flex-col items-center justify-center text-center ${overlayExiting ? 'card-flip-exit' : 'card-flip'}`}>
+      <div className="question-overlay-layout">
+        <div className={`question-overlay-main ${overlayExiting ? 'card-flip-exit' : 'card-flip'}`}>
           {(phase === 'dailyDouble' || phase === 'dailyDoubleBet') && (
             <div
               className={`daily-double-title${ddExiting ? ' daily-double-title--exit' : ''}`}
@@ -219,8 +218,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
           )}
         </div>
 
-        {/* Controls panel */}
-        <div className="w-72 flex-shrink-0 flex flex-col gap-4">
+        <aside className="question-overlay-sidebar">
           <div className="panel flex flex-col gap-3">
             <div className="font-condensed text-xs uppercase tracking-wider" style={{ color: 'var(--gold)', opacity: 0.7 }}>
               Controls
@@ -369,7 +367,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
               </div>
             ))}
           </div>
-        </div>
+        </aside>
       </div>
     </div>
   )

@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import type { Board, Question } from '../types'
 import { cellId } from '../lib/utils'
 
@@ -28,10 +29,18 @@ export default function GameBoard({
         gridTemplateColumns: `repeat(${board.categories.length}, minmax(140px, 1fr))`,
       }
 
+  const rootClass = [
+    'game-board',
+    fill ? 'game-board--fill h-full w-full min-h-0' : 'game-board--touch overflow-auto',
+  ].join(' ')
+
   return (
-    <div className={fill ? 'h-full w-full min-h-0' : 'overflow-auto'}>
+    <div
+      className={rootClass}
+      style={{ '--board-cols': board.categories.length } as CSSProperties}
+    >
       <div
-        className={`grid gap-2 ${fill ? 'h-full w-full' : 'min-w-max'}`}
+        className={`game-board__grid grid gap-2 ${fill ? 'h-full w-full' : 'min-w-max'}`}
         style={gridStyle}
       >
         {board.categories.map((cat) => (

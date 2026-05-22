@@ -441,40 +441,47 @@ export default function HostPage() {
     : boardStore.boards
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden page-fade-in" style={{ background: 'var(--navy)' }}>
+    <div className="app-page h-screen flex flex-col overflow-hidden page-fade-in" style={{ background: 'var(--navy)' }}>
       {/* Top bar */}
-      <div className="flex items-center gap-5 border-b" style={{ borderColor: 'var(--navy-light)', background: 'var(--navy-mid)', padding: '10px 24px' }}>
-        <button className="font-display text-2xl" style={{ color: 'var(--gold-bright)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} onClick={() => setTab('board')}>JEOPARDY!</button>
-        <div className="w-px h-6" style={{ background: 'var(--navy-light)' }} />
-        <div className="flex items-center gap-3">
-          <span className="font-condensed text-sm uppercase" style={{ color: '#4a5580' }}>Room</span>
+      <header className="host-topbar">
+        <button type="button" className="host-topbar__logo" onClick={() => setTab('board')}>
+          JEOPARDY!
+        </button>
+        <div className="host-topbar__divider" aria-hidden />
+        <div className="host-topbar__room">
+          <span className="host-topbar__room-label">Room</span>
           <button
-            className="font-display text-xl tracking-widest px-3 py-1 rounded"
-            style={{ background: 'rgba(212,160,23,0.1)', border: '1px solid rgba(212,160,23,0.3)', color: 'var(--gold-bright)' }}
+            type="button"
+            className="host-topbar__room-code"
             onClick={copyCode}
-            title="Click to copy"
+            title="Click to copy room code"
           >
             {roomCode}
           </button>
-          {copied && <span className="text-sm" style={{ color: 'var(--green)' }}>Copied!</span>}
+          {copied && <span className="host-topbar__copied text-sm" style={{ color: 'var(--green)' }}>Copied!</span>}
         </div>
-        <div className="flex-1" />
-        <button
-          className="btn-icon"
-          style={{ color: tab === 'settings' ? 'var(--gold)' : undefined }}
-          onClick={() => setTab(tab === 'settings' ? 'board' : 'settings')}
-          title={tab === 'settings' ? 'Back to board' : 'Settings'}
-        >
-          <Settings size={26} />
-        </button>
-        <button
-          className="btn-icon-exit"
-          onClick={handleExitRoom}
-          title="Exit room"
-        >
-          <LogOut size={22} />
-        </button>
-      </div>
+        <div className="host-topbar__actions">
+          <button
+            type="button"
+            className="btn-icon"
+            style={{ color: tab === 'settings' ? 'var(--gold)' : undefined }}
+            onClick={() => setTab(tab === 'settings' ? 'board' : 'settings')}
+            title={tab === 'settings' ? 'Back to board' : 'Settings'}
+            aria-label={tab === 'settings' ? 'Back to board' : 'Settings'}
+          >
+            <Settings size={26} />
+          </button>
+          <button
+            type="button"
+            className="btn-icon-exit"
+            onClick={handleExitRoom}
+            title="Exit room"
+            aria-label="Exit room"
+          >
+            <LogOut size={22} />
+          </button>
+        </div>
+      </header>
 
       <div className="flex flex-col flex-1 min-h-0">
         {tab === 'board' && (
@@ -514,17 +521,8 @@ export default function HostPage() {
               <div className="flex-1 flex flex-col min-h-0">
                 {/* Toolbar — sits directly below top bar with fixed spacing */}
                 {!editing && (
-                  <div
-                    className="flex-shrink-0 flex items-center gap-2"
-                    style={{
-                      paddingTop: 'var(--space-sm)',
-                      paddingBottom: 'var(--space-xs)',
-                      paddingLeft: 24,
-                      paddingRight: 24,
-                    }}
-                  >
-                    {/* Left: primary actions + labels */}
-                    <div className="flex items-center gap-2 flex-wrap flex-1">
+                  <div className="host-board-toolbar">
+                    <div className="host-board-toolbar__primary">
                       <button
                         className="btn-outline text-sm btn-with-icon"
                         onClick={openBoardPicker}
@@ -556,9 +554,8 @@ export default function HostPage() {
                       )}
                     </div>
 
-                    {/* Center: game navigation */}
                     {inGame && (
-                      <div className="flex items-center gap-1 flex-shrink-0">
+                      <div className="host-board-toolbar__nav">
                         <button
                           className="btn-ghost text-sm btn-icon-only"
                           onClick={handlePrevBoard}
@@ -578,8 +575,7 @@ export default function HostPage() {
                       </div>
                     )}
 
-                    {/* Right: destructive actions */}
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="host-board-toolbar__destructive">
                       {board && !inGame && (
                         <button
                           className="btn-ghost text-sm btn-icon-only"
@@ -597,7 +593,7 @@ export default function HostPage() {
 
                 <div className="flex-1 flex flex-col min-h-0 overflow-hidden gap-4 px-4 pb-4 pt-2">
                   {/* Board — grows to fill space above scoreboard */}
-                  <div className="flex-1 min-h-0 min-w-0 overflow-x-auto overflow-y-hidden">
+                  <div className="board-scroll-wrap">
                     {editing && board ? (
                       <BoardEditor board={board} onChange={handleBoardChange} onClose={() => {
                         setEditing(false)
@@ -667,12 +663,10 @@ export default function HostPage() {
 
         {tab === 'settings' && (
           <div
-            className="flex-1 overflow-auto tab-fade-in"
+            className="flex-1 overflow-auto tab-fade-in safe-area-x"
             style={{
               paddingTop: 'var(--space-sm)',
               paddingBottom: 'var(--space-lg)',
-              paddingLeft: 24,
-              paddingRight: 24,
             }}
           >
             <SettingsPanel
@@ -690,16 +684,15 @@ export default function HostPage() {
 
       {/* Board picker modal */}
       {showBoardPicker && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center p-4" style={{ background: 'rgba(6,11,40,0.9)' }}>
-          <div className="panel modal-enter w-full max-w-2xl flex flex-col" style={{ height: '70vh' }}>
+        <div className="board-picker-overlay">
+          <div className="panel modal-enter board-picker-modal">
             <div className="flex items-center justify-between mb-4 flex-shrink-0">
               <h2 className="font-condensed font-bold text-lg uppercase" style={{ color: 'var(--gold)' }}>Select Board</h2>
               <button className="btn-ghost text-sm" onClick={closeBoardPicker}>✕</button>
             </div>
 
-            <div className="flex gap-4 flex-1 min-h-0 overflow-hidden">
-              {/* Left: Games panel */}
-              <div className="w-44 flex-shrink-0 flex flex-col gap-1 overflow-auto">
+            <div className="board-picker-body">
+              <div className="board-picker-games">
                 <div className="font-condensed text-xs uppercase tracking-widest mb-1 flex-shrink-0" style={{ color: 'var(--gold)', opacity: 0.7 }}>
                   Games
                 </div>
@@ -816,10 +809,9 @@ export default function HostPage() {
                 </div>
               </div>
 
-              <div className="w-px flex-shrink-0" style={{ background: 'var(--navy-light)' }} />
+              <div className="board-picker-divider w-px flex-shrink-0" style={{ background: 'var(--navy-light)' }} />
 
-              {/* Right: Boards panel */}
-              <div className="flex-1 flex flex-col min-h-0">
+              <div className="board-picker-boards">
                 <div className="flex-1 overflow-auto flex flex-col gap-2 pr-1">
                   {pickerBoards.map((b, idx) => (
                     <div key={b.id} className="group flex items-center gap-2">
