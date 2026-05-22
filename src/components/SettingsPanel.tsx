@@ -218,9 +218,17 @@ export default function SettingsPanel({
                     border: '1px solid rgba(0,200,180,0.35)',
                     color: '#40e0d0',
                   }}
-                  title={boardControlId === p.id ? 'This player has board control' : 'Give this player board control'}
-                  aria-label={boardControlId === p.id ? 'Has board control' : 'Assign board control'}
-                  onClick={() => onAssignBoardControl(p.id)}
+                  title={
+                    boardControlId === p.id
+                      ? 'Remove board control from this player'
+                      : 'Give this player board control'
+                  }
+                  aria-label={
+                    boardControlId === p.id ? 'Remove board control' : 'Assign board control'
+                  }
+                  onClick={() =>
+                    onAssignBoardControl(boardControlId === p.id ? null : p.id)
+                  }
                 >
                   <Crown size={16} aria-hidden />
                 </button>
