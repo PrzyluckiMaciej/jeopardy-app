@@ -372,7 +372,10 @@ export default function PlayerPage() {
       </div>
 
       {/* Main content */}
-      <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+      <div
+        className="flex flex-col flex-1 min-h-0 overflow-hidden"
+        style={{ paddingTop: 'var(--space-sm)' }}
+      >
         {/* Podium view */}
         {state.phase === 'podium' && (
           <div className="flex-1 flex flex-col items-center justify-center p-4 overflow-auto">
@@ -382,7 +385,7 @@ export default function PlayerPage() {
 
         {/* Board area + scoreboard (all phases except podium) */}
         {state.phase !== 'podium' && (
-          <div className="flex-1 flex flex-col min-h-0 overflow-hidden gap-4 px-4 pb-4 pt-2">
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden gap-4 px-4 pb-4">
             <div className="flex-1 min-h-0 min-w-0 overflow-x-auto overflow-y-hidden">
               {state.phase === 'gameStart' && (
                 <div className="h-full flex flex-col items-center justify-center gap-4">
