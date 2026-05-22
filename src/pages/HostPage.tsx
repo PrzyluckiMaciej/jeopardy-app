@@ -582,9 +582,9 @@ export default function HostPage() {
                   </div>
                 )}
 
-                <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                <div className="flex-1 flex flex-col min-h-0 overflow-hidden gap-4 px-4 pb-4 pt-2">
                   {/* Board — grows to fill space above scoreboard */}
-                  <div className="flex-1 min-h-0 min-w-0 overflow-x-auto overflow-y-hidden px-4 pt-2">
+                  <div className="flex-1 min-h-0 min-w-0 overflow-x-auto overflow-y-hidden">
                     {editing && board ? (
                       <BoardEditor board={board} onChange={handleBoardChange} onClose={() => {
                         setEditing(false)
@@ -614,10 +614,7 @@ export default function HostPage() {
 
                   {/* Scoreboard — pinned below board, always visible */}
                   {!editing && (
-                    <div
-                      className="flex-shrink-0 border-t px-4 pb-3 pt-2"
-                      style={{ borderColor: 'var(--navy-light)' }}
-                    >
+                    <div className="flex-shrink-0">
                       <div className="flex items-center gap-2 mb-2">
                         <div className="font-condensed font-bold uppercase tracking-widest text-xs" style={{ color: 'var(--gold)', opacity: 0.7 }}>
                           Scoreboard

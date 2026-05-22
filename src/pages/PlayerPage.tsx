@@ -338,7 +338,7 @@ export default function PlayerPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'var(--navy)' }}>
+    <div className="h-screen flex flex-col overflow-hidden" style={{ background: 'var(--navy)' }}>
       {/* Top bar */}
       <div className="flex items-center justify-between border-b" style={{ borderColor: 'var(--navy-light)', background: 'var(--navy-mid)', padding: '10px 24px' }}>
         <div className="font-display text-2xl" style={{ color: 'var(--gold-bright)' }}>JEOPARDY!</div>
@@ -372,66 +372,62 @@ export default function PlayerPage() {
       </div>
 
       {/* Main content */}
-      <div className="flex flex-col flex-1 min-h-0 overflow-auto">
-        <div className="flex-1 flex flex-col p-4 gap-4">
-          {/* Game start waiting screen */}
-          {state.phase === 'gameStart' && (
-            <div className="flex-1 flex flex-col items-center justify-center gap-4">
-              <div className="font-display text-4xl" style={{ color: 'var(--gold-bright)' }}>JEOPARDY!</div>
-              <div className="font-condensed text-lg animate-pulse" style={{ color: '#4a5580' }}>
-                Waiting for host to start the game…
-              </div>
-              <div className="font-condensed text-sm" style={{ color: '#8899cc' }}>
-                {state.gameBoardIds.length} board{state.gameBoardIds.length !== 1 ? 's' : ''} queued
-              </div>
-            </div>
-          )}
+      <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        {/* Podium view */}
+        {state.phase === 'podium' && (
+          <div className="flex-1 flex flex-col items-center justify-center p-4 overflow-auto">
+            <Podium players={state.players} highlightId={myId} />
+          </div>
+        )}
 
-          {/* Podium view */}
-          {state.phase === 'podium' && (
-            <div className="flex-1 flex flex-col items-center justify-center">
-              <Podium players={state.players} highlightId={myId} />
-            </div>
-          )}
+        {/* Board area + scoreboard (all phases except podium) */}
+        {state.phase !== 'podium' && (
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden gap-4 px-4 pb-4 pt-2">
+            <div className="flex-1 min-h-0 min-w-0 overflow-x-auto overflow-y-hidden">
+              {state.phase === 'gameStart' && (
+                <div className="h-full flex flex-col items-center justify-center gap-4">
+                  <div className="font-display text-4xl" style={{ color: 'var(--gold-bright)' }}>JEOPARDY!</div>
+                  <div className="font-condensed text-lg animate-pulse" style={{ color: '#4a5580' }}>
+                    Waiting for host to start the game…
+                  </div>
+                  <div className="font-condensed text-sm" style={{ color: '#8899cc' }}>
+                    {state.gameBoardIds.length} board{state.gameBoardIds.length !== 1 ? 's' : ''} queued
+                  </div>
+                </div>
+              )}
 
-          {/* Normal board view */}
-          {state.phase !== 'gameStart' && state.phase !== 'podium' && (
-            <>
-              {state.board ? (
+              {state.phase !== 'gameStart' && state.board && (
                 <GameBoard
                   board={state.board}
                   answeredCells={state.answeredCells}
+                  fill
                 />
-              ) : (
-                <div className="flex-1 flex flex-col items-center justify-center gap-2">
+              )}
+
+              {state.phase !== 'gameStart' && !state.board && (
+                <div className="h-full flex flex-col items-center justify-center gap-2">
                   <div className="font-display text-4xl" style={{ color: 'var(--gold)', opacity: 0.3 }}>?</div>
                   <div className="font-condensed text-lg" style={{ color: '#4a5580' }}>
                     Waiting for host to load a board…
                   </div>
                 </div>
               )}
-            </>
-          )}
-        </div>
-
-        {/* Horizontal scoreboard */}
-        {state.phase !== 'podium' && (
-          <div
-            className="flex-shrink-0 border-t px-4 py-4"
-            style={{ borderColor: 'var(--navy-light)' }}
-          >
-            <div className="font-condensed font-bold uppercase tracking-widest text-xs mb-3" style={{ color: 'var(--gold)', opacity: 0.7 }}>
-              Scoreboard
             </div>
-            <Scoreboard
-              players={state.players}
-              buzzQueue={state.buzzQueue}
-              highlightId={myId}
-              boardControlId={state.boardControlId}
-              activeEmojis={activeEmojis}
-              myPlayerId={myId}
-              onEmojiSelect={handleEmojiSelect}
-            />
+
+            <div className="flex-shrink-0">
+              <div className="font-condensed font-bold uppercase tracking-widest text-xs mb-3" style={{ color: 'var(--gold)', opacity: 0.7 }}>
+                Scoreboard
+              </div>
+              <Scoreboard
+                players={state.players}
+                buzzQueue={state.buzzQueue}
+                highlightId={myId}
+                boardControlId={state.boardControlId}
+                activeEmojis={activeEmojis}
+                myPlayerId={myId}
+                onEmojiSelect={handleEmojiSelect}
+              />
+            </div>
           </div>
         )}
       </div>
