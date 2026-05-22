@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, X, ArrowLeft, CheckCircle, Bell, Eye } from 'lucide-react'
 import type { GameState, GameSettings } from '../types'
-import { cellId } from '../lib/utils'
+import { cellId, formatScore } from '../lib/utils'
 import * as net from '../lib/network'
 import { useGameStore } from '../store/gameStore'
 import { logEvent } from '../lib/logger'
@@ -12,12 +12,21 @@ interface Props {
   onClose: () => void
 }
 
+function scoreRank(sorted: { id: string; score: number }[], playerId: string): number {
+  const idx = sorted.findIndex((p) => p.id === playerId)
+  if (idx < 0) return 0
+  if (idx === 0) return 1
+  if (sorted[idx].score === sorted[idx - 1].score) {
+    return scoreRank(sorted, sorted[idx - 1].id)
+  }
+  return idx + 1
+}
+
 export default function QuestionOverlay({ state, settings }: Props) {
   const { activeQuestion, phase, buzzQueue, players, activeMedia, dailyDouble } = state
   const store = useGameStore()
   const roomCode = useGameStore(s => s.roomCode) ?? ''
 
-  // Exit animation state
   const [ddExiting, setDdExiting] = useState(false)
   const [overlayExiting, setOverlayExiting] = useState(false)
   const pendingOverlayAction = useRef<(() => void) | null>(null)
@@ -25,6 +34,11 @@ export default function QuestionOverlay({ state, settings }: Props) {
   const prevPhaseRef = useRef(phase)
   const [clueRevealKey, setClueRevealKey] = useState(0)
   const [answerRevealKey, setAnswerRevealKey] = useState(0)
+
+  const sortedPlayers = useMemo(
+    () => [...players].sort((a, b) => b.score - a.score),
+    [players],
+  )
 
   useEffect(() => {
     const prev = prevPhaseRef.current
@@ -86,7 +100,6 @@ export default function QuestionOverlay({ state, settings }: Props) {
   }
 
   function handleRevealDailyDoubleClue() {
-    // Trigger DD title exit animation; actual reveal happens in onAnimationEnd
     pendingDdAction.current = () => {
       store.revealDailyDoubleClue()
       net.broadcast({ type: 'DAILY_DOUBLE_REVEAL_CLUE' })
@@ -100,7 +113,6 @@ export default function QuestionOverlay({ state, settings }: Props) {
   }
 
   function handleDismiss() {
-    // Trigger overlay exit animation; actual close happens in onAnimationEnd
     pendingOverlayAction.current = () => {
       store.closeCard()
       net.broadcast({ type: 'CLOSE_CARD' })
@@ -110,7 +122,6 @@ export default function QuestionOverlay({ state, settings }: Props) {
 
   function handleClose() {
     const cId = cellId(categoryId, question.id)
-    // Trigger overlay exit animation; actual mark-answered happens in onAnimationEnd
     pendingOverlayAction.current = () => {
       store.markAnswered(cId)
       net.broadcast({ type: 'MARK_ANSWERED', cellId: cId })
@@ -123,8 +134,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex flex-col${overlayExiting ? ' question-overlay--exit' : ' question-overlay-enter'}`}
-      style={{ background: 'rgba(6,11,40,0.97)', backdropFilter: 'blur(4px)' }}
+      className={`question-overlay-backdrop fixed inset-0 z-50 flex flex-col${overlayExiting ? ' question-overlay--exit' : ' question-overlay-enter'}`}
       onAnimationEnd={(e) => {
         if (overlayExiting && e.animationName === 'overlayFadeOut' && e.target === e.currentTarget) {
           setOverlayExiting(false)
@@ -136,11 +146,11 @@ export default function QuestionOverlay({ state, settings }: Props) {
       }}
     >
       <header className="question-overlay-header">
-        <div className="font-condensed font-bold uppercase tracking-wider min-w-0" style={{ color: 'var(--gold)', fontSize: 14 }}>
+        <div className="question-overlay-header__meta min-w-0">
           {categoryName}
-          {categoryName && <span style={{ opacity: 0.5 }}> &nbsp;·&nbsp; </span>}
-          <span className="font-display text-xl" style={{ color: 'var(--gold-bright)' }}>${question.points}</span>
-          {isDD && <span style={{ color: 'var(--gold-bright)', marginLeft: 8 }}>DAILY DOUBLE</span>}
+          {categoryName && <span className="opacity-50"> &nbsp;·&nbsp; </span>}
+          <span className="question-overlay-header__points">${question.points}</span>
+          {isDD && <span className="question-overlay-header__dd">DAILY DOUBLE</span>}
         </div>
         <div className="question-overlay-header__actions">
           <button
@@ -152,8 +162,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
             <span>Dismiss</span>
           </button>
           <button
-            className="btn-ghost text-sm btn-with-icon"
-            style={{ color: 'var(--gold)' }}
+            className="btn-ghost text-sm btn-with-icon text-gold"
             onClick={handleClose}
             title="Return to board and mark this question as answered"
           >
@@ -199,17 +208,15 @@ export default function QuestionOverlay({ state, settings }: Props) {
               )}
 
               <div
-                className={`font-condensed font-bold text-3xl md:text-4xl leading-snug mb-6 max-w-2xl${activeMedia ? '' : ' clue-reveal'}`}
-                style={{ color: 'var(--white)' }}
+                className={`question-overlay-clue font-condensed font-bold text-3xl md:text-4xl leading-snug mb-6 max-w-2xl${activeMedia ? '' : ' clue-reveal'}`}
               >
-                {question.question || <span style={{ color: '#4a5580' }}>No question text</span>}
+                {question.question || <span className="text-muted">No question text</span>}
               </div>
 
               {phase === 'revealed' && (
                 <div
                   key={`answer-${answerRevealKey}`}
-                  className="font-display text-2xl md:text-3xl px-6 py-3 rounded-lg mt-2 answer-reveal"
-                  style={{ background: 'rgba(212,160,23,0.15)', border: '2px solid var(--gold)', color: 'var(--gold-bright)' }}
+                  className="question-overlay-answer font-display text-2xl md:text-3xl px-6 py-3 mt-2 answer-reveal"
                 >
                   {question.answer || '—'}
                 </div>
@@ -220,39 +227,36 @@ export default function QuestionOverlay({ state, settings }: Props) {
 
         <aside className="question-overlay-sidebar">
           <div className="panel flex flex-col gap-3">
-            <div className="font-condensed text-xs uppercase tracking-wider" style={{ color: 'var(--gold)', opacity: 0.7 }}>
+            <div className="font-condensed text-xs uppercase tracking-wider text-gold opacity-70">
               Controls
             </div>
 
-            {/* DD: title phase — waiting for wager */}
             {isDD && phase === 'dailyDouble' && (
-              <div className="text-sm font-condensed" style={{ color: '#8899cc' }}>
+              <div className="text-sm font-condensed text-subtle">
                 Waiting for {ddPlayer?.name ?? 'player'} to wager…
               </div>
             )}
 
-            {/* DD: bet received — host can reveal clue */}
             {isDD && phase === 'dailyDoubleBet' && dailyDouble.wager != null && (
               <>
-                <div className="font-condensed text-sm" style={{ color: 'var(--gold-bright)' }}>
+                <div className="font-condensed text-sm text-gold-bright">
                   {ddPlayer?.name} wagered <span className="font-display text-lg">${dailyDouble.wager}</span>
                 </div>
-                <button className="btn-gold w-full py-3" onClick={handleRevealDailyDoubleClue}>
+                <button type="button" className="btn-gold w-full py-3" onClick={handleRevealDailyDoubleClue}>
                   Reveal clue
                 </button>
               </>
             )}
 
-            {/* DD: question phase — judge the DD player directly */}
             {isDD && phase === 'question' && ddPlayer && (
               <div className="flex flex-col gap-2">
-                <div className="font-condensed text-sm" style={{ color: 'var(--gold-bright)' }}>
+                <div className="font-condensed text-sm text-gold-bright">
                   {ddPlayer.name} wagered <span className="font-display">${dailyDouble.wager}</span>
                 </div>
                 <div className="flex gap-2">
                   <button
-                    className="relative group w-8 h-8 rounded flex items-center justify-center"
-                    style={{ background: 'rgba(39,174,96,0.2)', border: '1px solid var(--green)', color: '#4cd98a' }}
+                    type="button"
+                    className="relative group w-8 h-8 rounded flex items-center justify-center judge-btn--accept"
                     onClick={() => handleJudge(ddPlayer.id, true)}
                     aria-label="Accept answer"
                   >
@@ -260,8 +264,8 @@ export default function QuestionOverlay({ state, settings }: Props) {
                     <span className="judge-tooltip judge-tooltip--accept" role="tooltip">Accept</span>
                   </button>
                   <button
-                    className="relative group w-8 h-8 rounded flex items-center justify-center"
-                    style={{ background: 'rgba(192,57,43,0.2)', border: '1px solid var(--red)', color: '#e07070' }}
+                    type="button"
+                    className="relative group w-8 h-8 rounded flex items-center justify-center judge-btn--decline"
                     onClick={() => handleJudge(ddPlayer.id, false)}
                     aria-label="Decline answer"
                   >
@@ -272,9 +276,9 @@ export default function QuestionOverlay({ state, settings }: Props) {
               </div>
             )}
 
-            {/* Normal: question phase — open for buzzing */}
             {!isDD && phase === 'question' && !settings.autoBuzzQueue && (
               <button
+                type="button"
                 className="btn-gold w-full py-3 btn-with-icon justify-center"
                 onClick={handleStartBuzzing}
                 title="Allow players to buzz in"
@@ -284,15 +288,15 @@ export default function QuestionOverlay({ state, settings }: Props) {
               </button>
             )}
 
-            {/* Normal: buzzing phase */}
             {!isDD && phase === 'buzzing' && (
-              <div className="text-sm font-condensed" style={{ color: '#8899cc' }}>
+              <div className="text-sm font-condensed text-subtle">
                 {buzzQueue.length > 0 ? 'Judging…' : 'Waiting for buzzes…'}
               </div>
             )}
 
             {phase !== 'revealed' && phase !== 'dailyDouble' && phase !== 'dailyDoubleBet' && (
               <button
+                type="button"
                 className="btn-outline w-full btn-with-icon justify-center"
                 onClick={handleReveal}
                 title="Show the answer to players"
@@ -303,10 +307,9 @@ export default function QuestionOverlay({ state, settings }: Props) {
             )}
           </div>
 
-          {/* Buzz queue (hidden during DD) */}
           {!isDD && buzzQueue.length > 0 && (
             <div className="panel flex flex-col gap-2">
-              <div className="font-condensed text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--gold)', opacity: 0.7 }}>
+              <div className="font-condensed text-xs uppercase tracking-wider mb-1 text-gold opacity-70">
                 Buzz queue
               </div>
               {buzzQueue.map((pid, idx) => {
@@ -316,15 +319,15 @@ export default function QuestionOverlay({ state, settings }: Props) {
                   <div key={pid} className="flex items-center gap-2">
                     <div className="flex-1">
                       <div className="font-condensed font-bold text-sm">{p.name}</div>
-                      <div className="text-xs" style={{ color: 'var(--gold)' }}>
-                        {p.score < 0 ? `-$${Math.abs(p.score)}` : `$${p.score}`}
+                      <div className={`text-xs ${p.score < 0 ? 'text-score-negative' : 'text-gold'}`}>
+                        {formatScore(p.score)}
                       </div>
                     </div>
                     {idx === 0 && phase === 'buzzing' && (
                       <div className="flex gap-2">
                         <button
-                          className="relative group w-8 h-8 rounded flex items-center justify-center"
-                          style={{ background: 'rgba(39,174,96,0.2)', border: '1px solid var(--green)', color: '#4cd98a' }}
+                          type="button"
+                          className="relative group w-8 h-8 rounded flex items-center justify-center judge-btn--accept"
                           onClick={() => handleJudge(pid, true)}
                           aria-label="Accept answer"
                         >
@@ -334,8 +337,8 @@ export default function QuestionOverlay({ state, settings }: Props) {
                           </span>
                         </button>
                         <button
-                          className="relative group w-8 h-8 rounded flex items-center justify-center"
-                          style={{ background: 'rgba(192,57,43,0.2)', border: '1px solid var(--red)', color: '#e07070' }}
+                          type="button"
+                          className="relative group w-8 h-8 rounded flex items-center justify-center judge-btn--decline"
                           onClick={() => handleJudge(pid, false)}
                           aria-label="Decline answer"
                         >
@@ -347,7 +350,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
                       </div>
                     )}
                     {idx > 0 && (
-                      <div className="text-xs" style={{ color: '#4a5580' }}>#{idx + 1}</div>
+                      <div className="text-xs text-muted">#{idx + 1}</div>
                     )}
                   </div>
                 )
@@ -355,17 +358,29 @@ export default function QuestionOverlay({ state, settings }: Props) {
             </div>
           )}
 
-          {/* Scores */}
           <div className="panel flex flex-col gap-2 overflow-auto flex-1">
-            <div className="font-condensed text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--gold)', opacity: 0.7 }}>Scores</div>
-            {[...players].sort((a, b) => b.score - a.score).map((p) => (
-              <div key={p.id} className="flex justify-between items-center">
-                <span className="font-condensed text-sm truncate">{p.name}</span>
-                <span className="font-display text-base" style={{ color: p.score < 0 ? '#e07070' : 'var(--gold-bright)' }}>
-                  {p.score < 0 ? `-$${Math.abs(p.score)}` : `$${p.score}`}
-                </span>
-              </div>
-            ))}
+            <div className="font-condensed text-xs uppercase tracking-wider mb-1 text-gold opacity-70">Scores</div>
+            <div className="overlay-score-list">
+              {sortedPlayers.map((p) => {
+                const rank = scoreRank(sortedPlayers, p.id)
+                return (
+                  <div key={p.id} className="overlay-score-row">
+                    <span
+                      className={`overlay-score-rank${rank === 1 ? ' overlay-score-rank--first' : ''}`}
+                      aria-label={`Rank ${rank}`}
+                    >
+                      #{rank}
+                    </span>
+                    <span className="overlay-score-name" title={p.name}>{p.name}</span>
+                    <span
+                      className={`overlay-score-value ${p.score < 0 ? 'text-score-negative' : 'text-score-positive'}`}
+                    >
+                      {formatScore(p.score)}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </aside>
       </div>

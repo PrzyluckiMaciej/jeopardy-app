@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Settings, Trash2, Pencil, Check, FolderOpen, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, Plus, RotateCcw, Shuffle } from 'lucide-react'
+import { Settings, Trash2, Pencil, Check, FolderOpen, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, Plus, RotateCcw, Shuffle, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useGameStore, useBoardStore } from '../store/gameStore'
 import * as net from '../lib/network'
@@ -686,36 +686,36 @@ export default function HostPage() {
       {showBoardPicker && (
         <div className="board-picker-overlay">
           <div className="panel modal-enter board-picker-modal">
-            <div className="flex items-center justify-between mb-4 flex-shrink-0">
-              <h2 className="font-condensed font-bold text-lg uppercase" style={{ color: 'var(--gold)' }}>Select Board</h2>
-              <button className="btn-ghost text-sm" onClick={closeBoardPicker}>✕</button>
+            <div className="board-picker-header">
+              <h2 className="board-picker-header__title">Select Board</h2>
+              <button
+                type="button"
+                className="board-picker-close"
+                onClick={closeBoardPicker}
+                aria-label="Close board picker"
+              >
+                <X size={18} aria-hidden />
+              </button>
             </div>
 
             <div className="board-picker-body">
               <div className="board-picker-games">
-                <div className="font-condensed text-xs uppercase tracking-widest mb-1 flex-shrink-0" style={{ color: 'var(--gold)', opacity: 0.7 }}>
-                  Games
-                </div>
+                <div className="board-picker-section-label">Games</div>
 
                 <button
-                  className="text-left px-3 py-2 rounded-lg font-condensed font-bold text-sm flex-shrink-0"
-                  style={{
-                    background: pickerGame === null ? 'rgba(212,160,23,0.18)' : 'transparent',
-                    border: pickerGame === null ? '1px solid rgba(212,160,23,0.45)' : '1px solid transparent',
-                    color: pickerGame === null ? 'var(--gold)' : '#fff',
-                  }}
+                  type="button"
+                  className={`board-picker-nav-item flex-shrink-0${pickerGame === null ? ' board-picker-nav-item--active' : ''}`}
                   onClick={() => setPickerGame(null)}
                 >
                   All Boards
-                  <span className="ml-1 text-xs" style={{ opacity: 0.5 }}>({boardStore.boards.length})</span>
+                  <span className="ml-1 text-xs opacity-50">({boardStore.boards.length})</span>
                 </button>
 
                 {boardStore.games.map((g) =>
                   editingGameId === g.id ? (
                     <div key={g.id} className="flex items-center gap-1 flex-shrink-0">
                       <input
-                        className="flex-1 px-2 py-1 rounded text-sm font-condensed"
-                        style={{ background: 'var(--navy)', border: '1px solid var(--gold)', color: '#fff', minWidth: 0 }}
+                        className="board-picker-input"
                         value={editingGameName}
                         onChange={(e) => setEditingGameName(e.target.value)}
                         onKeyDown={(e) => {
@@ -725,7 +725,8 @@ export default function HostPage() {
                         autoFocus
                       />
                       <button
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--green)', padding: '2px' }}
+                        type="button"
+                        className="board-picker-save-btn"
                         onClick={() => commitGameRename(g.id)}
                         title="Save"
                       >
@@ -735,36 +736,32 @@ export default function HostPage() {
                   ) : (
                     <div
                       key={g.id}
-                      className="group flex items-center gap-1 px-2 py-1.5 rounded-lg flex-shrink-0"
-                      style={{
-                        background: pickerGame === g.id ? 'rgba(212,160,23,0.18)' : 'transparent',
-                        border: pickerGame === g.id ? '1px solid rgba(212,160,23,0.45)' : '1px solid transparent',
-                      }}
+                      className={`board-picker-game-row${pickerGame === g.id ? ' board-picker-game-row--active' : ''}`}
                     >
                       <button
-                        className="flex-1 text-left font-condensed font-bold text-sm truncate"
-                        style={{ background: 'none', border: 'none', color: pickerGame === g.id ? 'var(--gold)' : '#fff', cursor: 'pointer', minWidth: 0 }}
+                        type="button"
+                        className="board-picker-game-row__btn truncate"
                         onClick={() => setPickerGame(g.id)}
                       >
                         <span className="flex items-center gap-1">
-                          <FolderOpen size={12} style={{ flexShrink: 0, opacity: 0.7 }} />
+                          <FolderOpen size={12} className="flex-shrink-0 opacity-70" />
                           <span className="truncate">{g.name}</span>
-                          <span className="text-xs flex-shrink-0" style={{ opacity: 0.5 }}>
+                          <span className="text-xs flex-shrink-0 opacity-50">
                             ({boardStore.boards.filter((b) => g.boardIds.includes(b.id)).length})
                           </span>
                         </span>
                       </button>
                       <button
-                        className="opacity-0 group-hover:opacity-100 flex-shrink-0"
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8899cc', padding: '2px', transition: 'opacity 150ms' }}
+                        type="button"
+                        className="board-picker-icon-btn"
                         title="Rename game"
                         onClick={() => { setEditingGameId(g.id); setEditingGameName(g.name) }}
                       >
                         <Pencil size={11} />
                       </button>
                       <button
-                        className="opacity-0 group-hover:opacity-100 flex-shrink-0"
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)', padding: '2px', transition: 'opacity 150ms' }}
+                        type="button"
+                        className="board-picker-icon-btn board-picker-icon-btn--danger"
                         title="Delete game"
                         onClick={() => handleDeleteGame(g.id)}
                       >
@@ -778,8 +775,7 @@ export default function HostPage() {
                   {creatingGame ? (
                     <div className="flex items-center gap-1">
                       <input
-                        className="flex-1 px-2 py-1 rounded text-sm font-condensed"
-                        style={{ background: 'var(--navy)', border: '1px solid var(--gold)', color: '#fff', minWidth: 0 }}
+                        className="board-picker-input"
                         placeholder="Game name"
                         value={newGameName}
                         onChange={(e) => setNewGameName(e.target.value)}
@@ -790,7 +786,8 @@ export default function HostPage() {
                         autoFocus
                       />
                       <button
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--green)', padding: '2px' }}
+                        type="button"
+                        className="board-picker-save-btn"
                         onClick={commitNewGame}
                         title="Create"
                       >
@@ -799,8 +796,8 @@ export default function HostPage() {
                     </div>
                   ) : (
                     <button
-                      className="btn-ghost text-sm w-full text-left"
-                      style={{ opacity: 0.8 }}
+                      type="button"
+                      className="btn-ghost text-sm w-full text-left opacity-80"
                       onClick={() => setCreatingGame(true)}
                     >
                       + New Game
@@ -809,18 +806,18 @@ export default function HostPage() {
                 </div>
               </div>
 
-              <div className="board-picker-divider w-px flex-shrink-0" style={{ background: 'var(--navy-light)' }} />
+              <div className="board-picker-divider" />
 
               <div className="board-picker-boards">
-                <div className="flex-1 overflow-auto flex flex-col gap-2 pr-1">
+                <div className="board-picker-section-label">Boards</div>
+                <div className="board-picker-boards__scroll">
                   {pickerBoards.map((b, idx) => (
-                    <div key={b.id} className="group flex items-center gap-2">
-                      {/* Reorder arrows when viewing a game */}
+                    <div key={b.id} className="board-picker-board-row">
                       {pickerGame && (
                         <div className="flex flex-col gap-0.5 flex-shrink-0">
                           <button
-                            className="w-5 h-5 rounded flex items-center justify-center"
-                            style={{ background: 'transparent', border: '1px solid var(--navy-light)', color: '#8899cc', cursor: idx === 0 ? 'not-allowed' : 'pointer', opacity: idx === 0 ? 0.3 : 1 }}
+                            type="button"
+                            className="board-picker-reorder-btn"
                             disabled={idx === 0}
                             onClick={() => boardStore.reorderBoardInGame(pickerGame, idx, idx - 1)}
                             title="Move up"
@@ -828,8 +825,8 @@ export default function HostPage() {
                             <ChevronUp size={12} />
                           </button>
                           <button
-                            className="w-5 h-5 rounded flex items-center justify-center"
-                            style={{ background: 'transparent', border: '1px solid var(--navy-light)', color: '#8899cc', cursor: idx === pickerBoards.length - 1 ? 'not-allowed' : 'pointer', opacity: idx === pickerBoards.length - 1 ? 0.3 : 1 }}
+                            type="button"
+                            className="board-picker-reorder-btn"
                             disabled={idx === pickerBoards.length - 1}
                             onClick={() => boardStore.reorderBoardInGame(pickerGame, idx, idx + 1)}
                             title="Move down"
@@ -839,20 +836,25 @@ export default function HostPage() {
                         </div>
                       )}
                       <button
-                        className="flex-1 flex items-center px-3 py-2 rounded-lg text-left"
-                        style={{ background: 'var(--navy)', border: '1px solid var(--navy-light)' }}
+                        type="button"
+                        className="board-picker-board-btn"
                         onClick={() => handleSelectBoard(b)}
                       >
                         {pickerGame && (
-                          <span className="font-condensed text-xs mr-2" style={{ color: '#4a5580' }}>{idx + 1}.</span>
+                          <span
+                            className={`board-picker-board-order${idx === 0 ? ' board-picker-board-order--first' : ''}`}
+                            aria-label={`Board position ${idx + 1}`}
+                          >
+                            {idx + 1}
+                          </span>
                         )}
                         <span className="font-condensed font-bold">{b.name}</span>
                       </button>
-                      <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100" style={{ transition: 'opacity 150ms' }}>
+                      <div className="board-picker-board-row__actions">
                         {pickerGame && (
                           <button
-                            className="w-6 h-6 rounded flex items-center justify-center text-sm font-bold"
-                            style={{ background: 'rgba(212,160,23,0.12)', border: '1px solid rgba(212,160,23,0.3)', color: 'var(--gold)', cursor: 'pointer' }}
+                            type="button"
+                            className="board-picker-remove-btn"
                             title="Remove from game"
                             onClick={() => boardStore.removeBoardFromGame(pickerGame, b.id)}
                           >
@@ -860,8 +862,8 @@ export default function HostPage() {
                           </button>
                         )}
                         <button
-                          className="w-6 h-6 rounded flex items-center justify-center"
-                          style={{ background: 'var(--red)', color: '#fff', border: 'none', cursor: 'pointer' }}
+                          type="button"
+                          className="board-picker-delete-btn"
                           title="Delete board"
                           onClick={(e) => { e.stopPropagation(); handleDeleteBoard(b.id) }}
                         >
@@ -872,12 +874,11 @@ export default function HostPage() {
                   ))}
 
                   {pickerBoards.length === 0 && (
-                    <div className="text-sm text-center py-4" style={{ color: '#4a5580' }}>
+                    <div className="board-picker-empty">
                       {pickerGame ? 'No boards in this game yet' : 'No saved boards'}
                     </div>
                   )}
 
-                  {/* Add boards to game section */}
                   {pickerGame && (() => {
                     const unassigned = boardStore.boards.filter(
                       (b) => !pickerBoardIds.includes(b.id)
@@ -885,19 +886,13 @@ export default function HostPage() {
                     if (unassigned.length === 0) return null
                     return (
                       <div className="mt-2">
-                        <div className="text-xs uppercase tracking-widest mb-2" style={{ color: '#4a5580' }}>
-                          Add to game
-                        </div>
+                        <div className="board-picker-section-label text-muted">Add to game</div>
                         {unassigned.map((b) => (
-                          <div
-                            key={b.id}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg mb-1"
-                            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--navy-light)' }}
-                          >
-                            <span className="flex-1 font-condensed text-sm" style={{ color: '#6b7db3' }}>{b.name}</span>
+                          <div key={b.id} className="board-picker-unassigned">
+                            <span className="flex-1 font-condensed text-sm text-subtle">{b.name}</span>
                             <button
-                              className="text-xs px-2 py-0.5 rounded"
-                              style={{ background: 'rgba(212,160,23,0.15)', border: '1px solid rgba(212,160,23,0.3)', color: 'var(--gold)', cursor: 'pointer' }}
+                              type="button"
+                              className="board-picker-add-btn"
                               onClick={() => boardStore.addBoardToGame(pickerGame, b.id)}
                             >
                               + Add
@@ -912,6 +907,7 @@ export default function HostPage() {
                 <div className="flex gap-2 mt-3 flex-shrink-0">
                   {pickerGame && pickerBoards.length > 0 && (
                     <button
+                      type="button"
                       className="btn-gold flex-1 flex items-center justify-center gap-2"
                       onClick={() => handleSelectGame(pickerGame, pickerBoardIds)}
                     >
@@ -919,7 +915,11 @@ export default function HostPage() {
                       Play Game
                     </button>
                   )}
-                  <button className={`btn-gold ${pickerGame && pickerBoards.length > 0 ? '' : 'w-full'}`} onClick={handleNewBoard}>
+                  <button
+                    type="button"
+                    className={`btn-gold${pickerGame && pickerBoards.length > 0 ? '' : ' w-full'}`}
+                    onClick={handleNewBoard}
+                  >
                     + Create New Board
                   </button>
                 </div>
