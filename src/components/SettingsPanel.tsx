@@ -12,6 +12,13 @@ interface Props {
   onRemovePlayer: (id: string) => void
 }
 
+const sectionTitleStyle = {
+  color: 'var(--gold)',
+  opacity: 0.8,
+  fontSize: '0.8125rem',
+  letterSpacing: '0.12em',
+} as const
+
 export default function SettingsPanel({
   settings,
   players,
@@ -45,56 +52,58 @@ export default function SettingsPanel({
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Game settings */}
-      <div>
-        <div className="font-condensed font-bold uppercase tracking-widest text-xs mb-3" style={{ color: 'var(--gold)', opacity: 0.7 }}>
-          Game settings
-        </div>
-        <div className="flex flex-col gap-3">
-          <Toggle
-            label="Point deduction"
-            description="Wrong answers deduct the question value"
-            value={settings.pointDeduction}
-            onChange={() => toggle('pointDeduction')}
-          />
-          <Toggle
-            label="Negative points"
-            description="Deductions can reduce a score below zero"
-            value={settings.allowNegativeScore}
-            onChange={() => toggle('allowNegativeScore')}
-            disabled={!settings.pointDeduction}
-          />
-          <Toggle
-            label="Auto buzz queue"
-            description="Players can buzz immediately after the clue is revealed"
-            value={settings.autoBuzzQueue}
-            onChange={() => toggle('autoBuzzQueue')}
-          />
-          <Toggle
-            label="Blur clue on buzz"
-            description="Blurs the clue when any player buzzes in"
-            value={settings.blurClueOnBuzz}
-            onChange={() => toggle('blurClueOnBuzz')}
-            disabled={!settings.autoBuzzQueue}
-          />
-        </div>
-      </div>
-
-      {/* Board control */}
-      <div>
-        <div className="font-condensed font-bold uppercase tracking-widest text-xs mb-3" style={{ color: 'var(--gold)', opacity: 0.7 }}>
-          Board control
-        </div>
-        <div
-          className="px-3 py-2 rounded-lg"
-          style={{ background: 'var(--navy)', border: '1px solid var(--navy-light)' }}
-        >
-          <div className="text-xs mb-2" style={{ color: '#4a5580' }}>
-            The selected player picks the next clue (required for Daily Doubles).
+    <div
+      className="grid gap-8"
+      style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}
+    >
+      {/* Left column: Game Settings + Board Control */}
+      <div className="flex flex-col gap-8">
+        {/* Game Settings */}
+        <div className="panel">
+          <div className="font-condensed font-bold uppercase mb-5" style={sectionTitleStyle}>
+            Game settings
           </div>
+          <div className="flex flex-col gap-4">
+            <Toggle
+              label="Point deduction"
+              description="Wrong answers deduct the question value"
+              value={settings.pointDeduction}
+              onChange={() => toggle('pointDeduction')}
+            />
+            <Toggle
+              label="Negative points"
+              description="Deductions can reduce a score below zero"
+              value={settings.allowNegativeScore}
+              onChange={() => toggle('allowNegativeScore')}
+              disabled={!settings.pointDeduction}
+            />
+            <Toggle
+              label="Auto buzz queue"
+              description="Players can buzz immediately after the clue is revealed"
+              value={settings.autoBuzzQueue}
+              onChange={() => toggle('autoBuzzQueue')}
+            />
+            <Toggle
+              label="Blur clue on buzz"
+              description="Blurs the clue when any player buzzes in"
+              value={settings.blurClueOnBuzz}
+              onChange={() => toggle('blurClueOnBuzz')}
+              disabled={!settings.autoBuzzQueue}
+            />
+          </div>
+        </div>
+
+        {/* Board Control */}
+        <div className="panel">
+          <div className="font-condensed font-bold uppercase mb-4" style={sectionTitleStyle}>
+            Board control
+          </div>
+          <p className="mb-4 leading-relaxed" style={{ color: '#6b7db3', fontSize: '0.9375rem' }}>
+            The selected player picks the next clue (required for Daily Doubles).
+          </p>
           <select
-            className="w-full text-sm"
+            className="w-full"
+            style={{ fontSize: '1rem', padding: '12px 14px' }}
             value={boardControlId ?? ''}
             onChange={(e) => onAssignBoardControl(e.target.value || null)}
             disabled={players.length === 0}
@@ -110,20 +119,29 @@ export default function SettingsPanel({
         </div>
       </div>
 
-      {/* Players */}
-      <div>
-        <div className="font-condensed font-bold uppercase tracking-widest text-xs mb-3" style={{ color: 'var(--gold)', opacity: 0.7 }}>
+      {/* Right column: Players */}
+      <div className="panel flex flex-col gap-5">
+        <div className="font-condensed font-bold uppercase" style={sectionTitleStyle}>
           Players
         </div>
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
           {players.map((p) =>
             editingId === p.id ? (
-              <div key={p.id} className="panel flex flex-col gap-2">
+              <div
+                key={p.id}
+                className="flex flex-col gap-3 rounded-lg"
+                style={{
+                  background: 'var(--navy)',
+                  border: '1px solid var(--navy-light)',
+                  padding: 'var(--space-md) var(--space-lg)',
+                }}
+              >
                 <input
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
                   placeholder="Name"
-                  className="w-full text-sm"
+                  className="w-full"
+                  style={{ fontSize: '1rem' }}
                   autoFocus
                 />
                 <input
@@ -131,38 +149,45 @@ export default function SettingsPanel({
                   onChange={(e) => setEditScore(e.target.value)}
                   placeholder="Score"
                   type="number"
-                  className="w-full text-sm"
+                  className="w-full"
+                  style={{ fontSize: '1rem' }}
                 />
-                <div className="flex gap-2">
-                  <button className="btn-gold flex-1 text-sm py-1" onClick={() => saveEdit(p)}>Save</button>
-                  <button className="btn-ghost flex-1 text-sm py-1" onClick={() => setEditingId(null)}>Cancel</button>
+                <div className="flex gap-3">
+                  <button className="btn-gold flex-1" style={{ fontSize: '0.9375rem', padding: '10px 16px' }} onClick={() => saveEdit(p)}>
+                    Save
+                  </button>
+                  <button className="btn-ghost flex-1" style={{ fontSize: '0.9375rem', padding: '10px 16px' }} onClick={() => setEditingId(null)}>
+                    Cancel
+                  </button>
                 </div>
               </div>
             ) : (
               <div
                 key={p.id}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                className="flex items-center gap-3 rounded-lg"
                 style={{
                   background: 'var(--navy)',
                   border: '1px solid var(--navy-light)',
                   opacity: p.isConnected ? 1 : 0.7,
+                  padding: 'var(--space-md) var(--space-lg)',
                 }}
               >
                 <div
-                  className="w-2 h-2 rounded-full flex-shrink-0"
+                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                   style={{ background: p.isConnected ? 'var(--green)' : '#4a5580' }}
                   title={p.isConnected ? 'Connected' : 'Not connected'}
                 />
                 <div className="flex-1 min-w-0">
-                  <div className="font-condensed font-bold text-sm truncate">
+                  <div className="font-condensed font-bold truncate" style={{ fontSize: '1.0625rem' }}>
                     {p.name}
                     {boardControlId === p.id && (
                       <span
-                        className="ml-1.5 font-condensed text-xs px-1.5 py-0.5 rounded"
+                        className="ml-2 font-condensed px-2 py-0.5 rounded"
                         style={{
                           background: 'rgba(0,200,180,0.2)',
                           color: '#40e0d0',
                           border: '1px solid rgba(0,200,180,0.45)',
+                          fontSize: '0.75rem',
                           verticalAlign: 'middle',
                         }}
                       >
@@ -170,28 +195,44 @@ export default function SettingsPanel({
                       </span>
                     )}
                   </div>
-                  <div className="text-xs" style={{ color: p.score < 0 ? '#e07070' : 'var(--gold)' }}>
+                  <div style={{ color: p.score < 0 ? '#e07070' : 'var(--gold)', fontSize: '0.9375rem', marginTop: 2 }}>
                     {formatScore(p.score)}
                   </div>
                 </div>
                 <button
-                  className="text-xs py-1 px-2 rounded"
+                  className="rounded"
                   style={{
                     background: boardControlId === p.id ? 'rgba(0,200,180,0.2)' : 'rgba(0,200,180,0.08)',
                     border: '1px solid rgba(0,200,180,0.35)',
                     color: '#40e0d0',
                     fontFamily: 'Barlow Condensed',
                     fontWeight: 600,
+                    fontSize: '0.875rem',
+                    padding: '8px 12px',
                   }}
                   title={boardControlId === p.id ? 'This player has board control' : 'Give this player board control'}
                   onClick={() => onAssignBoardControl(p.id)}
                 >
                   {boardControlId === p.id ? 'Control' : 'Assign'}
                 </button>
-                <button className="btn-ghost text-xs py-1 px-2" onClick={() => startEdit(p)}>Edit</button>
                 <button
-                  className="text-xs py-1 px-2 rounded"
-                  style={{ background: 'rgba(192,57,43,0.15)', border: '1px solid rgba(192,57,43,0.3)', color: '#e07070', fontFamily: 'Barlow Condensed', fontWeight: 600 }}
+                  className="btn-ghost"
+                  style={{ fontSize: '0.875rem', padding: '8px 12px' }}
+                  onClick={() => startEdit(p)}
+                >
+                  Edit
+                </button>
+                <button
+                  className="rounded"
+                  style={{
+                    background: 'rgba(192,57,43,0.15)',
+                    border: '1px solid rgba(192,57,43,0.3)',
+                    color: '#e07070',
+                    fontFamily: 'Barlow Condensed',
+                    fontWeight: 600,
+                    fontSize: '0.875rem',
+                    padding: '8px 12px',
+                  }}
                   onClick={() => onRemovePlayer(p.id)}
                 >
                   Remove
@@ -200,7 +241,7 @@ export default function SettingsPanel({
             )
           )}
           {players.length === 0 && (
-            <div className="text-sm text-center py-2" style={{ color: '#4a5580' }}>
+            <div className="text-center py-6 leading-relaxed" style={{ color: '#6b7db3', fontSize: '0.9375rem' }}>
               Players appear here when they join with a room code.
             </div>
           )}
@@ -210,7 +251,13 @@ export default function SettingsPanel({
   )
 }
 
-function Toggle({ label, description, value, onChange, disabled }: {
+function Toggle({
+  label,
+  description,
+  value,
+  onChange,
+  disabled,
+}: {
   label: string
   description: string
   value: boolean
@@ -219,28 +266,44 @@ function Toggle({ label, description, value, onChange, disabled }: {
 }) {
   return (
     <div
-      className="flex items-center gap-3 px-3 py-2 rounded-lg"
+      className="flex items-center rounded-lg"
       style={{
         background: 'var(--navy)',
         border: '1px solid var(--navy-light)',
         cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.45 : 1,
+        padding: 'var(--space-md) var(--space-lg)',
+        gap: 'var(--space-md)',
       }}
       onClick={disabled ? undefined : onChange}
     >
-      <div className="flex-1">
-        <div className="font-condensed font-bold text-sm">{label}</div>
-        <div className="text-xs" style={{ color: '#4a5580' }}>{description}</div>
+      <div className="flex-1 min-w-0">
+        <div className="font-condensed font-bold" style={{ fontSize: '1.0625rem', lineHeight: 1.3 }}>
+          {label}
+        </div>
+        <div
+          className="leading-relaxed"
+          style={{ color: '#6b7db3', fontSize: '0.9375rem', marginTop: 'var(--space-xs)' }}
+        >
+          {description}
+        </div>
       </div>
       <div
-        className="w-11 h-6 rounded-full relative transition-colors flex-shrink-0"
-        style={{ background: value ? 'var(--gold)' : 'var(--navy-light)' }}
+        className="rounded-full relative transition-colors flex-shrink-0"
+        style={{
+          background: value ? 'var(--gold)' : 'var(--navy-light)',
+          width: 48,
+          height: 26,
+        }}
       >
         <div
-          className="absolute top-0.5 w-5 h-5 rounded-full transition-transform"
+          className="absolute rounded-full transition-transform"
           style={{
             background: 'var(--navy-mid)',
-            left: value ? 'calc(100% - 22px)' : '2px',
+            width: 22,
+            height: 22,
+            top: 2,
+            left: value ? 'calc(100% - 24px)' : 2,
           }}
         />
       </div>

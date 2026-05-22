@@ -436,7 +436,7 @@ export default function HostPage() {
     : boardStore.boards
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'var(--navy)' }}>
+    <div className="h-screen flex flex-col overflow-hidden" style={{ background: 'var(--navy)' }}>
       {/* Top bar */}
       <div className="flex items-center gap-5 border-b" style={{ borderColor: 'var(--navy-light)', background: 'var(--navy-mid)', padding: '10px 24px' }}>
         <button className="font-display text-2xl" style={{ color: 'var(--gold-bright)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} onClick={() => setTab('board')}>JEOPARDY!</button>
@@ -473,10 +473,10 @@ export default function HostPage() {
 
       <div className="flex flex-col flex-1 min-h-0">
         {tab === 'board' && (
-          <div className="flex-1 flex flex-col p-4 gap-4 overflow-auto">
+          <div className="flex-1 flex flex-col min-h-0">
             {/* Game start view */}
             {state.phase === 'gameStart' && activeGameData && (
-              <div className="flex-1 flex flex-col items-center justify-center gap-6">
+              <div className="flex-1 flex flex-col items-center justify-center gap-6 p-4 overflow-auto">
                 <div className="font-condensed text-lg uppercase tracking-widest" style={{ color: '#4a5580' }}>Game</div>
                 <div className="font-display text-5xl" style={{ color: 'var(--gold-bright)' }}>{activeGameData.name}</div>
                 <div className="font-condensed text-sm" style={{ color: '#8899cc' }}>
@@ -496,7 +496,7 @@ export default function HostPage() {
 
             {/* Podium view */}
             {state.phase === 'podium' && (
-              <div className="flex-1 flex flex-col items-center justify-center gap-6">
+              <div className="flex-1 flex flex-col items-center justify-center gap-6 p-4 overflow-auto">
                 <Podium players={state.players} />
                 <button className="btn-gold text-sm mt-4" onClick={handleEndGame}>
                   Back to lobby
@@ -506,23 +506,47 @@ export default function HostPage() {
 
             {/* Normal board/editor view */}
             {state.phase !== 'gameStart' && state.phase !== 'podium' && (
-              <>
+              <div className="flex-1 flex flex-col min-h-0">
+                {/* Toolbar — sits directly below top bar with fixed spacing */}
                 {!editing && (
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <button className="btn-outline text-sm" onClick={openBoardPicker}>
-                      Select board
-                    </button>
-                    <button className="btn-ghost text-sm" onClick={() => { if (board) setEditing(true); else handleNewBoard() }}>
-                      {board ? 'Edit board' : 'New board'}
-                    </button>
-                    {board && <span className="font-condensed font-bold" style={{ color: 'var(--gold)' }}>{board.name}</span>}
-                    {inGame && activeGameData && (
-                      <span className="font-condensed text-xs px-2 py-1 rounded" style={{ background: 'rgba(212,160,23,0.12)', border: '1px solid rgba(212,160,23,0.3)', color: 'var(--gold)' }}>
-                        {activeGameData.name} — Board {state.currentBoardIndex + 1}/{state.gameBoardIds.length}
-                      </span>
-                    )}
+                  <div
+                    className="flex-shrink-0 flex items-center gap-2"
+                    style={{
+                      paddingTop: 'var(--space-sm)',
+                      paddingBottom: 'var(--space-xs)',
+                      paddingLeft: 24,
+                      paddingRight: 24,
+                    }}
+                  >
+                    {/* Left: primary actions + labels */}
+                    <div className="flex items-center gap-2 flex-wrap flex-1">
+                      <button className="btn-outline text-sm" onClick={openBoardPicker}>
+                        Select board
+                      </button>
+                      <button
+                        className="btn-ghost text-sm"
+                        onClick={() => { if (board) setEditing(true); else handleNewBoard() }}
+                      >
+                        {board ? 'Edit board' : 'New board'}
+                      </button>
+                      {board && (
+                        <span className="font-condensed font-bold" style={{ color: 'var(--gold)' }}>
+                          {board.name}
+                        </span>
+                      )}
+                      {inGame && activeGameData && (
+                        <span
+                          className="font-condensed text-xs px-2 py-1 rounded"
+                          style={{ background: 'rgba(212,160,23,0.12)', border: '1px solid rgba(212,160,23,0.3)', color: 'var(--gold)' }}
+                        >
+                          {activeGameData.name} — Board {state.currentBoardIndex + 1}/{state.gameBoardIds.length}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Center: game navigation */}
                     {inGame && (
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 flex-shrink-0">
                         <button
                           className="btn-ghost text-sm py-1 px-2 flex items-center gap-1"
                           onClick={handlePrevBoard}
@@ -541,87 +565,105 @@ export default function HostPage() {
                         </button>
                       </div>
                     )}
-                    {board && !inGame && (
-                      <button
-                        className="btn-ghost text-sm"
-                        style={{ color: 'var(--red)', borderColor: 'var(--red)' }}
-                        onClick={handleResetBoard}
-                        title="Mark all questions as unanswered and reset all scores to 0"
-                      >
-                        Reset board
-                      </button>
-                    )}
-                  </div>
-                )}
 
-                {editing && board ? (
-                  <div className="flex-1 min-h-0">
-                    <BoardEditor board={board} onChange={handleBoardChange} onClose={() => {
-                      setEditing(false)
-                      const current = useGameStore.getState().state
-                      net.broadcast({ type: 'SYNC_STATE', state: current })
-                    }} />
-                  </div>
-                ) : board ? (
-                  <GameBoard board={board} answeredCells={state.answeredCells} onOpenCell={handleOpenCell} dailyDoubleQuestionId={board.dailyDoubleQuestionId} />
-                ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center gap-4">
-                    <div className="font-condensed text-lg" style={{ color: '#4a5580' }}>No board loaded</div>
-                    <div className="flex gap-3">
-                      <button className="btn-gold" onClick={handleNewBoard}>Create new board</button>
-                      {boardStore.boards.length > 0 && (
-                        <button className="btn-outline" onClick={openBoardPicker}>Load existing board</button>
+                    {/* Right: destructive actions */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {board && !inGame && (
+                        <button
+                          className="btn-ghost text-sm"
+                          style={{ color: 'var(--red)', borderColor: 'var(--red)' }}
+                          onClick={handleResetBoard}
+                          title="Mark all questions as unanswered and reset all scores to 0"
+                        >
+                          Reset board
+                        </button>
                       )}
                     </div>
                   </div>
                 )}
-              </>
-            )}
 
-            {/* Horizontal scoreboard */}
-            {!editing && state.phase !== 'gameStart' && state.phase !== 'podium' && (
-              <div
-                className="flex-shrink-0 border-t pt-4"
-                style={{ borderColor: 'var(--navy-light)' }}
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="font-condensed font-bold uppercase tracking-widest text-xs" style={{ color: 'var(--gold)', opacity: 0.7 }}>
-                    Scoreboard
+                <div className="flex-1 flex flex-col min-h-0 overflow-hidden gap-4 px-4 pb-4 pt-2">
+                  {/* Board — grows to fill space above scoreboard */}
+                  <div className="flex-1 min-h-0 min-w-0 overflow-x-auto overflow-y-hidden">
+                    {editing && board ? (
+                      <BoardEditor board={board} onChange={handleBoardChange} onClose={() => {
+                        setEditing(false)
+                        const current = useGameStore.getState().state
+                        net.broadcast({ type: 'SYNC_STATE', state: current })
+                      }} />
+                    ) : board ? (
+                      <GameBoard
+                        board={board}
+                        answeredCells={state.answeredCells}
+                        onOpenCell={handleOpenCell}
+                        dailyDoubleQuestionId={board.dailyDoubleQuestionId}
+                        fill
+                      />
+                    ) : (
+                      <div className="h-full flex flex-col items-center justify-center gap-4">
+                        <div className="font-condensed text-lg" style={{ color: '#4a5580' }}>No board loaded</div>
+                        <div className="flex gap-3">
+                          <button className="btn-gold" onClick={handleNewBoard}>Create new board</button>
+                          {boardStore.boards.length > 0 && (
+                            <button className="btn-outline" onClick={openBoardPicker}>Load existing board</button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  {state.players.some(p => p.isConnected) && (
-                    <button
-                      className="font-condensed text-xs px-2 py-1 rounded"
-                      style={{
-                        background: 'rgba(0,200,180,0.15)',
-                        color: '#40e0d0',
-                        border: '1px solid rgba(0,200,180,0.35)',
-                      }}
-                      title="Randomly select a player to have board control"
-                      onClick={() => {
-                        const connected = state.players.filter(p => p.isConnected)
-                        if (connected.length === 0) return
-                        const pick = pickRandom(connected)
-                        setBoardControl(pick.id)
-                        net.broadcast({ type: 'SET_BOARD_CONTROL', playerId: pick.id })
-                      }}
-                    >
-                      Randomize
-                    </button>
+
+                  {/* Scoreboard — pinned below board, always visible */}
+                  {!editing && (
+                    <div className="flex-shrink-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="font-condensed font-bold uppercase tracking-widest text-xs" style={{ color: 'var(--gold)', opacity: 0.7 }}>
+                          Scoreboard
+                        </div>
+                        {state.players.some(p => p.isConnected) && (
+                          <button
+                            className="font-condensed text-xs px-2 py-0.5 rounded"
+                            style={{
+                              background: 'rgba(0,200,180,0.15)',
+                              color: '#40e0d0',
+                              border: '1px solid rgba(0,200,180,0.35)',
+                            }}
+                            title="Randomly select a player to have board control"
+                            onClick={() => {
+                              const connected = state.players.filter(p => p.isConnected)
+                              if (connected.length === 0) return
+                              const pick = pickRandom(connected)
+                              setBoardControl(pick.id)
+                              net.broadcast({ type: 'SET_BOARD_CONTROL', playerId: pick.id })
+                            }}
+                          >
+                            Randomize
+                          </button>
+                        )}
+                      </div>
+                      <Scoreboard
+                        players={state.players}
+                        buzzQueue={state.buzzQueue}
+                        boardControlId={state.boardControlId}
+                        activeEmojis={activeEmojis}
+                      />
+                    </div>
                   )}
                 </div>
-                <Scoreboard
-                  players={state.players}
-                  buzzQueue={state.buzzQueue}
-                  boardControlId={state.boardControlId}
-                  activeEmojis={activeEmojis}
-                />
               </div>
             )}
           </div>
         )}
 
         {tab === 'settings' && (
-          <div className="flex-1 p-4 overflow-auto max-w-2xl">
+          <div
+            className="flex-1 overflow-auto"
+            style={{
+              paddingTop: 'var(--space-sm)',
+              paddingBottom: 'var(--space-lg)',
+              paddingLeft: 24,
+              paddingRight: 24,
+            }}
+          >
             <SettingsPanel
               settings={settings}
               players={state.players}

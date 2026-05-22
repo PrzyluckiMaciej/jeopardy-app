@@ -6,20 +6,45 @@ interface GameBoardProps {
   answeredCells: string[]
   onOpenCell?: (categoryId: string, q: Question) => void
   dailyDoubleQuestionId?: string
+  /** Stretch grid to fill parent height (host view) */
+  fill?: boolean
 }
 
-export default function GameBoard({ board, answeredCells, onOpenCell, dailyDoubleQuestionId }: GameBoardProps) {
+export default function GameBoard({
+  board,
+  answeredCells,
+  onOpenCell,
+  dailyDoubleQuestionId,
+  fill = false,
+}: GameBoardProps) {
+  const rowCount = board.pointValues.length
+
+  const gridStyle = fill
+    ? {
+        gridTemplateColumns: `repeat(${board.categories.length}, minmax(0, 1fr))`,
+        gridTemplateRows: `minmax(3rem, auto) repeat(${rowCount}, minmax(0, 1fr))`,
+      }
+    : {
+        gridTemplateColumns: `repeat(${board.categories.length}, minmax(140px, 1fr))`,
+      }
+
   return (
-    <div className="overflow-auto">
+    <div className={fill ? 'h-full w-full min-h-0' : 'overflow-auto'}>
       <div
-        className="grid gap-2 min-w-max"
-        style={{ gridTemplateColumns: `repeat(${board.categories.length}, minmax(140px, 1fr))` }}
+        className={`grid gap-2 ${fill ? 'h-full w-full' : 'min-w-max'}`}
+        style={gridStyle}
       >
         {board.categories.map((cat) => (
           <div
             key={cat.id}
-            className="flex items-center justify-center text-center px-2 py-4 rounded font-condensed font-bold uppercase"
-            style={{ background: 'var(--navy-mid)', border: '2px solid var(--navy-light)', letterSpacing: 1, fontSize: 14, minHeight: 72 }}
+            className={`flex items-center justify-center text-center px-2 rounded font-condensed font-bold uppercase min-h-0 ${fill ? 'py-2' : 'py-4'}`}
+            style={{
+              background: 'var(--navy-mid)',
+              border: '2px solid var(--navy-light)',
+              letterSpacing: 1,
+              fontSize: fill ? 'clamp(0.75rem, 1.4vh, 0.875rem)' : 14,
+              minHeight: fill ? undefined : 72,
+            }}
           >
             {cat.name}
           </div>
@@ -34,9 +59,10 @@ export default function GameBoard({ board, answeredCells, onOpenCell, dailyDoubl
             return (
               <button
                 key={q.id}
-                className={`board-cell rounded flex flex-col items-center justify-center gap-1 ${isAnswered ? 'answered' : ''}`}
+                className={`board-cell rounded flex flex-col items-center justify-center gap-1 min-h-0 ${isAnswered ? 'answered' : ''}`}
                 style={{
-                  minHeight: 90,
+                  height: fill ? '100%' : undefined,
+                  minHeight: fill ? 0 : 90,
                   cursor: interactive ? 'pointer' : 'default',
                   pointerEvents: onOpenCell ? undefined : 'none',
                   position: 'relative',
@@ -44,7 +70,13 @@ export default function GameBoard({ board, answeredCells, onOpenCell, dailyDoubl
                 onClick={() => interactive && onOpenCell(cat.id, q)}
                 disabled={isAnswered || !onOpenCell}
               >
-                <span className="font-display text-3xl" style={{ color: isAnswered ? '#4a5580' : 'var(--gold-bright)' }}>
+                <span
+                  className={fill ? 'font-display leading-none' : 'font-display text-3xl leading-none'}
+                  style={{
+                    color: isAnswered ? '#4a5580' : 'var(--gold-bright)',
+                    fontSize: fill ? 'clamp(1.25rem, 5vh, 2.25rem)' : undefined,
+                  }}
+                >
                   ${pts}
                 </span>
                 {q.mediaId && !isAnswered && (

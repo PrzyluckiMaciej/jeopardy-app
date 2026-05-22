@@ -68,9 +68,9 @@ export default function Scoreboard({
             key={p.id}
             className="flex flex-col items-center transition-all"
             style={{
-              minWidth: 130,
+              minWidth: 110,
               maxWidth: 180,
-              flex: '1 1 130px',
+              flex: '1 1 110px',
               opacity: p.isConnected ? 1 : 0.5,
               background: isHighlighted
                 ? 'rgba(212,160,23,0.13)'
@@ -82,19 +82,15 @@ export default function Scoreboard({
               position: 'relative',
             }}
           >
-            {/* Floating emoji reaction */}
             {reaction && (
               <div key={reaction.seq} className="emoji-float">
                 {reaction.emoji}
               </div>
             )}
 
-            {/* Top accent bar */}
             <div style={{ width: '100%', height: 4, background: accentColor, flexShrink: 0, borderRadius: '10px 10px 0 0' }} />
 
-            {/* Content */}
             <div className="flex flex-col items-center gap-1 px-3 pt-2 pb-2 w-full">
-              {/* Emoji picker button — only on the current player's own card */}
               {isMe && onEmojiSelect && (
                 <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center' }}>
                   <button
@@ -115,7 +111,6 @@ export default function Scoreboard({
                     😊
                   </button>
 
-                  {/* Emoji picker popup */}
                   {showPicker && (
                     <div
                       style={{
@@ -165,7 +160,6 @@ export default function Scoreboard({
                 </div>
               )}
 
-              {/* Name */}
               <div
                 className="font-condensed font-bold text-sm text-center w-full truncate"
                 style={{ color: isHighlighted ? 'var(--gold-bright)' : 'var(--white)' }}
@@ -179,7 +173,6 @@ export default function Scoreboard({
                 )}
               </div>
 
-              {/* Score */}
               <div
                 className="font-display text-2xl leading-none"
                 style={{ color: p.score < 0 ? '#e07070' : 'var(--gold-bright)' }}
@@ -187,7 +180,6 @@ export default function Scoreboard({
                 {formatScore(p.score)}
               </div>
 
-              {/* Status badges */}
               <div className="flex flex-wrap gap-1 justify-center mt-1" style={{ minHeight: 22 }}>
                 {hasControl && (
                   <span
@@ -216,7 +208,6 @@ export default function Scoreboard({
               </div>
             </div>
 
-            {/* Bottom light bar */}
             <div
               style={{
                 width: '100%',
