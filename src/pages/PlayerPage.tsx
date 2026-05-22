@@ -8,6 +8,7 @@ import { generateId, formatScore } from '../lib/utils'
 import { logEvent } from '../lib/logger'
 import GameBoard from '../components/GameBoard'
 import Scoreboard from '../components/Scoreboard'
+import Podium from '../components/Podium'
 
 export default function PlayerPage() {
   const navigate = useNavigate()
@@ -345,35 +346,69 @@ export default function PlayerPage() {
         </div>
       </div>
 
-      {/* Board view */}
+      {/* Main content */}
       <div className="flex flex-col flex-1 min-h-0 overflow-auto">
         <div className="flex-1 flex flex-col p-4 gap-4">
-          {state.board ? (
-            <GameBoard
-              board={state.board}
-              answeredCells={state.answeredCells}
-            />
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center gap-2">
-              <div className="font-display text-4xl" style={{ color: 'var(--gold)', opacity: 0.3 }}>?</div>
-              <div className="font-condensed text-lg" style={{ color: '#4a5580' }}>
-                Waiting for host to load a board…
+          {/* Game start waiting screen */}
+          {state.phase === 'gameStart' && (
+            <div className="flex-1 flex flex-col items-center justify-center gap-4">
+              <div className="font-display text-4xl" style={{ color: 'var(--gold-bright)' }}>JEOPARDY!</div>
+              <div className="font-condensed text-lg animate-pulse" style={{ color: '#4a5580' }}>
+                Waiting for host to start the game…
+              </div>
+              <div className="font-condensed text-sm" style={{ color: '#8899cc' }}>
+                {state.gameBoardIds.length} board{state.gameBoardIds.length !== 1 ? 's' : ''} queued
               </div>
             </div>
+          )}
+
+          {/* Podium view */}
+          {state.phase === 'podium' && (
+            <div className="flex-1 flex flex-col items-center justify-center">
+              <Podium players={state.players} highlightId={myId} />
+            </div>
+          )}
+
+          {/* Normal board view */}
+          {state.phase !== 'gameStart' && state.phase !== 'podium' && (
+            <>
+              {state.board ? (
+                <GameBoard
+                  board={state.board}
+                  answeredCells={state.answeredCells}
+                />
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center gap-2">
+                  <div className="font-display text-4xl" style={{ color: 'var(--gold)', opacity: 0.3 }}>?</div>
+                  <div className="font-condensed text-lg" style={{ color: '#4a5580' }}>
+                    Waiting for host to load a board…
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
 
         {/* Horizontal scoreboard */}
-        <div
-          className="flex-shrink-0 border-t px-4 py-4"
-          style={{ borderColor: 'var(--navy-light)' }}
-        >
-          <div className="font-condensed font-bold uppercase tracking-widest text-xs mb-3" style={{ color: 'var(--gold)', opacity: 0.7 }}>
-            Scoreboard
+        {state.phase !== 'podium' && (
+          <div
+            className="flex-shrink-0 border-t px-4 py-4"
+            style={{ borderColor: 'var(--navy-light)' }}
+          >
+            <div className="font-condensed font-bold uppercase tracking-widest text-xs mb-3" style={{ color: 'var(--gold)', opacity: 0.7 }}>
+              Scoreboard
+            </div>
+            <Scoreboard players={state.players} buzzQueue={state.buzzQueue} highlightId={myId} boardControlId={state.boardControlId} />
           </div>
-          <Scoreboard players={state.players} buzzQueue={state.buzzQueue} highlightId={myId} boardControlId={state.boardControlId} />
-        </div>
+        )}
       </div>
+
+      {/* Board transition overlay */}
+      {state.boardTransition && (
+        <div className="board-transition-overlay">
+          <div className="board-transition-title">{state.boardTransition}</div>
+        </div>
+      )}
 
       {/* Question overlay — mirrors QuestionOverlay layout without host controls */}
       {showOverlay && activeQ && (

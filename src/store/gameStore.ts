@@ -1,26 +1,27 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { Board, BoardGroup, GameState, GameSettings, Player, Question } from '../types'
+import type { Board, Game, GameState, GameSettings, Player, Question } from '../types'
 
 // ---- Board editor store (persisted) ----
 interface BoardStore {
   boards: Board[]
-  groups: BoardGroup[]
+  games: Game[]
   saveBoard: (board: Board) => void
   deleteBoard: (id: string) => void
   getBoard: (id: string) => Board | undefined
-  createGroup: (name: string) => void
-  renameGroup: (id: string, name: string) => void
-  deleteGroup: (id: string) => void
-  addBoardToGroup: (groupId: string, boardId: string) => void
-  removeBoardFromGroup: (groupId: string, boardId: string) => void
+  createGame: (name: string) => void
+  renameGame: (id: string, name: string) => void
+  deleteGame: (id: string) => void
+  addBoardToGame: (gameId: string, boardId: string) => void
+  removeBoardFromGame: (gameId: string, boardId: string) => void
+  reorderBoardInGame: (gameId: string, fromIndex: number, toIndex: number) => void
 }
 
 export const useBoardStore = create<BoardStore>()(
   persist(
     (set, get) => ({
       boards: [],
-      groups: [],
+      games: [],
       saveBoard: (board) =>
         set((s) => {
           const idx = s.boards.findIndex((b) => b.id === board.id)
@@ -34,48 +35,68 @@ export const useBoardStore = create<BoardStore>()(
       deleteBoard: (id) =>
         set((s) => ({
           boards: s.boards.filter((b) => b.id !== id),
-          groups: s.groups.map((g) => ({
+          games: s.games.map((g) => ({
             ...g,
             boardIds: g.boardIds.filter((bid) => bid !== id),
           })),
         })),
       getBoard: (id) => get().boards.find((b) => b.id === id),
-      createGroup: (name) =>
+      createGame: (name) =>
         set((s) => {
           const now = Date.now()
           return {
-            groups: [
-              ...s.groups,
+            games: [
+              ...s.games,
               { id: crypto.randomUUID(), name, boardIds: [], createdAt: now, updatedAt: now },
             ],
           }
         }),
-      renameGroup: (id, name) =>
+      renameGame: (id, name) =>
         set((s) => ({
-          groups: s.groups.map((g) =>
+          games: s.games.map((g) =>
             g.id === id ? { ...g, name, updatedAt: Date.now() } : g
           ),
         })),
-      deleteGroup: (id) =>
-        set((s) => ({ groups: s.groups.filter((g) => g.id !== id) })),
-      addBoardToGroup: (groupId, boardId) =>
+      deleteGame: (id) =>
+        set((s) => ({ games: s.games.filter((g) => g.id !== id) })),
+      addBoardToGame: (gameId, boardId) =>
         set((s) => ({
-          groups: s.groups.map((g) =>
-            g.id === groupId && !g.boardIds.includes(boardId)
+          games: s.games.map((g) =>
+            g.id === gameId && !g.boardIds.includes(boardId)
               ? { ...g, boardIds: [...g.boardIds, boardId], updatedAt: Date.now() }
               : g
           ),
         })),
-      removeBoardFromGroup: (groupId, boardId) =>
+      removeBoardFromGame: (gameId, boardId) =>
         set((s) => ({
-          groups: s.groups.map((g) =>
-            g.id === groupId
+          games: s.games.map((g) =>
+            g.id === gameId
               ? { ...g, boardIds: g.boardIds.filter((id) => id !== boardId), updatedAt: Date.now() }
               : g
           ),
         })),
+      reorderBoardInGame: (gameId, fromIndex, toIndex) =>
+        set((s) => ({
+          games: s.games.map((g) => {
+            if (g.id !== gameId) return g
+            const ids = [...g.boardIds]
+            const [moved] = ids.splice(fromIndex, 1)
+            ids.splice(toIndex, 0, moved)
+            return { ...g, boardIds: ids, updatedAt: Date.now() }
+          }),
+        })),
     }),
-    { name: 'jeopardy-boards' }
+    {
+      name: 'jeopardy-boards',
+      migrate: (persisted: any) => {
+        if (persisted && persisted.groups && !persisted.games) {
+          persisted.games = persisted.groups
+          delete persisted.groups
+        }
+        return persisted
+      },
+      version: 1,
+    }
   )
 )
 
@@ -113,6 +134,10 @@ interface GameStore {
   resetBoard: () => void
   reset: () => void
   leaveRoom: () => void
+
+  selectGame: (gameId: string, boardIds: string[]) => void
+  setBoardTransition: (boardName: string | null) => void
+  showPodium: () => void
 }
 
 const defaultState: GameState = {
@@ -125,6 +150,10 @@ const defaultState: GameState = {
   activeMedia: null,
   boardControlId: null,
   dailyDouble: null,
+  activeGameId: null,
+  gameBoardIds: [],
+  currentBoardIndex: 0,
+  boardTransition: null,
 }
 
 const defaultSettings: GameSettings = {
@@ -310,6 +339,45 @@ export const useGameStore = create<GameStore>()(
             activeMedia: null,
             boardControlId: null,
             dailyDouble: null,
+          },
+        })),
+
+      selectGame: (gameId, boardIds) =>
+        set((s) => ({
+          state: {
+            ...s.state,
+            phase: 'gameStart',
+            activeGameId: gameId,
+            gameBoardIds: boardIds,
+            currentBoardIndex: 0,
+            board: null,
+            answeredCells: [],
+            activeQuestion: null,
+            buzzQueue: [],
+            activeMedia: null,
+            boardControlId: null,
+            dailyDouble: null,
+            boardTransition: null,
+            players: s.state.players.map((p) => ({ ...p, score: 0 })),
+          },
+        })),
+
+      setBoardTransition: (boardName) =>
+        set((s) => ({
+          state: { ...s.state, boardTransition: boardName },
+        })),
+
+      showPodium: () =>
+        set((s) => ({
+          state: {
+            ...s.state,
+            phase: 'podium',
+            board: null,
+            activeQuestion: null,
+            buzzQueue: [],
+            activeMedia: null,
+            dailyDouble: null,
+            boardTransition: null,
           },
         })),
 
