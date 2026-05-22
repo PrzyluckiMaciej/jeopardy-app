@@ -17,6 +17,24 @@ interface BoardStore {
   reorderBoardInGame: (gameId: string, fromIndex: number, toIndex: number) => void
 }
 
+type PersistedBoardStore = Pick<BoardStore, 'boards' | 'games'>
+type LegacyPersistedBoardStore = PersistedBoardStore & { groups?: Game[] }
+
+function migrateBoardStore(persisted: unknown): PersistedBoardStore {
+  if (!persisted || typeof persisted !== 'object') {
+    return { boards: [], games: [] }
+  }
+  const state = persisted as LegacyPersistedBoardStore
+  if (state.groups && !state.games) {
+    const { groups, ...rest } = state
+    return { ...rest, games: groups }
+  }
+  return {
+    boards: state.boards ?? [],
+    games: state.games ?? [],
+  }
+}
+
 export const useBoardStore = create<BoardStore>()(
   persist(
     (set, get) => ({
@@ -88,13 +106,7 @@ export const useBoardStore = create<BoardStore>()(
     }),
     {
       name: 'jeopardy-boards',
-      migrate: (persisted: any) => {
-        if (persisted && persisted.groups && !persisted.games) {
-          persisted.games = persisted.groups
-          delete persisted.groups
-        }
-        return persisted
-      },
+      migrate: migrateBoardStore,
       version: 1,
     }
   )
