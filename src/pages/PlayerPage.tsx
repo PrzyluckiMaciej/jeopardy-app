@@ -256,6 +256,16 @@ export default function PlayerPage() {
     prevScoreRef.current = score
   }, [myPlayer?.score])
 
+  const [boardFill, setBoardFill] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches,
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)')
+    const update = () => setBoardFill(mq.matches)
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
+
   function handleBuzz() {
     if (hasBuzzed || state.phase !== 'buzzing') return
     setHasBuzzed(true)
@@ -326,6 +336,7 @@ export default function PlayerPage() {
 
   const displayQ = activeQ ?? lastOverlayQ.current
   const displayCategory = categoryName || lastCategoryName.current
+  const questionOverlayOpen = overlayMounted && !!displayQ
 
   const uiPhase = overlayExiting ? lastOverlayPhase.current : state.phase
   const isDD = overlayExiting ? lastIsDD.current : state.dailyDouble !== null
@@ -422,19 +433,23 @@ export default function PlayerPage() {
   }
 
   return (
-    <div className="app-page h-screen flex flex-col overflow-hidden page-fade-in" style={{ background: 'var(--navy)' }}>
+    <div
+      className={`app-page h-screen flex flex-col overflow-hidden page-fade-in${questionOverlayOpen ? ' app-page--question-open' : ''}`}
+      style={{ background: 'var(--navy)' }}
+    >
       <header className="player-topbar">
-        <div className="font-display text-xl md:text-2xl flex-shrink-0" style={{ color: 'var(--gold-bright)' }}>
+        <div className="player-topbar__brand font-display" style={{ color: 'var(--gold-bright)' }}>
           JEOPARDY!
         </div>
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="player-topbar__meta">
           {state.boardControlId === myId && (
-            <div className="player-topbar__turn-badge">YOUR TURN</div>
+            <span className="player-topbar__turn-badge">YOUR TURN</span>
           )}
           <div className="player-topbar__identity">
-            <span className="player-topbar__name font-condensed font-bold truncate" style={{ color: 'var(--white)' }}>
+            <span className="player-topbar__name font-condensed font-bold" style={{ color: 'var(--white)' }}>
               {myPlayer?.name ?? playerName}
             </span>
+            <span className="player-topbar__sep" aria-hidden>·</span>
             <span
               className={`player-topbar__score font-display${scorePulsing ? ' score-pulse' : ''}`}
               style={{ color: myScore < 0 ? '#e07070' : 'var(--gold-bright)' }}
@@ -443,16 +458,16 @@ export default function PlayerPage() {
               {formatScore(myScore)}
             </span>
           </div>
-          <button
-            type="button"
-            className="btn-icon-exit flex-shrink-0"
-            onClick={handleExitRoom}
-            title="Exit room"
-            aria-label="Exit room"
-          >
-            <LogOut size={22} />
-          </button>
         </div>
+        <button
+          type="button"
+          className="btn-icon-exit player-topbar__exit"
+          onClick={handleExitRoom}
+          title="Exit room"
+          aria-label="Exit room"
+        >
+          <LogOut size={22} />
+        </button>
       </header>
 
       {/* Main content */}
@@ -469,7 +484,10 @@ export default function PlayerPage() {
 
         {/* Board area + scoreboard (all phases except podium) */}
         {state.phase !== 'podium' && (
-          <div className="flex-1 flex flex-col min-h-0 gap-4 px-4 pb-4">
+          <div
+            className={`player-main flex-1 flex flex-col min-h-0 gap-4 px-4 pb-4${questionOverlayOpen ? ' player-main--hidden' : ''}`}
+            aria-hidden={questionOverlayOpen}
+          >
             <div className="board-scroll-wrap">
               {state.phase === 'gameStart' && (
                 <div className="h-full flex flex-col items-center justify-center gap-4">
@@ -487,7 +505,7 @@ export default function PlayerPage() {
                 <GameBoard
                   board={state.board}
                   answeredCells={state.answeredCells}
-                  fill
+                  fill={boardFill}
                 />
               )}
 
@@ -535,7 +553,7 @@ export default function PlayerPage() {
       {/* Question overlay — mirrors QuestionOverlay layout without host controls */}
       {overlayMounted && displayQ && (
         <div
-          className={`fixed inset-0 z-50 flex flex-col${overlayExiting ? ' question-overlay--exit' : ' question-overlay-enter'}`}
+          className={`player-question-overlay fixed inset-0 z-50 flex flex-col${overlayExiting ? ' question-overlay--exit' : ' question-overlay-enter'}`}
           style={{ background: 'rgba(6,11,40,0.97)', backdropFilter: 'blur(4px)' }}
           onAnimationEnd={(e) => {
             if (overlayExiting && e.animationName === 'overlayFadeOut' && e.target === e.currentTarget) {
@@ -702,7 +720,7 @@ export default function PlayerPage() {
 
                 {/* Normal: buzzing phase — inline on desktop, docked on mobile via .player-buzz-dock */}
                 {!isDD && uiPhase === 'buzzing' && !judgeResult && !(hasBuzzed && !state.buzzQueue.includes(myId)) && (
-                  <div className="player-buzz-dock">
+                  <div className="player-buzz-dock" data-mobile-dock>
                     <button
                       type="button"
                       className={`player-buzz-btn font-display transition-all ${!hasBuzzed ? 'buzz-btn' : ''}`}

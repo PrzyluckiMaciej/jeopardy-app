@@ -80,10 +80,10 @@ export default function GameBoard({
                 disabled={isAnswered || !onOpenCell}
               >
                 <span
-                  className={fill ? 'font-display leading-none' : 'font-display text-3xl leading-none'}
+                  className={`board-cell__value font-display leading-none${fill ? '' : ' text-3xl'}`}
                   style={{
                     color: isAnswered ? '#4a5580' : 'var(--gold-bright)',
-                    fontSize: fill ? 'clamp(1.25rem, 5vh, 2.25rem)' : undefined,
+                    fontSize: fill ? 'clamp(0.75rem, min(3.5vw, 4vh), 1.35rem)' : undefined,
                   }}
                 >
                   ${pts}

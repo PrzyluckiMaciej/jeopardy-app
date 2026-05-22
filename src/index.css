@@ -735,10 +735,25 @@ button {
 }
 @media (max-width: 767px) {
   .game-board:not(.game-board--fill) .game-board__grid {
-    grid-template-columns: repeat(var(--board-cols, 6), minmax(100px, 1fr)) !important;
+    grid-template-columns: repeat(var(--board-cols, 6), minmax(88px, 1fr)) !important;
   }
   .game-board:not(.game-board--fill) .board-cell {
     min-height: 56px;
+  }
+  .game-board:not(.game-board--fill) .board-cell .board-cell__value {
+    font-size: 1.25rem !important;
+  }
+  .game-board--fill .board-cell {
+    overflow: hidden;
+    padding: 4px 2px;
+  }
+  .game-board--fill .board-cell .board-cell__value {
+    font-size: clamp(0.625rem, 3.2vw, 1rem) !important;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1;
   }
 }
 
@@ -911,38 +926,95 @@ button {
   flex-shrink: 0;
 }
 
-/* ── Player top bar (compact on mobile) ─────────────────────── */
+/* ── Player top bar ─────────────────────────────────────────── */
 .player-topbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-sm);
   border-bottom: 1px solid var(--navy-light);
   background: var(--navy-mid);
-  padding: 10px max(24px, env(safe-area-inset-right, 0px)) 10px max(24px, env(safe-area-inset-left, 0px));
+  padding: 10px max(16px, env(safe-area-inset-right, 0px)) 10px max(16px, env(safe-area-inset-left, 0px));
+  flex-shrink: 0;
+}
+.player-topbar__brand {
+  font-size: 1.125rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+.player-topbar__meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  min-width: 0;
 }
 .player-topbar__identity {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  text-align: right;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 6px;
   min-width: 0;
+  line-height: 1.2;
+}
+.player-topbar__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 10rem;
+}
+.player-topbar__sep {
+  color: #4a5580;
+  flex-shrink: 0;
+}
+.player-topbar__score {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .player-topbar__turn-badge {
-  display: none;
   font-family: 'Barlow Condensed', sans-serif;
-  font-size: 0.75rem;
-  padding: 4px 8px;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 4px 6px;
   border-radius: 4px;
   background: rgba(0, 200, 180, 0.2);
   color: #40e0d0;
   border: 1px solid rgba(0, 200, 180, 0.45);
   flex-shrink: 0;
+  white-space: nowrap;
 }
-@media (min-width: 480px) {
-  .player-topbar__turn-badge {
-    display: block;
+.player-topbar__exit {
+  justify-self: end;
+}
+@media (min-width: 768px) {
+  .player-topbar {
+    padding-left: max(24px, env(safe-area-inset-left, 0px));
+    padding-right: max(24px, env(safe-area-inset-right, 0px));
   }
+  .player-topbar__brand {
+    font-size: 1.5rem;
+  }
+  .player-topbar__name {
+    max-width: 14rem;
+  }
+  .player-topbar__turn-badge {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+  }
+}
+
+/* Hide board/scoreboard behind question overlay (prevents scroll flash) */
+.player-main--hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+.app-page--question-open {
+  overflow: hidden;
+}
+.player-question-overlay {
+  overscroll-behavior: contain;
+  touch-action: pan-y;
 }
 
 /* ── Player buzz dock (fixed bottom on mobile) ──────────────── */
@@ -1077,55 +1149,56 @@ button {
     padding: 10px;
   }
 
-  .player-topbar__identity {
-    flex-direction: row;
-    align-items: baseline;
-    gap: var(--space-sm);
-  }
-  .player-topbar__identity .player-topbar__name {
-    font-size: 0.9375rem;
-  }
-  .player-topbar__identity .player-topbar__score {
-    font-size: 1.25rem;
-  }
-  .player-topbar__turn-badge {
-    font-size: 0.625rem;
-    padding: 4px 6px;
-  }
-
-  /* Buzz button: large, fixed at bottom on mobile */
-  .player-buzz-dock {
-    display: block;
+  /* Buzz button: large, fixed and centered at bottom on mobile */
+  .player-buzz-dock[data-mobile-dock] {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     position: fixed;
     left: 0;
     right: 0;
     bottom: 0;
     z-index: 55;
+    width: 100%;
     padding: var(--space-md) max(var(--space-md), env(safe-area-inset-right, 0px)) max(var(--space-md), env(safe-area-inset-bottom, 0px)) max(var(--space-md), env(safe-area-inset-left, 0px));
-    background: linear-gradient(to top, rgba(6, 11, 40, 0.98) 70%, transparent);
+    background: linear-gradient(to top, rgba(6, 11, 40, 0.98) 65%, transparent);
     pointer-events: none;
+    box-sizing: border-box;
   }
-  .player-buzz-dock > * {
+  .player-buzz-dock[data-mobile-dock] > * {
     pointer-events: auto;
   }
-  .player-buzz-dock .panel {
-    background: transparent;
-    border: none;
-    box-shadow: none;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-sm);
-  }
-  .player-buzz-btn {
+  .player-buzz-dock[data-mobile-dock] .player-buzz-btn {
     width: min(100%, 280px);
     height: 72px;
+    margin: 0 auto;
     border-radius: 9999px;
     font-size: 1.375rem !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 0 16px;
+    box-sizing: border-box;
+  }
+  .player-buzz-dock[data-mobile-dock] .font-condensed {
+    text-align: center;
+    width: 100%;
   }
   .question-overlay-layout--player.question-overlay-layout--has-buzz {
     padding-bottom: 120px;
+  }
+  .player-question-overlay .question-overlay-layout {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .player-question-overlay .question-overlay-sidebar .panel:has([data-mobile-dock]) {
+    padding: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    min-height: 0;
   }
 
   .settings-grid {
