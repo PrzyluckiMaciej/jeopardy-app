@@ -53,10 +53,7 @@ export default function SettingsPanel({
   }
 
   return (
-    <div
-      className="grid gap-8"
-      style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}
-    >
+    <div className="settings-grid">
       {/* Left column: Game Settings + Board Control */}
       <div className="flex flex-col gap-8">
         {/* Game Settings */}
@@ -273,15 +270,9 @@ function Toggle({
 }) {
   return (
     <div
-      className="flex items-center rounded-lg"
-      style={{
-        background: 'var(--navy)',
-        border: '1px solid var(--navy-light)',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.45 : 1,
-        padding: 'var(--space-md) var(--space-lg)',
-        gap: 'var(--space-md)',
-      }}
+      role="switch"
+      aria-checked={value}
+      className={`settings-toggle${disabled ? ' settings-toggle--disabled' : ''}`}
       onClick={disabled ? undefined : onChange}
     >
       <div className="flex-1 min-w-0">

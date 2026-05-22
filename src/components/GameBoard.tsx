@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import type { Board, Question } from '../types'
 import { cellId } from '../lib/utils'
 
@@ -28,10 +29,18 @@ export default function GameBoard({
         gridTemplateColumns: `repeat(${board.categories.length}, minmax(140px, 1fr))`,
       }
 
+  const rootClass = [
+    'game-board',
+    fill ? 'game-board--fill h-full w-full min-h-0' : 'game-board--touch overflow-auto',
+  ].join(' ')
+
   return (
-    <div className={fill ? 'h-full w-full min-h-0' : 'overflow-auto'}>
+    <div
+      className={rootClass}
+      style={{ '--board-cols': board.categories.length } as CSSProperties}
+    >
       <div
-        className={`grid gap-2 ${fill ? 'h-full w-full' : 'min-w-max'}`}
+        className={`game-board__grid grid gap-2 ${fill ? 'h-full w-full' : 'min-w-max'}`}
         style={gridStyle}
       >
         {board.categories.map((cat) => (
@@ -71,10 +80,10 @@ export default function GameBoard({
                 disabled={isAnswered || !onOpenCell}
               >
                 <span
-                  className={fill ? 'font-display leading-none' : 'font-display text-3xl leading-none'}
+                  className={`board-cell__value font-display leading-none${fill ? '' : ' text-3xl'}`}
                   style={{
                     color: isAnswered ? '#4a5580' : 'var(--gold-bright)',
-                    fontSize: fill ? 'clamp(1.25rem, 5vh, 2.25rem)' : undefined,
+                    fontSize: fill ? 'clamp(0.75rem, min(3.5vw, 4vh), 1.35rem)' : undefined,
                   }}
                 >
                   ${pts}

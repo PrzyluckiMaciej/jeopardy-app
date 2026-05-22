@@ -256,6 +256,16 @@ export default function PlayerPage() {
     prevScoreRef.current = score
   }, [myPlayer?.score])
 
+  const [boardFill, setBoardFill] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches,
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)')
+    const update = () => setBoardFill(mq.matches)
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
+
   function handleBuzz() {
     if (hasBuzzed || state.phase !== 'buzzing') return
     setHasBuzzed(true)
@@ -326,6 +336,7 @@ export default function PlayerPage() {
 
   const displayQ = activeQ ?? lastOverlayQ.current
   const displayCategory = categoryName || lastCategoryName.current
+  const questionOverlayOpen = overlayMounted && !!displayQ
 
   const uiPhase = overlayExiting ? lastOverlayPhase.current : state.phase
   const isDD = overlayExiting ? lastIsDD.current : state.dailyDouble !== null
@@ -422,42 +433,42 @@ export default function PlayerPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden page-fade-in" style={{ background: 'var(--navy)' }}>
-      {/* Top bar */}
-      <div className="flex items-center justify-between border-b" style={{ borderColor: 'var(--navy-light)', background: 'var(--navy-mid)', padding: '10px 24px' }}>
-        <div className="font-display text-2xl" style={{ color: 'var(--gold-bright)' }}>JEOPARDY!</div>
-        <div className="flex items-center gap-3">
+    <div
+      className={`app-page h-screen flex flex-col overflow-hidden page-fade-in${questionOverlayOpen ? ' app-page--question-open' : ''}`}
+      style={{ background: 'var(--navy)' }}
+    >
+      <header className="player-topbar">
+        <div className="player-topbar__brand font-display" style={{ color: 'var(--gold-bright)' }}>
+          JEOPARDY!
+        </div>
+        <div className="player-topbar__meta">
           {state.boardControlId === myId && (
-            <div
-              className="font-condensed text-xs px-2 py-1 rounded"
-              style={{
-                background: 'rgba(0,200,180,0.2)',
-                color: '#40e0d0',
-                border: '1px solid rgba(0,200,180,0.45)',
-              }}
-            >
-              YOUR TURN TO PICK
-            </div>
+            <span className="player-topbar__turn-badge">YOUR TURN</span>
           )}
-          <div className="text-right">
-            <div className="font-condensed font-bold" style={{ color: 'var(--white)' }}>{myPlayer?.name ?? playerName}</div>
-            <div
-              className={`font-display text-xl${scorePulsing ? ' score-pulse' : ''}`}
+          <div className="player-topbar__identity">
+            <span className="player-topbar__name font-condensed font-bold" style={{ color: 'var(--white)' }}>
+              {myPlayer?.name ?? playerName}
+            </span>
+            <span className="player-topbar__sep" aria-hidden>·</span>
+            <span
+              className={`player-topbar__score font-display${scorePulsing ? ' score-pulse' : ''}`}
               style={{ color: myScore < 0 ? '#e07070' : 'var(--gold-bright)' }}
               onAnimationEnd={() => setScorePulsing(false)}
             >
               {formatScore(myScore)}
-            </div>
+            </span>
           </div>
-          <button
-            className="btn-icon-exit"
-            onClick={handleExitRoom}
-            title="Exit room"
-          >
-            <LogOut size={22} />
-          </button>
         </div>
-      </div>
+        <button
+          type="button"
+          className="btn-icon-exit player-topbar__exit"
+          onClick={handleExitRoom}
+          title="Exit room"
+          aria-label="Exit room"
+        >
+          <LogOut size={22} />
+        </button>
+      </header>
 
       {/* Main content */}
       <div
@@ -473,8 +484,11 @@ export default function PlayerPage() {
 
         {/* Board area + scoreboard (all phases except podium) */}
         {state.phase !== 'podium' && (
-          <div className="flex-1 flex flex-col min-h-0 gap-4 px-4 pb-4">
-            <div className="flex-1 min-h-0 min-w-0 overflow-x-auto overflow-y-hidden">
+          <div
+            className={`player-main flex-1 flex flex-col min-h-0 gap-4 px-4 pb-4${questionOverlayOpen ? ' player-main--hidden' : ''}`}
+            aria-hidden={questionOverlayOpen}
+          >
+            <div className="board-scroll-wrap">
               {state.phase === 'gameStart' && (
                 <div className="h-full flex flex-col items-center justify-center gap-4">
                   <div className="font-display text-4xl" style={{ color: 'var(--gold-bright)' }}>JEOPARDY!</div>
@@ -491,7 +505,7 @@ export default function PlayerPage() {
                 <GameBoard
                   board={state.board}
                   answeredCells={state.answeredCells}
-                  fill
+                  fill={boardFill}
                 />
               )}
 
@@ -539,7 +553,7 @@ export default function PlayerPage() {
       {/* Question overlay — mirrors QuestionOverlay layout without host controls */}
       {overlayMounted && displayQ && (
         <div
-          className={`fixed inset-0 z-50 flex flex-col${overlayExiting ? ' question-overlay--exit' : ' question-overlay-enter'}`}
+          className={`player-question-overlay fixed inset-0 z-50 flex flex-col${overlayExiting ? ' question-overlay--exit' : ' question-overlay-enter'}`}
           style={{ background: 'rgba(6,11,40,0.97)', backdropFilter: 'blur(4px)' }}
           onAnimationEnd={(e) => {
             if (overlayExiting && e.animationName === 'overlayFadeOut' && e.target === e.currentTarget) {
@@ -549,19 +563,17 @@ export default function PlayerPage() {
             }
           }}
         >
-          {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--navy-light)' }}>
-            <div className="font-condensed font-bold uppercase tracking-wider" style={{ color: 'var(--gold)', fontSize: 14 }}>
+          <header className="question-overlay-header">
+            <div className="font-condensed font-bold uppercase tracking-wider min-w-0" style={{ color: 'var(--gold)', fontSize: 14 }}>
               {displayCategory}
               {displayCategory && <span style={{ opacity: 0.5 }}> &nbsp;·&nbsp; </span>}
               <span className="font-display text-xl" style={{ color: 'var(--gold-bright)' }}>${displayQ.points}</span>
               {isDD && <span style={{ color: 'var(--gold-bright)', marginLeft: 8 }}>DAILY DOUBLE</span>}
             </div>
-          </div>
+          </header>
 
-          <div className="flex-1 flex gap-6 p-6 min-h-0">
-            {/* Main area */}
-            <div className={`flex-1 flex flex-col items-center justify-center text-center ${overlayExiting ? 'card-flip-exit' : 'card-flip'}`}>
+          <div className={`question-overlay-layout question-overlay-layout--player${!isDD && uiPhase === 'buzzing' && !judgeResult && !(hasBuzzed && !state.buzzQueue.includes(myId)) ? ' question-overlay-layout--has-buzz' : ''}`}>
+            <div className={`question-overlay-main ${overlayExiting ? 'card-flip-exit' : 'card-flip'}`}>
               {/* DD title splash */}
               {uiPhase === 'dailyDouble' && (
                 <div className="daily-double-title">DAILY DOUBLE!</div>
@@ -630,8 +642,7 @@ export default function PlayerPage() {
               )}
             </div>
 
-            {/* Right panel */}
-            <div className="w-72 flex-shrink-0 flex flex-col gap-4">
+            <aside className="question-overlay-sidebar">
               <div className="panel flex flex-col items-center gap-3">
                 {/* DD: title phase — wager input for DD player, waiting message for others */}
                 {uiPhase === 'dailyDouble' && (
@@ -707,11 +718,12 @@ export default function PlayerPage() {
                   </div>
                 )}
 
-                {/* Normal: buzzing phase */}
+                {/* Normal: buzzing phase — inline on desktop, docked on mobile via .player-buzz-dock */}
                 {!isDD && uiPhase === 'buzzing' && !judgeResult && !(hasBuzzed && !state.buzzQueue.includes(myId)) && (
-                  <>
+                  <div className="player-buzz-dock" data-mobile-dock>
                     <button
-                      className={`w-32 h-32 rounded-full font-display transition-all ${!hasBuzzed ? 'buzz-btn' : ''}`}
+                      type="button"
+                      className={`player-buzz-btn font-display transition-all ${!hasBuzzed ? 'buzz-btn' : ''}`}
                       style={{
                         background: hasBuzzed
                           ? isMyTurn ? 'rgba(212,160,23,0.3)' : 'rgba(74,85,128,0.2)'
@@ -731,13 +743,13 @@ export default function PlayerPage() {
                         : 'BUZZ!'}
                     </button>
                     {!hasBuzzed && (
-                      <div className="font-condensed text-sm" style={{ color: '#4a5580' }}>
+                      <div className="font-condensed text-sm text-center" style={{ color: '#4a5580' }}>
                         {state.buzzQueue.length > 0
                           ? `${state.buzzQueue.length} player${state.buzzQueue.length > 1 ? 's' : ''} buzzed`
                           : 'Be first to buzz!'}
                       </div>
                     )}
-                  </>
+                  </div>
                 )}
 
                 {/* Normal: question phase — waiting for buzzing */}
@@ -821,7 +833,7 @@ export default function PlayerPage() {
                   </div>
                 ))}
               </div>
-            </div>
+            </aside>
           </div>
         </div>
       )}

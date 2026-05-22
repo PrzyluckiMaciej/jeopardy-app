@@ -30,7 +30,7 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 page-fade-in" style={{ background: 'var(--navy)' }}>
+    <div className="app-page min-h-screen flex flex-col items-center justify-center safe-area-x safe-area-bottom px-4 page-fade-in" style={{ background: 'var(--navy)' }}>
       {/* Logo */}
       <div className="text-center mb-12">
         <div className="font-display text-6xl md:text-8xl tracking-wider mb-1" style={{ color: 'var(--gold-bright)', textShadow: '0 0 40px rgba(255,224,102,0.4)' }}>
