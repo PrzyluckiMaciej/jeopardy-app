@@ -186,11 +186,14 @@ export default function SettingsPanel({
                   title={p.isConnected ? 'Connected' : 'Not connected'}
                 />
                 <div className="flex-1 min-w-0">
-                  <div className="font-condensed font-bold truncate" style={{ fontSize: '1.0625rem' }}>
-                    {p.name}
+                  <div
+                    className="font-condensed font-bold flex items-center min-w-0"
+                    style={{ fontSize: '1.0625rem', gap: '0.5rem' }}
+                  >
+                    <span className="truncate min-w-0">{p.name}</span>
                     {boardControlId === p.id && (
                       <span
-                        className="ml-2 inline-flex items-center justify-center rounded"
+                        className="inline-flex flex-shrink-0 items-center justify-center rounded"
                         title="Board control"
                         aria-label="Board control"
                         style={{
@@ -198,7 +201,6 @@ export default function SettingsPanel({
                           color: '#40e0d0',
                           border: '1px solid rgba(0,200,180,0.45)',
                           padding: '2px 5px',
-                          verticalAlign: 'middle',
                         }}
                       >
                         <Crown size={12} aria-hidden />
