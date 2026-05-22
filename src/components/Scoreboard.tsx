@@ -68,9 +68,9 @@ export default function Scoreboard({
             key={p.id}
             className="flex flex-col items-center transition-all"
             style={{
-              minWidth: 130,
-              maxWidth: 180,
-              flex: '1 1 130px',
+            minWidth: 110,
+            maxWidth: 180,
+            flex: '1 1 110px',
               opacity: p.isConnected ? 1 : 0.5,
               background: isHighlighted
                 ? 'rgba(212,160,23,0.13)'

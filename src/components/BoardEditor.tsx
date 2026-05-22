@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
-import { Trash2, X, Check } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
 import type { Board, Category, Question } from '../types'
 import { generateId } from '../lib/utils'
 import { saveMedia, deleteMedia, getMedia, blobToDataUrl } from '../lib/db'
@@ -38,9 +38,12 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
     ? board.categories.find((c) => c.id === editingCell.categoryId) ?? null
     : null
 
-  const updateBoard = useCallback((patch: Partial<Board>) => {
-    onChange({ ...board, ...patch, updatedAt: Date.now() })
-  }, [board, onChange])
+  const updateBoard = useCallback(
+    (patch: Partial<Board>) => {
+      onChange({ ...board, ...patch, updatedAt: Date.now() })
+    },
+    [board, onChange]
+  )
 
   function updateCategory(catId: string, patch: Partial<Category>) {
     updateBoard({
@@ -134,36 +137,63 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Toolbar */}
-      <div className="flex items-center gap-4 mb-5 flex-wrap">
+      {/* Edit mode toolbar */}
+      <div
+        className="flex items-center gap-3 mb-5 px-4 py-3 rounded-lg flex-wrap flex-shrink-0"
+        style={{
+          background: 'rgba(59,130,246,0.07)',
+          border: '1px solid rgba(59,130,246,0.25)',
+        }}
+      >
+        {/* EDITING badge */}
+        <span
+          className="font-condensed font-bold text-xs px-2 py-0.5 rounded flex-shrink-0"
+          style={{
+            background: 'rgba(59,130,246,0.2)',
+            border: '1px solid rgba(59,130,246,0.45)',
+            color: '#60a5fa',
+            letterSpacing: '0.08em',
+          }}
+        >
+          EDITING
+        </span>
+
+        {/* Board name input */}
         <input
           className="text-xl font-condensed"
-          style={{ background: 'transparent', border: 'none', color: 'var(--gold-bright)', fontSize: 22, fontWeight: 700, letterSpacing: 1, borderBottom: '2px solid var(--navy-light)', borderRadius: 0, paddingLeft: 0 }}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            borderBottom: '2px solid rgba(59,130,246,0.35)',
+            color: 'var(--gold-bright)',
+            fontSize: 20,
+            fontWeight: 700,
+            letterSpacing: 1,
+            borderRadius: 0,
+            paddingLeft: 0,
+            boxShadow: 'none',
+          }}
           value={boardName}
           onChange={(e) => {
             setBoardName(e.target.value)
             updateBoard({ name: e.target.value })
           }}
         />
-        <button className="btn-outline text-sm" onClick={addCategory}>+ Category</button>
+
+        {/* Add category — center */}
+        <button className="btn-outline text-sm" onClick={addCategory}>
+          + Category
+        </button>
+
         <div className="flex-1" />
-        <div className="flex items-center gap-1">
-          <button
-            className="btn-icon"
-            onClick={discardChanges}
-            title="Discard changes"
-          >
-            <X size={22} />
-          </button>
-          <button
-            className="btn-icon"
-            style={{ color: 'var(--gold)' }}
-            onClick={onClose}
-            title="Save"
-          >
-            <Check size={22} />
-          </button>
-        </div>
+
+        {/* Discard + Save actions */}
+        <button className="btn-ghost text-sm" onClick={discardChanges}>
+          Discard
+        </button>
+        <button className="btn-gold text-sm" onClick={onClose}>
+          Save &amp; Close
+        </button>
       </div>
 
       <div className="flex gap-5 flex-1 min-h-0 items-start">
@@ -183,7 +213,12 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                   <input
                     autoFocus
                     className="w-full text-center text-sm font-condensed font-bold uppercase"
-                    style={{ background: 'var(--navy-mid)', border: '2px solid var(--gold)', borderRadius: 6, padding: '10px 8px' }}
+                    style={{
+                      background: 'var(--navy-mid)',
+                      border: '2px solid var(--gold)',
+                      borderRadius: 6,
+                      padding: '10px 8px',
+                    }}
                     value={cat.name}
                     onChange={(e) => updateCategory(cat.id, { name: e.target.value })}
                     onBlur={() => setEditingCategoryId(null)}
@@ -192,7 +227,15 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                 ) : (
                   <div
                     className="text-center text-sm font-condensed font-bold uppercase py-3 px-2 rounded cursor-pointer"
-                    style={{ background: 'var(--navy-mid)', border: '2px solid var(--navy-light)', letterSpacing: 1, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    style={{
+                      background: 'var(--navy-mid)',
+                      border: '2px dashed rgba(59,130,246,0.35)',
+                      letterSpacing: 1,
+                      minHeight: 44,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
                     onClick={() => setEditingCategoryId(cat.id)}
                     title="Click to rename"
                   >
@@ -201,7 +244,12 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                 )}
                 <button
                   className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:brightness-75"
-                  style={{ background: 'var(--red)', color: '#fff', border: 'none', transition: 'opacity 150ms, filter 150ms' }}
+                  style={{
+                    background: 'var(--red)',
+                    color: '#fff',
+                    border: 'none',
+                    transition: 'opacity 150ms, filter 150ms',
+                  }}
                   onClick={() => removeCategory(cat.id)}
                 >
                   <Trash2 size={11} />
@@ -239,7 +287,7 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                   className="font-display text-lg rounded"
                   style={{
                     background: 'var(--navy-mid)',
-                    border: '2px solid var(--navy-light)',
+                    border: '2px dashed rgba(59,130,246,0.3)',
                     color: 'var(--gold-bright)',
                     minHeight: 72,
                     width: '100%',
@@ -248,8 +296,12 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                   }}
                   title="Click to edit point value"
                   onClick={() => startEditingRowPts(pts)}
-                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.borderColor = 'var(--gold)')}
-                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.borderColor = 'var(--navy-light)')}
+                  onMouseEnter={(e) =>
+                    ((e.currentTarget as HTMLElement).style.borderColor = 'var(--gold)')
+                  }
+                  onMouseLeave={(e) =>
+                    ((e.currentTarget as HTMLElement).style.borderColor = 'rgba(59,130,246,0.3)')
+                  }
                 >
                   ${pts}
                 </button>
@@ -266,7 +318,9 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                     className="board-cell rounded"
                     style={{
                       minHeight: 72,
-                      border: isActive ? '2px solid var(--gold)' : '2px solid var(--navy-light)',
+                      border: isActive
+                        ? '2px solid var(--gold)'
+                        : '2px dashed rgba(59,130,246,0.3)',
                       position: 'relative',
                     }}
                     onClick={() => openCell(cat.id, q)}
@@ -275,13 +329,21 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                       ${pts}
                     </div>
                     {!hasContent && (
-                      <div className="text-xs mt-1" style={{ color: '#4a5580' }}>empty</div>
+                      <div className="text-xs mt-1" style={{ color: '#4a5580' }}>
+                        empty
+                      </div>
                     )}
                     {hasContent && (
-                      <div className="w-2 h-2 rounded-full mx-auto mt-1" style={{ background: 'var(--gold)', opacity: 0.6 }} />
+                      <div
+                        className="w-2 h-2 rounded-full mx-auto mt-1"
+                        style={{ background: 'var(--gold)', opacity: 0.6 }}
+                      />
                     )}
                     {q.mediaId && (
-                      <div className="w-1.5 h-1.5 rounded-full mx-auto mt-1" style={{ background: 'var(--gold)', opacity: 0.8 }} />
+                      <div
+                        className="w-1.5 h-1.5 rounded-full mx-auto mt-1"
+                        style={{ background: 'var(--gold)', opacity: 0.8 }}
+                      />
                     )}
                     {board.dailyDoubleQuestionId === q.id && (
                       <div className="dd-badge">DD</div>
@@ -297,14 +359,25 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
         {editingCell && activeQ && activeCategory && (
           <div className="panel w-80 flex-shrink-0 flex flex-col gap-4 overflow-auto">
             <div className="flex items-center justify-between">
-              <span className="font-condensed font-bold uppercase text-sm" style={{ color: 'var(--gold)' }}>
+              <span
+                className="font-condensed font-bold uppercase text-sm"
+                style={{ color: 'var(--gold)' }}
+              >
                 {activeCategory.name} · ${activeQ.points}
               </span>
-              <button className="btn-ghost text-xs py-1 px-2" onClick={() => setEditingCell(null)}>✕</button>
+              <button
+                className="btn-ghost text-xs py-1 px-2"
+                onClick={() => setEditingCell(null)}
+              >
+                ✕
+              </button>
             </div>
 
             <div>
-              <label className="font-condensed text-xs uppercase tracking-wider mb-1 block" style={{ color: 'var(--gold)', opacity: 0.7 }}>
+              <label
+                className="font-condensed text-xs uppercase tracking-wider mb-1 block"
+                style={{ color: 'var(--gold)', opacity: 0.7 }}
+              >
                 Question (clue)
               </label>
               <textarea
@@ -312,12 +385,17 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                 rows={3}
                 placeholder="Enter the clue shown to players…"
                 value={activeQ.question}
-                onChange={(e) => updateQuestion(editingCell.categoryId, activeQ.id, { question: e.target.value })}
+                onChange={(e) =>
+                  updateQuestion(editingCell.categoryId, activeQ.id, { question: e.target.value })
+                }
               />
             </div>
 
             <div>
-              <label className="font-condensed text-xs uppercase tracking-wider mb-1 block" style={{ color: 'var(--gold)', opacity: 0.7 }}>
+              <label
+                className="font-condensed text-xs uppercase tracking-wider mb-1 block"
+                style={{ color: 'var(--gold)', opacity: 0.7 }}
+              >
                 Answer (in Jeopardy form)
               </label>
               <textarea
@@ -325,12 +403,17 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                 rows={2}
                 placeholder="What is…?"
                 value={activeQ.answer}
-                onChange={(e) => updateQuestion(editingCell.categoryId, activeQ.id, { answer: e.target.value })}
+                onChange={(e) =>
+                  updateQuestion(editingCell.categoryId, activeQ.id, { answer: e.target.value })
+                }
               />
             </div>
 
             <div>
-              <label className="font-condensed text-xs uppercase tracking-wider mb-2 block" style={{ color: 'var(--gold)', opacity: 0.7 }}>
+              <label
+                className="font-condensed text-xs uppercase tracking-wider mb-2 block"
+                style={{ color: 'var(--gold)', opacity: 0.7 }}
+              >
                 Media attachment
               </label>
               {mediaPreview ? (
@@ -338,17 +421,28 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                   {activeQ.mediaId && (
                     <>
                       {mediaPreview.startsWith('data:image') && (
-                        <img src={mediaPreview} className="w-full rounded mb-2" style={{ maxHeight: 140, objectFit: 'contain' }} />
+                        <img
+                          src={mediaPreview}
+                          className="w-full rounded mb-2"
+                          style={{ maxHeight: 140, objectFit: 'contain' }}
+                        />
                       )}
                       {mediaPreview.startsWith('data:audio') && (
                         <audio controls src={mediaPreview} className="w-full mb-2" />
                       )}
                       {mediaPreview.startsWith('data:video') && (
-                        <video controls src={mediaPreview} className="w-full rounded mb-2" style={{ maxHeight: 120 }} />
+                        <video
+                          controls
+                          src={mediaPreview}
+                          className="w-full rounded mb-2"
+                          style={{ maxHeight: 120 }}
+                        />
                       )}
                     </>
                   )}
-                  <button className="btn-ghost text-xs w-full" onClick={removeMedia}>Remove media</button>
+                  <button className="btn-ghost text-xs w-full" onClick={removeMedia}>
+                    Remove media
+                  </button>
                 </div>
               ) : (
                 <>
@@ -360,7 +454,10 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                     onChange={handleMediaUpload}
                     id="media-upload"
                   />
-                  <label htmlFor="media-upload" className="btn-ghost text-sm w-full block text-center py-2 cursor-pointer">
+                  <label
+                    htmlFor="media-upload"
+                    className="btn-ghost text-sm w-full block text-center py-2 cursor-pointer"
+                  >
                     Attach image / audio / video
                   </label>
                 </>
@@ -370,8 +467,15 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
             <div
               className="flex items-center gap-3 px-3 py-2 rounded-lg"
               style={{
-                background: board.dailyDoubleQuestionId === activeQ.id ? 'rgba(212,160,23,0.15)' : 'var(--navy)',
-                border: `1px solid ${board.dailyDoubleQuestionId === activeQ.id ? 'rgba(212,160,23,0.45)' : 'var(--navy-light)'}`,
+                background:
+                  board.dailyDoubleQuestionId === activeQ.id
+                    ? 'rgba(212,160,23,0.15)'
+                    : 'var(--navy)',
+                border: `1px solid ${
+                  board.dailyDoubleQuestionId === activeQ.id
+                    ? 'rgba(212,160,23,0.45)'
+                    : 'var(--navy-light)'
+                }`,
                 cursor: 'pointer',
               }}
               onClick={() => {
@@ -381,17 +485,23 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
             >
               <div className="flex-1">
                 <div className="font-condensed font-bold text-sm">Daily Double</div>
-                <div className="text-xs" style={{ color: '#4a5580' }}>Mark this question as the daily double</div>
+                <div className="text-xs" style={{ color: '#4a5580' }}>
+                  Mark this question as the daily double
+                </div>
               </div>
               <div
                 className="w-11 h-6 rounded-full relative transition-colors flex-shrink-0"
-                style={{ background: board.dailyDoubleQuestionId === activeQ.id ? 'var(--gold)' : 'var(--navy-light)' }}
+                style={{
+                  background:
+                    board.dailyDoubleQuestionId === activeQ.id ? 'var(--gold)' : 'var(--navy-light)',
+                }}
               >
                 <div
                   className="absolute top-0.5 w-5 h-5 rounded-full transition-transform"
                   style={{
                     background: 'var(--navy-mid)',
-                    left: board.dailyDoubleQuestionId === activeQ.id ? 'calc(100% - 22px)' : '2px',
+                    left:
+                      board.dailyDoubleQuestionId === activeQ.id ? 'calc(100% - 22px)' : '2px',
                   }}
                 />
               </div>
