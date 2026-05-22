@@ -41,6 +41,7 @@ export default function PlayerPage() {
   const lastOverlayPhase = useRef(state.phase)
   const lastIsDD = useRef(false)
   const lastActiveMedia = useRef(state.activeMedia)
+  const lastSyncedBoardTransition = useRef<string | null>(null)
 
   const [myId] = useState(() => {
     const existing = useGameStore.getState().myPlayerId
@@ -222,15 +223,26 @@ export default function PlayerPage() {
     }
   }, [myPlayer?.name]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Board transition overlay — exit when host clears boardTransition
+  // Board transition overlay — exit when host clears boardTransition (synced via SYNC_STATE)
   useEffect(() => {
-    if (state.boardTransition) {
-      setBoardTransitionLabel(state.boardTransition)
-      setBoardTransitionExiting(false)
-    } else if (boardTransitionLabel) {
+    const name = state.boardTransition
+    if (name) {
+      const isNew = name !== lastSyncedBoardTransition.current
+      lastSyncedBoardTransition.current = name
+      setBoardTransitionLabel(name)
+      if (isNew) setBoardTransitionExiting(false)
+    } else if (lastSyncedBoardTransition.current !== null) {
+      lastSyncedBoardTransition.current = null
       setBoardTransitionExiting(true)
     }
-  }, [state.boardTransition]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state.boardTransition])
+
+  // Fallback: dismiss splash if host never clears boardTransition in synced state
+  useEffect(() => {
+    if (!boardTransitionLabel || boardTransitionExiting) return
+    const t = setTimeout(() => setBoardTransitionExiting(true), 2500)
+    return () => clearTimeout(t)
+  }, [boardTransitionLabel, boardTransitionExiting])
 
   // Question overlay mount / exit
   const showOverlay = ['question', 'buzzing', 'revealed', 'dailyDouble', 'dailyDoubleBet'].includes(state.phase) && !!state.activeQuestion?.question

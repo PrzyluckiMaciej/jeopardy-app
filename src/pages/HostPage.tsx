@@ -936,6 +936,7 @@ export default function HostPage() {
             if (boardTransitionExiting && e.animationName === 'overlayFadeOut') {
               setBoardTransitionExiting(false)
               setBoardTransition(null)
+              net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
             }
           }}
         >
