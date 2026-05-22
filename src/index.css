@@ -2,21 +2,67 @@
 @import "tailwindcss";
 
 :root {
-  --navy: #060b28;
-  --navy-mid: #0d1545;
+  /* ── Background / elevation tones ──────────────────────────── */
+  --bg-primary:   #070c2b;   /* page base */
+  --bg-elevated:  #0f1647;   /* cards, panels */
+  --bg-surface:   #161e55;   /* raised surfaces, inputs */
+  --bg-overlay:   rgba(7, 12, 43, 0.97);
+
+  /* ── Legacy navy aliases (kept for backward compatibility) ──── */
+  --navy:       #070c2b;
+  --navy-mid:   #0f1647;
   --navy-light: #1a2260;
-  --gold: #d4a017;
-  --gold-light: #f5c842;
-  --gold-bright: #ffe066;
+
+  /* ── Gold palette — warmer, more premium ────────────────────── */
+  --gold:         #d4a017;   /* primary gold (unchanged) */
+  --gold-light:   #f5c842;   /* hover / lighter gold */
+  --gold-bright:  #ffe066;   /* brightest highlight */
+  --gold-premium: #c8920a;   /* deeper, richer amber for accents */
+  --gold-muted:   rgba(212, 160, 23, 0.18);
+
+  /* ── Accent blue ─────────────────────────────────────────────── */
+  --accent-blue:       #3b82f6;
+  --accent-blue-muted: rgba(59, 130, 246, 0.18);
+
+  /* ── Semantic colors ─────────────────────────────────────────── */
+  --success:       #22c55e;
+  --success-muted: rgba(34, 197, 94, 0.18);
+  --danger:        #ef4444;
+  --danger-muted:  rgba(239, 68, 68, 0.18);
+  --warning:       #f59e0b;
+  --warning-muted: rgba(245, 158, 11, 0.18);
+  --info:          #3b82f6;
+  --info-muted:    rgba(59, 130, 246, 0.18);
+
+  /* ── Legacy semantic aliases ─────────────────────────────────── */
+  --red:   #ef4444;
+  --green: #22c55e;
   --white: #f0f0f0;
-  --red: #c0392b;
-  --green: #27ae60;
+
+  /* ── Border system ───────────────────────────────────────────── */
+  --border-subtle:   #111844;   /* barely-there dividers */
+  --border-default:  #1a2260;   /* standard panel/card borders */
+  --border-emphasis: #2d3d8f;   /* focus rings, active states */
+
+  /* ── Spacing scale ───────────────────────────────────────────── */
+  --space-xs:  4px;
+  --space-sm:  8px;
+  --space-md:  16px;
+  --space-lg:  24px;
+  --space-xl:  32px;
+  --space-2xl: 48px;
+
+  /* ── Surface elevation shadows ───────────────────────────────── */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.7);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background: var(--navy);
+  background: var(--bg-primary);
   color: var(--white);
   font-family: 'Barlow', sans-serif;
   min-height: 100vh;
@@ -27,8 +73,8 @@ body {
 
 /* Jeopardy board cell glow on hover */
 .board-cell {
-  background: var(--navy-mid);
-  border: 2px solid var(--navy-light);
+  background: var(--bg-elevated);
+  border: 2px solid var(--border-default);
   transition: all 0.15s ease;
   cursor: pointer;
 }
@@ -37,8 +83,8 @@ body {
   box-shadow: 0 0 18px rgba(212, 160, 23, 0.35), inset 0 0 12px rgba(212, 160, 23, 0.08);
 }
 .board-cell.answered {
-  background: var(--navy);
-  border-color: var(--navy-light);
+  background: var(--bg-primary);
+  border-color: var(--border-subtle);
   cursor: default;
   opacity: 0.35;
 }
@@ -114,7 +160,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(6, 11, 40, 0.97);
+  background: var(--bg-overlay);
   backdrop-filter: blur(4px);
 }
 
@@ -161,22 +207,24 @@ body {
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--navy); }
-::-webkit-scrollbar-thumb { background: var(--navy-light); border-radius: 3px; }
+::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-emphasis); }
 
 input, textarea, select {
-  background: var(--navy);
-  border: 1.5px solid var(--navy-light);
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-default);
   color: var(--white);
   border-radius: 6px;
-  padding: 8px 12px;
+  padding: var(--space-sm) 12px;
   font-family: 'Barlow', sans-serif;
   font-size: 14px;
   outline: none;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 input:focus, textarea:focus, select:focus {
   border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold-muted);
 }
 input::placeholder, textarea::placeholder {
   color: #4a5580;
@@ -216,12 +264,12 @@ button {
 .btn-ghost {
   background: transparent;
   color: var(--white);
-  border: 1.5px solid var(--navy-light);
+  border: 1.5px solid var(--border-default);
   padding: 8px 16px;
   border-radius: 6px;
   font-size: 14px;
 }
-.btn-ghost:hover { border-color: #4a5580; }
+.btn-ghost:hover { border-color: var(--border-emphasis); background: rgba(255,255,255,0.04); }
 
 .btn-icon {
   background: transparent;
@@ -248,14 +296,24 @@ button {
 .btn-icon-exit:hover { background: rgba(192,57,43,0.15); color: #e07070; }
 
 .panel {
-  background: var(--navy-mid);
-  border: 1px solid var(--navy-light);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
   border-radius: 10px;
-  padding: 20px;
+  padding: var(--space-lg) 28px;
+  box-shadow: var(--shadow-md);
 }
 
-.tag-correct { background: rgba(39,174,96,0.2); color: #4cd98a; border: 1px solid rgba(39,174,96,0.4); padding: 2px 8px; border-radius: 4px; font-size: 12px; }
-.tag-wrong { background: rgba(192,57,43,0.2); color: #e07070; border: 1px solid rgba(192,57,43,0.4); padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+/* Raised surface — sits one level above .panel */
+.panel-surface {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-emphasis);
+  border-radius: 10px;
+  padding: var(--space-lg) 28px;
+  box-shadow: var(--shadow-lg);
+}
+
+.tag-correct { background: var(--success-muted); color: #4cd98a; border: 1px solid rgba(34, 197, 94, 0.4); padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+.tag-wrong { background: var(--danger-muted); color: #e07070; border: 1px solid rgba(239, 68, 68, 0.4); padding: 2px 8px; border-radius: 4px; font-size: 12px; }
 
 /* Judge accept/decline speech-bubble tooltips */
 .judge-tooltip {
