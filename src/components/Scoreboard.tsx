@@ -17,6 +17,8 @@ interface Props {
   activeEmojis?: Record<string, EmojiReaction>
   myPlayerId?: string
   onEmojiSelect?: (emoji: string) => void
+  /** Tighter cards for host view on laptop screens */
+  compact?: boolean
 }
 
 export default function Scoreboard({
@@ -27,6 +29,7 @@ export default function Scoreboard({
   activeEmojis = {},
   myPlayerId,
   onEmojiSelect,
+  compact = false,
 }: Props) {
   const [showPicker, setShowPicker] = useState(false)
   const sorted = [...players].sort((a, b) => b.score - a.score)
@@ -44,8 +47,17 @@ export default function Scoreboard({
     onEmojiSelect?.(emoji)
   }
 
+  const cardMin = compact ? 88 : 110
+  const cardFlex = compact ? '1 1 88px' : '1 1 110px'
+  const cardMax = compact ? 150 : 180
+  const contentPad = compact ? 'px-2 pt-1.5 pb-1.5' : 'px-3 pt-2 pb-2'
+  const scoreSize = compact ? '1.25rem' : undefined
+  const nameClass = compact ? 'font-condensed font-bold text-xs' : 'font-condensed font-bold text-sm'
+  const badgeMinH = compact ? 18 : 22
+  const bottomBarH = compact ? 4 : 6
+
   return (
-    <div className="flex flex-wrap gap-3 justify-center">
+    <div className={`flex flex-wrap justify-center ${compact ? 'gap-2' : 'gap-3'}`}>
       {sorted.map((p) => {
         const buzzPos = buzzQueue.indexOf(p.id)
         const isBuzzed = buzzPos >= 0
@@ -68,9 +80,9 @@ export default function Scoreboard({
             key={p.id}
             className="flex flex-col items-center transition-all"
             style={{
-            minWidth: 110,
-            maxWidth: 180,
-            flex: '1 1 110px',
+              minWidth: cardMin,
+              maxWidth: cardMax,
+              flex: cardFlex,
               opacity: p.isConnected ? 1 : 0.5,
               background: isHighlighted
                 ? 'rgba(212,160,23,0.13)'
@@ -90,10 +102,10 @@ export default function Scoreboard({
             )}
 
             {/* Top accent bar */}
-            <div style={{ width: '100%', height: 4, background: accentColor, flexShrink: 0, borderRadius: '10px 10px 0 0' }} />
+            <div style={{ width: '100%', height: 3, background: accentColor, flexShrink: 0, borderRadius: '10px 10px 0 0' }} />
 
             {/* Content */}
-            <div className="flex flex-col items-center gap-1 px-3 pt-2 pb-2 w-full">
+            <div className={`flex flex-col items-center gap-0.5 w-full ${contentPad}`}>
               {/* Emoji picker button — only on the current player's own card */}
               {isMe && onEmojiSelect && (
                 <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center' }}>
@@ -167,7 +179,7 @@ export default function Scoreboard({
 
               {/* Name */}
               <div
-                className="font-condensed font-bold text-sm text-center w-full truncate"
+                className={`${nameClass} text-center w-full truncate`}
                 style={{ color: isHighlighted ? 'var(--gold-bright)' : 'var(--white)' }}
                 title={p.name}
               >
@@ -181,14 +193,17 @@ export default function Scoreboard({
 
               {/* Score */}
               <div
-                className="font-display text-2xl leading-none"
-                style={{ color: p.score < 0 ? '#e07070' : 'var(--gold-bright)' }}
+                className={compact ? 'font-display leading-none' : 'font-display text-2xl leading-none'}
+                style={{
+                  color: p.score < 0 ? '#e07070' : 'var(--gold-bright)',
+                  fontSize: scoreSize,
+                }}
               >
                 {formatScore(p.score)}
               </div>
 
               {/* Status badges */}
-              <div className="flex flex-wrap gap-1 justify-center mt-1" style={{ minHeight: 22 }}>
+              <div className="flex flex-wrap gap-1 justify-center mt-0.5" style={{ minHeight: badgeMinH }}>
                 {hasControl && (
                   <span
                     className="font-condensed text-xs px-2 py-0.5 rounded"
@@ -220,7 +235,7 @@ export default function Scoreboard({
             <div
               style={{
                 width: '100%',
-                height: 6,
+                height: bottomBarH,
                 background: accentColor,
                 opacity: 0.35,
                 flexShrink: 0,
