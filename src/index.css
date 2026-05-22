@@ -409,6 +409,16 @@ button {
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
+/* Offline player — greyed-out card */
+.scoreboard-card--offline {
+  opacity: 0.42;
+  filter: grayscale(0.85) saturate(0.5);
+  transition: opacity 0.25s ease, filter 0.25s ease;
+}
+.scoreboard-card--offline .scoreboard-card-stripe {
+  background: var(--border-subtle) !important;
+}
+
 /* Emoji picker (position set inline when portaled to document.body) */
 .scoreboard-emoji-popover {
   background: var(--bg-elevated);

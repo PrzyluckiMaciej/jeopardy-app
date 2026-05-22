@@ -59,6 +59,7 @@ export default function HostPage() {
       const clientId = peerToClient.current.get(peerId)
       if (clientId) {
         setPlayerConnected(clientId, false)
+        net.broadcast({ type: 'PLAYER_LEAVE', playerId: clientId })
         const leavingPlayer = useGameStore.getState().state.players.find(p => p.id === clientId)
         logEvent({
           role: 'host',

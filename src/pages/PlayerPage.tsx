@@ -15,7 +15,7 @@ export default function PlayerPage() {
   const [params, setParams] = useSearchParams()
   const playerName = params.get('name') || 'Player'
   const { roomCode, state, settings, setState, setMyPlayerId,
-    addBuzz, patchState, updatePlayer, removePlayer, setSettings } = useGameStore()
+    addBuzz, patchState, updatePlayer, removePlayer, setSettings, setPlayerConnected } = useGameStore()
 
   const [connected, setConnected] = useState(false)
   const [hasBuzzed, setHasBuzzed] = useState(false)
@@ -164,6 +164,9 @@ export default function PlayerPage() {
         setDdWagerInput('')
         setDdWagerError('')
         setDdWagerSubmitted(false)
+      }
+      if (msg.type === 'PLAYER_LEAVE') {
+        setPlayerConnected(msg.playerId, false)
       }
       if (msg.type === 'UPDATE_PLAYER') {
         updatePlayer(msg.player)

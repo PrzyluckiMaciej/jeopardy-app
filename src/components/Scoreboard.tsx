@@ -83,12 +83,18 @@ export default function Scoreboard({
           ? 'rgba(255, 255, 255, 0.18)'
           : 'var(--border-default)'
 
-        const cardAnimClass = isFirst ? 'scoreboard-card--buzzed-first' : isMe ? 'scoreboard-card--me' : ''
+        const cardStateClass = [
+          !p.isConnected && 'scoreboard-card--offline',
+          isFirst && 'scoreboard-card--buzzed-first',
+          isMe && p.isConnected && 'scoreboard-card--me',
+        ]
+          .filter(Boolean)
+          .join(' ')
 
         return (
           <div
             key={p.id}
-            className={`flex transition-all ${cardAnimClass}`}
+            className={`flex transition-all ${cardStateClass}`}
             style={{
               minWidth: 110,
               maxWidth: 180,
@@ -111,9 +117,10 @@ export default function Scoreboard({
             )}
 
             <div
+              className="scoreboard-card-stripe"
               style={{
                 width: 4,
-                background: stripeColor,
+                background: p.isConnected ? stripeColor : 'var(--border-subtle)',
                 flexShrink: 0,
                 borderRadius: '10px 0 0 10px',
                 transition: 'background 0.3s',
