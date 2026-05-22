@@ -614,7 +614,7 @@ export default function HostPage() {
 
                   {/* Scoreboard — pinned below board, always visible */}
                   {!editing && (
-                    <div className="flex-shrink-0">
+                    <div className="flex-shrink-0 relative z-20 overflow-visible">
                       <div className="flex items-center gap-2 mb-2">
                         <div className="font-condensed font-bold uppercase tracking-widest text-xs" style={{ color: 'var(--gold)', opacity: 0.7 }}>
                           Scoreboard
