@@ -30,7 +30,7 @@ export interface Board {
   updatedAt: number
 }
 
-export interface BoardGroup {
+export interface Game {
   id: string
   name: string
   boardIds: string[]
@@ -47,12 +47,14 @@ export interface Player {
 
 export type GamePhase =
   | 'lobby'            // waiting for players
+  | 'gameStart'        // game selected, waiting for host to press start
   | 'board'            // main board visible
   | 'question'         // a card is open
   | 'buzzing'          // players can buzz (host judges first in queue while others keep buzzing)
   | 'revealed'         // answer revealed
   | 'dailyDouble'      // daily double title splash
   | 'dailyDoubleBet'   // player is inputting their wager
+  | 'podium'           // end-of-game podium showing top 3 players
 
 export interface GameState {
   phase: GamePhase
@@ -64,6 +66,10 @@ export interface GameState {
   activeMedia: { type: 'image' | 'audio' | 'video'; dataUrl: string } | null
   boardControlId: string | null // player id of the player with board control
   dailyDouble: { playerId: string; wager: number | null } | null
+  activeGameId: string | null
+  gameBoardIds: string[]
+  currentBoardIndex: number
+  boardTransition: string | null // board name shown during transition animation
 }
 
 // ---- Network messages ----

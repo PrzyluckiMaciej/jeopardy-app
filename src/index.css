@@ -88,6 +88,61 @@ body {
   animation: ddReveal 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
+/* Board transition title splash (shown when switching boards within a game) */
+@keyframes boardReveal {
+  0%   { transform: scale(0.3) rotate(-5deg); opacity: 0; text-shadow: 0 0 0 transparent; }
+  50%  { transform: scale(1.06) rotate(0.5deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; text-shadow: 0 0 40px rgba(212, 160, 23, 0.5), 0 0 80px rgba(212, 160, 23, 0.25); }
+}
+@keyframes boardRevealFadeOut {
+  0%   { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.08); }
+}
+.board-transition-title {
+  font-family: 'Anton', sans-serif;
+  font-size: clamp(3rem, 8vw, 6rem);
+  color: var(--gold-bright);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 40px rgba(212, 160, 23, 0.5), 0 0 80px rgba(212, 160, 23, 0.25);
+  animation: boardReveal 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+.board-transition-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 11, 40, 0.97);
+  backdrop-filter: blur(4px);
+}
+
+/* Podium */
+@keyframes podiumRise {
+  0%   { transform: scaleY(0); opacity: 0; }
+  60%  { transform: scaleY(1.04); opacity: 1; }
+  100% { transform: scaleY(1); opacity: 1; }
+}
+.podium-bar {
+  transform-origin: bottom center;
+  animation: podiumRise 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+.podium-bar-1st { animation-delay: 0.3s; }
+.podium-bar-2nd { animation-delay: 0.1s; }
+.podium-bar-3rd { animation-delay: 0.5s; }
+@keyframes podiumNameReveal {
+  0%   { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.podium-name {
+  opacity: 0;
+  animation: podiumNameReveal 0.4s ease-out forwards;
+}
+.podium-name-1st { animation-delay: 0.6s; }
+.podium-name-2nd { animation-delay: 0.4s; }
+.podium-name-3rd { animation-delay: 0.8s; }
+
 /* Daily Double badge on board cells */
 .dd-badge {
   position: absolute;

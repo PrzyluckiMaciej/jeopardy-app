@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Settings, Trash2, Pencil, Check, FolderOpen, LogOut } from 'lucide-react'
+import { Settings, Trash2, Pencil, Check, FolderOpen, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useGameStore, useBoardStore } from '../store/gameStore'
 import * as net from '../lib/network'
@@ -12,6 +12,7 @@ import GameBoard from '../components/GameBoard'
 import QuestionOverlay from '../components/QuestionOverlay'
 import SettingsPanel from '../components/SettingsPanel'
 import Scoreboard from '../components/Scoreboard'
+import Podium from '../components/Podium'
 
 type Tab = 'board' | 'settings'
 
@@ -24,7 +25,7 @@ export default function HostPage() {
   const store = useGameStore()
   const { state, settings, roomCode, setSettings, addPlayer, removePlayer, updatePlayer,
     openCard, patchState, setPlayerConnected, addBuzz, resetBoard, setBoardControl,
-    startDailyDouble, setDailyDoubleBet } = store
+    startDailyDouble, setDailyDoubleBet, selectGame, setBoardTransition, showPodium } = store
   const boardStore = useBoardStore()
 
   const [tab, setTab] = useState<Tab>('board')
@@ -34,14 +35,12 @@ export default function HostPage() {
   const [copied, setCopied] = useState(false)
   const [showDdNoControlAlert, setShowDdNoControlAlert] = useState(false)
 
-  // Board picker group state
-  const [pickerGroup, setPickerGroup] = useState<string | null>(null)
-  const [creatingGroup, setCreatingGroup] = useState(false)
-  const [newGroupName, setNewGroupName] = useState('')
-  const [editingGroupId, setEditingGroupId] = useState<string | null>(null)
-  const [editingGroupName, setEditingGroupName] = useState('')
+  const [pickerGame, setPickerGame] = useState<string | null>(null)
+  const [creatingGame, setCreatingGame] = useState(false)
+  const [newGameName, setNewGameName] = useState('')
+  const [editingGameId, setEditingGameId] = useState<string | null>(null)
+  const [editingGameName, setEditingGameName] = useState('')
 
-  // Maps Trystero peerId → stable clientId for every connected peer
   const peerToClient = useRef(new Map<string, string>())
 
   useEffect(() => {
@@ -73,7 +72,6 @@ export default function HostPage() {
       if (msg.type === 'PLAYER_JOIN') {
         const clientId = msg.player.id
 
-        // Remove any stale peer mapping for this clientId (e.g. from a pre-refresh connection)
         for (const [oldPeerId, cid] of peerToClient.current.entries()) {
           if (cid === clientId && oldPeerId !== peerId) {
             peerToClient.current.delete(oldPeerId)
@@ -83,7 +81,6 @@ export default function HostPage() {
 
         const existing = useGameStore.getState().state.players.find(p => p.id === clientId)
         if (existing) {
-          // Reconnect: restore the player's slot with their existing score
           setPlayerConnected(clientId, true)
           logEvent({
             role: 'host',
@@ -97,7 +94,6 @@ export default function HostPage() {
           return
         }
 
-        // New join: reject if name is already taken by a connected player
         const nameTaken = useGameStore.getState().state.players.some(
           p => p.name === msg.player.name && p.isConnected
         )
@@ -147,10 +143,109 @@ export default function HostPage() {
     setActiveBoard(b)
     const connectedPlayers = useGameStore.getState().state.players.filter(p => p.isConnected)
     const randomControl = connectedPlayers.length > 0 ? pickRandom(connectedPlayers).id : null
-    patchState({ board: b, answeredCells: [], phase: 'board', boardControlId: randomControl })
-    net.broadcast({ type: 'SYNC_STATE', state: { ...useGameStore.getState().state, board: b, answeredCells: [], phase: 'board', boardControlId: randomControl } })
+    patchState({
+      board: b, answeredCells: [], phase: 'board', boardControlId: randomControl,
+      activeGameId: null, gameBoardIds: [], currentBoardIndex: 0, boardTransition: null,
+    })
+    net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
     closeBoardPicker()
     setEditing(false)
+  }
+
+  function handleSelectGame(gameId: string, boardIds: string[]) {
+    selectGame(gameId, boardIds)
+    setActiveBoard(null)
+    net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+    closeBoardPicker()
+    setEditing(false)
+  }
+
+  function handleStartGame() {
+    const { gameBoardIds, currentBoardIndex } = useGameStore.getState().state
+    const boardId = gameBoardIds[currentBoardIndex]
+    const boardData = boardStore.getBoard(boardId)
+    if (!boardData) return
+
+    const b = { ...boardData }
+    setActiveBoard(b)
+    setBoardTransition(b.name)
+    patchState({ board: b, answeredCells: [], phase: 'board' })
+    net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+
+    setTimeout(() => {
+      const connectedPlayers = useGameStore.getState().state.players.filter(p => p.isConnected)
+      const randomControl = connectedPlayers.length > 0 ? pickRandom(connectedPlayers).id : null
+      setBoardTransition(null)
+      patchState({ boardControlId: randomControl })
+      net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+    }, 2000)
+  }
+
+  function handleNextBoard() {
+    const { gameBoardIds, currentBoardIndex } = useGameStore.getState().state
+    const nextIndex = currentBoardIndex + 1
+    if (nextIndex >= gameBoardIds.length) {
+      showPodium()
+      net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+      return
+    }
+    const boardData = boardStore.getBoard(gameBoardIds[nextIndex])
+    if (!boardData) return
+
+    const b = { ...boardData }
+    setActiveBoard(b)
+    patchState({ currentBoardIndex: nextIndex })
+    setBoardTransition(b.name)
+    patchState({ board: b, answeredCells: [], phase: 'board', activeQuestion: null, buzzQueue: [], activeMedia: null, dailyDouble: null })
+    net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+
+    setTimeout(() => {
+      const connectedPlayers = useGameStore.getState().state.players.filter(p => p.isConnected)
+      const randomControl = connectedPlayers.length > 0 ? pickRandom(connectedPlayers).id : null
+      setBoardTransition(null)
+      patchState({ boardControlId: randomControl })
+      net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+    }, 2000)
+  }
+
+  function handlePrevBoard() {
+    const { currentBoardIndex, activeGameId, gameBoardIds } = useGameStore.getState().state
+    if (currentBoardIndex <= 0) {
+      if (activeGameId) {
+        patchState({ phase: 'gameStart', board: null, answeredCells: [], boardTransition: null })
+        setActiveBoard(null)
+        net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+      }
+      return
+    }
+    const prevIndex = currentBoardIndex - 1
+    const boardData = boardStore.getBoard(gameBoardIds[prevIndex])
+    if (!boardData) return
+
+    const b = { ...boardData }
+    setActiveBoard(b)
+    patchState({ currentBoardIndex: prevIndex })
+    setBoardTransition(b.name)
+    patchState({ board: b, answeredCells: [], phase: 'board', activeQuestion: null, buzzQueue: [], activeMedia: null, dailyDouble: null })
+    net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+
+    setTimeout(() => {
+      const connectedPlayers = useGameStore.getState().state.players.filter(p => p.isConnected)
+      const randomControl = connectedPlayers.length > 0 ? pickRandom(connectedPlayers).id : null
+      setBoardTransition(null)
+      patchState({ boardControlId: randomControl })
+      net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+    }, 2000)
+  }
+
+  function handleEndGame() {
+    patchState({
+      phase: 'lobby', board: null, answeredCells: [], activeGameId: null,
+      gameBoardIds: [], currentBoardIndex: 0, boardTransition: null,
+      activeQuestion: null, buzzQueue: [], activeMedia: null, dailyDouble: null,
+    })
+    setActiveBoard(null)
+    net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
   }
 
   function handleDeleteBoard(id: string) {
@@ -159,7 +254,7 @@ export default function HostPage() {
       setActiveBoard(null)
       setEditing(false)
       patchState({ board: null, answeredCells: [], phase: 'lobby' })
-      net.broadcast({ type: 'SYNC_STATE', state: { ...useGameStore.getState().state, board: null, answeredCells: [], phase: 'lobby' } })
+      net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
     }
   }
 
@@ -276,44 +371,52 @@ export default function HostPage() {
   }
 
   function openBoardPicker() {
-    setPickerGroup(null)
-    setCreatingGroup(false)
-    setNewGroupName('')
-    setEditingGroupId(null)
-    setEditingGroupName('')
+    setPickerGame(null)
+    setCreatingGame(false)
+    setNewGameName('')
+    setEditingGameId(null)
+    setEditingGameName('')
     setShowBoardPicker(true)
   }
 
   function closeBoardPicker() {
-    setCreatingGroup(false)
-    setNewGroupName('')
-    setEditingGroupId(null)
-    setEditingGroupName('')
+    setCreatingGame(false)
+    setNewGameName('')
+    setEditingGameId(null)
+    setEditingGameName('')
     setShowBoardPicker(false)
   }
 
-  function commitNewGroup() {
-    const name = newGroupName.trim()
+  function commitNewGame() {
+    const name = newGameName.trim()
     if (!name) return
-    boardStore.createGroup(name)
-    setNewGroupName('')
-    setCreatingGroup(false)
+    boardStore.createGame(name)
+    setNewGameName('')
+    setCreatingGame(false)
   }
 
-  function commitGroupRename(id: string) {
-    const name = editingGroupName.trim()
+  function commitGameRename(id: string) {
+    const name = editingGameName.trim()
     if (!name) return
-    boardStore.renameGroup(id, name)
-    setEditingGroupId(null)
+    boardStore.renameGame(id, name)
+    setEditingGameId(null)
   }
 
-  function handleDeleteGroup(id: string) {
-    boardStore.deleteGroup(id)
-    if (pickerGroup === id) setPickerGroup(null)
+  function handleDeleteGame(id: string) {
+    boardStore.deleteGame(id)
+    if (pickerGame === id) setPickerGame(null)
   }
 
   const board = activeBoard ?? state.board
   const showOverlay = ['question', 'buzzing', 'revealed', 'dailyDouble', 'dailyDoubleBet'].includes(state.phase) && !!state.activeQuestion
+  const inGame = !!state.activeGameId
+  const activeGameData = inGame ? boardStore.games.find(g => g.id === state.activeGameId) : null
+
+  const pickerGameData = pickerGame ? boardStore.games.find(g => g.id === pickerGame) : null
+  const pickerBoardIds = pickerGameData?.boardIds ?? []
+  const pickerBoards = pickerGame
+    ? pickerBoardIds.map(id => boardStore.boards.find(b => b.id === id)).filter((b): b is Board => !!b)
+    : boardStore.boards
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--navy)' }}>
@@ -354,52 +457,112 @@ export default function HostPage() {
       <div className="flex flex-col flex-1 min-h-0">
         {tab === 'board' && (
           <div className="flex-1 flex flex-col p-4 gap-4 overflow-auto">
-            {!editing && (
-              <div className="flex items-center gap-3 flex-wrap">
-                <button className="btn-outline text-sm" onClick={openBoardPicker}>
-                  Select board
-                </button>
-                <button className="btn-ghost text-sm" onClick={() => { if (board) setEditing(true); else handleNewBoard() }}>
-                  {board ? 'Edit board' : 'New board'}
-                </button>
-                {board && <span className="font-condensed font-bold" style={{ color: 'var(--gold)' }}>{board.name}</span>}
-                {board && (
-                  <button
-                    className="btn-ghost text-sm"
-                    style={{ color: 'var(--red)', borderColor: 'var(--red)' }}
-                    onClick={handleResetBoard}
-                    title="Mark all questions as unanswered and reset all scores to 0"
-                  >
-                    Reset board
-                  </button>
-                )}
-              </div>
-            )}
-
-            {editing && board ? (
-              <div className="flex-1 min-h-0">
-                <BoardEditor board={board} onChange={handleBoardChange} onClose={() => {
-                  setEditing(false)
-                  const current = useGameStore.getState().state
-                  net.broadcast({ type: 'SYNC_STATE', state: current })
-                }} />
-              </div>
-            ) : board ? (
-              <GameBoard board={board} answeredCells={state.answeredCells} onOpenCell={handleOpenCell} dailyDoubleQuestionId={board.dailyDoubleQuestionId} />
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center gap-4">
-                <div className="font-condensed text-lg" style={{ color: '#4a5580' }}>No board loaded</div>
-                <div className="flex gap-3">
-                  <button className="btn-gold" onClick={handleNewBoard}>Create new board</button>
-                  {boardStore.boards.length > 0 && (
-                    <button className="btn-outline" onClick={openBoardPicker}>Load existing board</button>
-                  )}
+            {/* Game start view */}
+            {state.phase === 'gameStart' && activeGameData && (
+              <div className="flex-1 flex flex-col items-center justify-center gap-6">
+                <div className="font-condensed text-lg uppercase tracking-widest" style={{ color: '#4a5580' }}>Game</div>
+                <div className="font-display text-5xl" style={{ color: 'var(--gold-bright)' }}>{activeGameData.name}</div>
+                <div className="font-condensed text-sm" style={{ color: '#8899cc' }}>
+                  {state.gameBoardIds.length} board{state.gameBoardIds.length !== 1 ? 's' : ''}
+                  {' · '}
+                  {state.players.filter(p => p.isConnected).length} player{state.players.filter(p => p.isConnected).length !== 1 ? 's' : ''} connected
                 </div>
+                <button className="btn-gold text-xl px-12 py-4 flex items-center gap-3" onClick={handleStartGame}>
+                  <Play size={24} />
+                  START
+                </button>
+                <button className="btn-ghost text-sm mt-2" onClick={handleEndGame}>
+                  Cancel
+                </button>
               </div>
             )}
 
-            {/* Horizontal scoreboard — shown below the board when not editing */}
-            {!editing && (
+            {/* Podium view */}
+            {state.phase === 'podium' && (
+              <div className="flex-1 flex flex-col items-center justify-center gap-6">
+                <Podium players={state.players} />
+                <button className="btn-gold text-sm mt-4" onClick={handleEndGame}>
+                  Back to lobby
+                </button>
+              </div>
+            )}
+
+            {/* Normal board/editor view */}
+            {state.phase !== 'gameStart' && state.phase !== 'podium' && (
+              <>
+                {!editing && (
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <button className="btn-outline text-sm" onClick={openBoardPicker}>
+                      Select board
+                    </button>
+                    <button className="btn-ghost text-sm" onClick={() => { if (board) setEditing(true); else handleNewBoard() }}>
+                      {board ? 'Edit board' : 'New board'}
+                    </button>
+                    {board && <span className="font-condensed font-bold" style={{ color: 'var(--gold)' }}>{board.name}</span>}
+                    {inGame && activeGameData && (
+                      <span className="font-condensed text-xs px-2 py-1 rounded" style={{ background: 'rgba(212,160,23,0.12)', border: '1px solid rgba(212,160,23,0.3)', color: 'var(--gold)' }}>
+                        {activeGameData.name} — Board {state.currentBoardIndex + 1}/{state.gameBoardIds.length}
+                      </span>
+                    )}
+                    {inGame && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          className="btn-ghost text-sm py-1 px-2 flex items-center gap-1"
+                          onClick={handlePrevBoard}
+                          title={state.currentBoardIndex === 0 ? 'Back to start' : 'Previous board'}
+                        >
+                          <ChevronLeft size={16} />
+                          Prev
+                        </button>
+                        <button
+                          className="btn-ghost text-sm py-1 px-2 flex items-center gap-1"
+                          onClick={handleNextBoard}
+                          title={state.currentBoardIndex >= state.gameBoardIds.length - 1 ? 'Go to podium' : 'Next board'}
+                        >
+                          Next
+                          <ChevronRight size={16} />
+                        </button>
+                      </div>
+                    )}
+                    {board && !inGame && (
+                      <button
+                        className="btn-ghost text-sm"
+                        style={{ color: 'var(--red)', borderColor: 'var(--red)' }}
+                        onClick={handleResetBoard}
+                        title="Mark all questions as unanswered and reset all scores to 0"
+                      >
+                        Reset board
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {editing && board ? (
+                  <div className="flex-1 min-h-0">
+                    <BoardEditor board={board} onChange={handleBoardChange} onClose={() => {
+                      setEditing(false)
+                      const current = useGameStore.getState().state
+                      net.broadcast({ type: 'SYNC_STATE', state: current })
+                    }} />
+                  </div>
+                ) : board ? (
+                  <GameBoard board={board} answeredCells={state.answeredCells} onOpenCell={handleOpenCell} dailyDoubleQuestionId={board.dailyDoubleQuestionId} />
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center gap-4">
+                    <div className="font-condensed text-lg" style={{ color: '#4a5580' }}>No board loaded</div>
+                    <div className="flex gap-3">
+                      <button className="btn-gold" onClick={handleNewBoard}>Create new board</button>
+                      {boardStore.boards.length > 0 && (
+                        <button className="btn-outline" onClick={openBoardPicker}>Load existing board</button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Horizontal scoreboard */}
+            {!editing && state.phase !== 'gameStart' && state.phase !== 'podium' && (
               <div
                 className="flex-shrink-0 border-t pt-4"
                 style={{ borderColor: 'var(--navy-light)' }}
@@ -454,51 +617,48 @@ export default function HostPage() {
       {showBoardPicker && (
         <div className="fixed inset-0 z-40 flex items-center justify-center p-4" style={{ background: 'rgba(6,11,40,0.9)' }}>
           <div className="panel w-full max-w-2xl flex flex-col" style={{ height: '70vh' }}>
-            {/* Header */}
             <div className="flex items-center justify-between mb-4 flex-shrink-0">
               <h2 className="font-condensed font-bold text-lg uppercase" style={{ color: 'var(--gold)' }}>Select Board</h2>
               <button className="btn-ghost text-sm" onClick={closeBoardPicker}>✕</button>
             </div>
 
             <div className="flex gap-4 flex-1 min-h-0 overflow-hidden">
-              {/* Left: Groups panel */}
+              {/* Left: Games panel */}
               <div className="w-44 flex-shrink-0 flex flex-col gap-1 overflow-auto">
                 <div className="font-condensed text-xs uppercase tracking-widest mb-1 flex-shrink-0" style={{ color: 'var(--gold)', opacity: 0.7 }}>
-                  Groups
+                  Games
                 </div>
 
-                {/* All boards */}
                 <button
                   className="text-left px-3 py-2 rounded-lg font-condensed font-bold text-sm flex-shrink-0"
                   style={{
-                    background: pickerGroup === null ? 'rgba(212,160,23,0.18)' : 'transparent',
-                    border: pickerGroup === null ? '1px solid rgba(212,160,23,0.45)' : '1px solid transparent',
-                    color: pickerGroup === null ? 'var(--gold)' : '#fff',
+                    background: pickerGame === null ? 'rgba(212,160,23,0.18)' : 'transparent',
+                    border: pickerGame === null ? '1px solid rgba(212,160,23,0.45)' : '1px solid transparent',
+                    color: pickerGame === null ? 'var(--gold)' : '#fff',
                   }}
-                  onClick={() => setPickerGroup(null)}
+                  onClick={() => setPickerGame(null)}
                 >
                   All Boards
                   <span className="ml-1 text-xs" style={{ opacity: 0.5 }}>({boardStore.boards.length})</span>
                 </button>
 
-                {/* Group list */}
-                {boardStore.groups.map((g) =>
-                  editingGroupId === g.id ? (
+                {boardStore.games.map((g) =>
+                  editingGameId === g.id ? (
                     <div key={g.id} className="flex items-center gap-1 flex-shrink-0">
                       <input
                         className="flex-1 px-2 py-1 rounded text-sm font-condensed"
                         style={{ background: 'var(--navy)', border: '1px solid var(--gold)', color: '#fff', minWidth: 0 }}
-                        value={editingGroupName}
-                        onChange={(e) => setEditingGroupName(e.target.value)}
+                        value={editingGameName}
+                        onChange={(e) => setEditingGameName(e.target.value)}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitGroupRename(g.id)
-                          if (e.key === 'Escape') setEditingGroupId(null)
+                          if (e.key === 'Enter') commitGameRename(g.id)
+                          if (e.key === 'Escape') setEditingGameId(null)
                         }}
                         autoFocus
                       />
                       <button
                         style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--green)', padding: '2px' }}
-                        onClick={() => commitGroupRename(g.id)}
+                        onClick={() => commitGameRename(g.id)}
                         title="Save"
                       >
                         <Check size={14} />
@@ -509,14 +669,14 @@ export default function HostPage() {
                       key={g.id}
                       className="group flex items-center gap-1 px-2 py-1.5 rounded-lg flex-shrink-0"
                       style={{
-                        background: pickerGroup === g.id ? 'rgba(212,160,23,0.18)' : 'transparent',
-                        border: pickerGroup === g.id ? '1px solid rgba(212,160,23,0.45)' : '1px solid transparent',
+                        background: pickerGame === g.id ? 'rgba(212,160,23,0.18)' : 'transparent',
+                        border: pickerGame === g.id ? '1px solid rgba(212,160,23,0.45)' : '1px solid transparent',
                       }}
                     >
                       <button
                         className="flex-1 text-left font-condensed font-bold text-sm truncate"
-                        style={{ background: 'none', border: 'none', color: pickerGroup === g.id ? 'var(--gold)' : '#fff', cursor: 'pointer', minWidth: 0 }}
-                        onClick={() => setPickerGroup(g.id)}
+                        style={{ background: 'none', border: 'none', color: pickerGame === g.id ? 'var(--gold)' : '#fff', cursor: 'pointer', minWidth: 0 }}
+                        onClick={() => setPickerGame(g.id)}
                       >
                         <span className="flex items-center gap-1">
                           <FolderOpen size={12} style={{ flexShrink: 0, opacity: 0.7 }} />
@@ -529,16 +689,16 @@ export default function HostPage() {
                       <button
                         className="opacity-0 group-hover:opacity-100 flex-shrink-0"
                         style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8899cc', padding: '2px', transition: 'opacity 150ms' }}
-                        title="Rename group"
-                        onClick={() => { setEditingGroupId(g.id); setEditingGroupName(g.name) }}
+                        title="Rename game"
+                        onClick={() => { setEditingGameId(g.id); setEditingGameName(g.name) }}
                       >
                         <Pencil size={11} />
                       </button>
                       <button
                         className="opacity-0 group-hover:opacity-100 flex-shrink-0"
                         style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)', padding: '2px', transition: 'opacity 150ms' }}
-                        title="Delete group"
-                        onClick={() => handleDeleteGroup(g.id)}
+                        title="Delete game"
+                        onClick={() => handleDeleteGame(g.id)}
                       >
                         <Trash2 size={11} />
                       </button>
@@ -546,25 +706,24 @@ export default function HostPage() {
                   )
                 )}
 
-                {/* New group */}
                 <div className="flex-shrink-0 mt-1">
-                  {creatingGroup ? (
+                  {creatingGame ? (
                     <div className="flex items-center gap-1">
                       <input
                         className="flex-1 px-2 py-1 rounded text-sm font-condensed"
                         style={{ background: 'var(--navy)', border: '1px solid var(--gold)', color: '#fff', minWidth: 0 }}
-                        placeholder="Group name"
-                        value={newGroupName}
-                        onChange={(e) => setNewGroupName(e.target.value)}
+                        placeholder="Game name"
+                        value={newGameName}
+                        onChange={(e) => setNewGameName(e.target.value)}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitNewGroup()
-                          if (e.key === 'Escape') { setCreatingGroup(false); setNewGroupName('') }
+                          if (e.key === 'Enter') commitNewGame()
+                          if (e.key === 'Escape') { setCreatingGame(false); setNewGameName('') }
                         }}
                         autoFocus
                       />
                       <button
                         style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--green)', padding: '2px' }}
-                        onClick={commitNewGroup}
+                        onClick={commitNewGame}
                         title="Create"
                       >
                         <Check size={14} />
@@ -574,42 +733,61 @@ export default function HostPage() {
                     <button
                       className="btn-ghost text-sm w-full text-left"
                       style={{ opacity: 0.8 }}
-                      onClick={() => setCreatingGroup(true)}
+                      onClick={() => setCreatingGame(true)}
                     >
-                      + New Group
+                      + New Game
                     </button>
                   )}
                 </div>
               </div>
 
-              {/* Divider */}
               <div className="w-px flex-shrink-0" style={{ background: 'var(--navy-light)' }} />
 
               {/* Right: Boards panel */}
               <div className="flex-1 flex flex-col min-h-0">
                 <div className="flex-1 overflow-auto flex flex-col gap-2 pr-1">
-                  {/* Boards in current view */}
-                  {(pickerGroup
-                    ? boardStore.boards.filter((b) =>
-                        boardStore.groups.find((g) => g.id === pickerGroup)?.boardIds.includes(b.id)
-                      )
-                    : boardStore.boards
-                  ).map((b) => (
+                  {pickerBoards.map((b, idx) => (
                     <div key={b.id} className="group flex items-center gap-2">
+                      {/* Reorder arrows when viewing a game */}
+                      {pickerGame && (
+                        <div className="flex flex-col gap-0.5 flex-shrink-0">
+                          <button
+                            className="w-5 h-5 rounded flex items-center justify-center"
+                            style={{ background: 'transparent', border: '1px solid var(--navy-light)', color: '#8899cc', cursor: idx === 0 ? 'not-allowed' : 'pointer', opacity: idx === 0 ? 0.3 : 1 }}
+                            disabled={idx === 0}
+                            onClick={() => boardStore.reorderBoardInGame(pickerGame, idx, idx - 1)}
+                            title="Move up"
+                          >
+                            <ChevronUp size={12} />
+                          </button>
+                          <button
+                            className="w-5 h-5 rounded flex items-center justify-center"
+                            style={{ background: 'transparent', border: '1px solid var(--navy-light)', color: '#8899cc', cursor: idx === pickerBoards.length - 1 ? 'not-allowed' : 'pointer', opacity: idx === pickerBoards.length - 1 ? 0.3 : 1 }}
+                            disabled={idx === pickerBoards.length - 1}
+                            onClick={() => boardStore.reorderBoardInGame(pickerGame, idx, idx + 1)}
+                            title="Move down"
+                          >
+                            <ChevronDown size={12} />
+                          </button>
+                        </div>
+                      )}
                       <button
                         className="flex-1 flex items-center px-3 py-2 rounded-lg text-left"
                         style={{ background: 'var(--navy)', border: '1px solid var(--navy-light)' }}
                         onClick={() => handleSelectBoard(b)}
                       >
+                        {pickerGame && (
+                          <span className="font-condensed text-xs mr-2" style={{ color: '#4a5580' }}>{idx + 1}.</span>
+                        )}
                         <span className="font-condensed font-bold">{b.name}</span>
                       </button>
                       <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100" style={{ transition: 'opacity 150ms' }}>
-                        {pickerGroup && (
+                        {pickerGame && (
                           <button
                             className="w-6 h-6 rounded flex items-center justify-center text-sm font-bold"
                             style={{ background: 'rgba(212,160,23,0.12)', border: '1px solid rgba(212,160,23,0.3)', color: 'var(--gold)', cursor: 'pointer' }}
-                            title="Remove from group"
-                            onClick={() => boardStore.removeBoardFromGroup(pickerGroup, b.id)}
+                            title="Remove from game"
+                            onClick={() => boardStore.removeBoardFromGame(pickerGame, b.id)}
                           >
                             –
                           </button>
@@ -626,28 +804,22 @@ export default function HostPage() {
                     </div>
                   ))}
 
-                  {/* Empty state for current view */}
-                  {(pickerGroup
-                    ? boardStore.boards.filter((b) =>
-                        boardStore.groups.find((g) => g.id === pickerGroup)?.boardIds.includes(b.id)
-                      )
-                    : boardStore.boards
-                  ).length === 0 && (
+                  {pickerBoards.length === 0 && (
                     <div className="text-sm text-center py-4" style={{ color: '#4a5580' }}>
-                      {pickerGroup ? 'No boards in this group yet' : 'No saved boards'}
+                      {pickerGame ? 'No boards in this game yet' : 'No saved boards'}
                     </div>
                   )}
 
-                  {/* Add boards to group section */}
-                  {pickerGroup && (() => {
+                  {/* Add boards to game section */}
+                  {pickerGame && (() => {
                     const unassigned = boardStore.boards.filter(
-                      (b) => !boardStore.groups.find((g) => g.id === pickerGroup)?.boardIds.includes(b.id)
+                      (b) => !pickerBoardIds.includes(b.id)
                     )
                     if (unassigned.length === 0) return null
                     return (
                       <div className="mt-2">
                         <div className="text-xs uppercase tracking-widest mb-2" style={{ color: '#4a5580' }}>
-                          Add to group
+                          Add to game
                         </div>
                         {unassigned.map((b) => (
                           <div
@@ -659,7 +831,7 @@ export default function HostPage() {
                             <button
                               className="text-xs px-2 py-0.5 rounded"
                               style={{ background: 'rgba(212,160,23,0.15)', border: '1px solid rgba(212,160,23,0.3)', color: 'var(--gold)', cursor: 'pointer' }}
-                              onClick={() => boardStore.addBoardToGroup(pickerGroup, b.id)}
+                              onClick={() => boardStore.addBoardToGame(pickerGame, b.id)}
                             >
                               + Add
                             </button>
@@ -670,12 +842,30 @@ export default function HostPage() {
                   })()}
                 </div>
 
-                <button className="btn-gold w-full mt-3 flex-shrink-0" onClick={handleNewBoard}>
-                  + Create New Board
-                </button>
+                <div className="flex gap-2 mt-3 flex-shrink-0">
+                  {pickerGame && pickerBoards.length > 0 && (
+                    <button
+                      className="btn-gold flex-1 flex items-center justify-center gap-2"
+                      onClick={() => handleSelectGame(pickerGame, pickerBoardIds)}
+                    >
+                      <Play size={16} />
+                      Play Game
+                    </button>
+                  )}
+                  <button className={`btn-gold ${pickerGame && pickerBoards.length > 0 ? '' : 'w-full'}`} onClick={handleNewBoard}>
+                    + Create New Board
+                  </button>
+                </div>
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Board transition overlay */}
+      {state.boardTransition && (
+        <div className="board-transition-overlay">
+          <div className="board-transition-title">{state.boardTransition}</div>
         </div>
       )}
 
