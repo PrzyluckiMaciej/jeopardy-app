@@ -25,10 +25,7 @@ export default function PlayerPage() {
   const [ddWagerError, setDdWagerError] = useState('')
   const [ddWagerSubmitted, setDdWagerSubmitted] = useState(false)
   const [activeEmojis, setActiveEmojis] = useState<Record<string, { emoji: string; seq: number }>>({})
-  const [boardTransitionLabel, setBoardTransitionLabel] = useState<string | null>(null)
-  const [boardTransitionExiting, setBoardTransitionExiting] = useState(false)
-  const [overlayMounted, setOverlayMounted] = useState(false)
-  const [overlayExiting, setOverlayExiting] = useState(false)
+  const [, bumpAnimRender] = useState(0)
   const [clueRevealKey, setClueRevealKey] = useState(0)
   const [answerRevealKey, setAnswerRevealKey] = useState(0)
   const [scorePulsing, setScorePulsing] = useState(false)
@@ -41,7 +38,10 @@ export default function PlayerPage() {
   const lastOverlayPhase = useRef(state.phase)
   const lastIsDD = useRef(false)
   const lastActiveMedia = useRef(state.activeMedia)
-  const lastSyncedBoardTransition = useRef<string | null>(null)
+  const boardSplashLabelRef = useRef<string | null>(null)
+  const boardSplashExitingRef = useRef(false)
+  const overlayOpenRef = useRef(false)
+  const overlayExitingRef = useRef(false)
 
   const [myId] = useState(() => {
     const existing = useGameStore.getState().myPlayerId
@@ -223,45 +223,17 @@ export default function PlayerPage() {
     }
   }, [myPlayer?.name]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Board transition overlay — exit when host clears boardTransition (synced via SYNC_STATE)
+  // Fallback: dismiss board splash if host never clears boardTransition in synced state
   useEffect(() => {
-    const name = state.boardTransition
-    if (name) {
-      const isNew = name !== lastSyncedBoardTransition.current
-      lastSyncedBoardTransition.current = name
-      setBoardTransitionLabel(name)
-      if (isNew) setBoardTransitionExiting(false)
-    } else if (lastSyncedBoardTransition.current !== null) {
-      lastSyncedBoardTransition.current = null
-      setBoardTransitionExiting(true)
-    }
-  }, [state.boardTransition])
-
-  // Fallback: dismiss splash if host never clears boardTransition in synced state
-  useEffect(() => {
-    if (!boardTransitionLabel || boardTransitionExiting) return
-    const t = setTimeout(() => setBoardTransitionExiting(true), 2500)
+    if (!state.boardTransition) return
+    const t = setTimeout(() => {
+      if (boardSplashLabelRef.current && !boardSplashExitingRef.current) {
+        boardSplashExitingRef.current = true
+        bumpAnimRender((n) => n + 1)
+      }
+    }, 2500)
     return () => clearTimeout(t)
-  }, [boardTransitionLabel, boardTransitionExiting])
-
-  // Question overlay mount / exit
-  const showOverlay = ['question', 'buzzing', 'revealed', 'dailyDouble', 'dailyDoubleBet'].includes(state.phase) && !!state.activeQuestion?.question
-
-  useEffect(() => {
-    if (showOverlay) {
-      setOverlayMounted(true)
-      setOverlayExiting(false)
-      lastOverlayPhase.current = state.phase
-    } else if (overlayMounted) {
-      setOverlayExiting(true)
-    }
-  }, [showOverlay, state.phase]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  if (showOverlay) {
-    lastOverlayPhase.current = state.phase
-    lastIsDD.current = state.dailyDouble !== null
-    if (state.activeMedia) lastActiveMedia.current = state.activeMedia
-  }
+  }, [state.boardTransition])
 
   // Clue / answer reveal keys on phase transitions
   useEffect(() => {
@@ -323,6 +295,31 @@ export default function PlayerPage() {
   const isMyTurn = state.buzzQueue[0] === myId
   const activeQ = state.activeQuestion?.question
   const categoryName = state.board?.categories.find(c => c.id === state.activeQuestion?.categoryId)?.name ?? ''
+  const showOverlay = ['question', 'buzzing', 'revealed', 'dailyDouble', 'dailyDoubleBet'].includes(state.phase) && !!state.activeQuestion?.question
+
+  // Board transition splash — refs updated during render; exit triggered when synced title clears
+  if (state.boardTransition) {
+    boardSplashLabelRef.current = state.boardTransition
+    boardSplashExitingRef.current = false
+  } else if (boardSplashLabelRef.current && !boardSplashExitingRef.current) {
+    boardSplashExitingRef.current = true
+  }
+  const boardTransitionLabel = boardSplashLabelRef.current
+  const boardTransitionExiting = boardSplashExitingRef.current
+  const showBoardSplash = boardTransitionLabel !== null
+
+  // Question overlay mount / exit — same ref pattern as board splash
+  if (showOverlay) {
+    overlayOpenRef.current = true
+    overlayExitingRef.current = false
+    lastOverlayPhase.current = state.phase
+    lastIsDD.current = state.dailyDouble !== null
+    if (state.activeMedia) lastActiveMedia.current = state.activeMedia
+  } else if (overlayOpenRef.current && !overlayExitingRef.current) {
+    overlayExitingRef.current = true
+  }
+  const overlayMounted = overlayOpenRef.current
+  const overlayExiting = overlayExitingRef.current
 
   if (activeQ) lastOverlayQ.current = activeQ
   if (categoryName) lastCategoryName.current = categoryName
@@ -524,13 +521,14 @@ export default function PlayerPage() {
       </div>
 
       {/* Board transition overlay */}
-      {boardTransitionLabel && (
+      {showBoardSplash && (
         <div
           className={`board-transition-overlay${boardTransitionExiting ? ' board-transition-overlay--exit' : ''}`}
           onAnimationEnd={(e) => {
             if (boardTransitionExiting && e.animationName === 'overlayFadeOut') {
-              setBoardTransitionExiting(false)
-              setBoardTransitionLabel(null)
+              boardSplashLabelRef.current = null
+              boardSplashExitingRef.current = false
+              bumpAnimRender((n) => n + 1)
             }
           }}
         >
@@ -545,8 +543,9 @@ export default function PlayerPage() {
           style={{ background: 'rgba(6,11,40,0.97)', backdropFilter: 'blur(4px)' }}
           onAnimationEnd={(e) => {
             if (overlayExiting && e.animationName === 'overlayFadeOut' && e.target === e.currentTarget) {
-              setOverlayExiting(false)
-              setOverlayMounted(false)
+              overlayOpenRef.current = false
+              overlayExitingRef.current = false
+              bumpAnimRender((n) => n + 1)
             }
           }}
         >
