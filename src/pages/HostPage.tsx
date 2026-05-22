@@ -192,7 +192,11 @@ export default function HostPage() {
     const isDailyDouble = currentBoard?.dailyDoubleQuestionId === question.id
 
     if (isDailyDouble) {
-      const ddPlayerId = useGameStore.getState().state.boardControlId
+      const { boardControlId, players } = useGameStore.getState().state
+      const ddPlayerId =
+        boardControlId && players.some((p) => p.id === boardControlId)
+          ? boardControlId
+          : null
       if (!ddPlayerId) {
         setShowDdNoControlAlert(true)
         return
