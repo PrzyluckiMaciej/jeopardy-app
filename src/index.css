@@ -520,6 +520,34 @@ button {
 .btn-gold:active:not(:disabled)    { transform: scale(0.97); }
 .btn-outline:active:not(:disabled) { transform: scale(0.97); }
 
+/* Question overlay entrance */
+@keyframes overlayEnter {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+.question-overlay-enter {
+  animation: overlayEnter 0.28s ease-out forwards;
+}
+
+/* Clue text / media reveal */
+@keyframes clueReveal {
+  0%   { opacity: 0; transform: translateY(18px) scale(0.97); }
+  100% { opacity: 1; transform: translateY(0)    scale(1); }
+}
+.clue-reveal {
+  animation: clueReveal 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Answer reveal */
+@keyframes answerReveal {
+  0%   { opacity: 0; transform: scale(0.82); filter: brightness(0.6); }
+  55%  { transform: scale(1.05); filter: brightness(1.15); }
+  100% { opacity: 1; transform: scale(1);    filter: brightness(1); }
+}
+.answer-reveal {
+  animation: answerReveal 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
 /* Emoji reaction float animation */
 @keyframes emojiFloat {
   0%   { transform: translateX(-50%) scale(0)   translateY(0);     opacity: 0; }

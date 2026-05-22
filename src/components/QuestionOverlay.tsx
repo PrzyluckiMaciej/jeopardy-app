@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Check, X } from 'lucide-react'
 import type { GameState, GameSettings } from '../types'
 import { cellId } from '../lib/utils'
@@ -22,6 +22,20 @@ export default function QuestionOverlay({ state, settings }: Props) {
   const [overlayExiting, setOverlayExiting] = useState(false)
   const pendingOverlayAction = useRef<(() => void) | null>(null)
   const pendingDdAction = useRef<(() => void) | null>(null)
+  const prevPhaseRef = useRef(phase)
+  const [clueRevealKey, setClueRevealKey] = useState(0)
+  const [answerRevealKey, setAnswerRevealKey] = useState(0)
+
+  useEffect(() => {
+    const prev = prevPhaseRef.current
+    if (phase === 'question' && prev !== 'question' && prev !== 'buzzing' && prev !== 'revealed') {
+      setClueRevealKey((k) => k + 1)
+    }
+    if (phase === 'revealed' && prev !== 'revealed') {
+      setAnswerRevealKey((k) => k + 1)
+    }
+    prevPhaseRef.current = phase
+  }, [phase])
 
   if (!activeQuestion) return null
   const { question, categoryId } = activeQuestion
@@ -109,7 +123,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex flex-col${overlayExiting ? ' question-overlay--exit' : ''}`}
+      className={`fixed inset-0 z-50 flex flex-col${overlayExiting ? ' question-overlay--exit' : ' question-overlay-enter'}`}
       style={{ background: 'rgba(6,11,40,0.97)', backdropFilter: 'blur(4px)' }}
       onAnimationEnd={(e) => {
         if (overlayExiting && e.animationName === 'overlayFadeOut' && e.target === e.currentTarget) {
@@ -159,11 +173,11 @@ export default function QuestionOverlay({ state, settings }: Props) {
           )}
 
           {showClue && (
-            <>
+            <div key={`clue-${clueRevealKey}`} className="flex flex-col items-center w-full max-w-2xl">
               {activeMedia && (
-                <div className="mb-6">
+                <div className="mb-6 clue-reveal">
                   {activeMedia.type === 'image' && (
-                    <img src={activeMedia.dataUrl} className="max-h-48 rounded-lg object-contain mx-auto" />
+                    <img src={activeMedia.dataUrl} className="max-h-48 rounded-lg object-contain mx-auto" alt="" />
                   )}
                   {activeMedia.type === 'audio' && (
                     <audio controls src={activeMedia.dataUrl} autoPlay className="mx-auto" />
@@ -175,7 +189,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
               )}
 
               <div
-                className="font-condensed font-bold text-3xl md:text-4xl leading-snug mb-6 max-w-2xl"
+                className={`font-condensed font-bold text-3xl md:text-4xl leading-snug mb-6 max-w-2xl${activeMedia ? '' : ' clue-reveal'}`}
                 style={{ color: 'var(--white)' }}
               >
                 {question.question || <span style={{ color: '#4a5580' }}>No question text</span>}
@@ -183,13 +197,14 @@ export default function QuestionOverlay({ state, settings }: Props) {
 
               {phase === 'revealed' && (
                 <div
-                  className="font-display text-2xl md:text-3xl px-6 py-3 rounded-lg mt-2"
+                  key={`answer-${answerRevealKey}`}
+                  className="font-display text-2xl md:text-3xl px-6 py-3 rounded-lg mt-2 answer-reveal"
                   style={{ background: 'rgba(212,160,23,0.15)', border: '2px solid var(--gold)', color: 'var(--gold-bright)' }}
                 >
                   {question.answer || '—'}
                 </div>
               )}
-            </>
+            </div>
           )}
         </div>
 

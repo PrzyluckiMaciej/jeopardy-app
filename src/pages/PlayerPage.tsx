@@ -25,8 +25,22 @@ export default function PlayerPage() {
   const [ddWagerError, setDdWagerError] = useState('')
   const [ddWagerSubmitted, setDdWagerSubmitted] = useState(false)
   const [activeEmojis, setActiveEmojis] = useState<Record<string, { emoji: string; seq: number }>>({})
+  const [boardTransitionLabel, setBoardTransitionLabel] = useState<string | null>(null)
+  const [boardTransitionExiting, setBoardTransitionExiting] = useState(false)
+  const [overlayMounted, setOverlayMounted] = useState(false)
+  const [overlayExiting, setOverlayExiting] = useState(false)
+  const [clueRevealKey, setClueRevealKey] = useState(0)
+  const [answerRevealKey, setAnswerRevealKey] = useState(0)
+  const [scorePulsing, setScorePulsing] = useState(false)
   const hostPeerId = useRef<string | null>(null)
   const emojiTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const prevPhaseRef = useRef(state.phase)
+  const prevScoreRef = useRef<number | undefined>(undefined)
+  const lastOverlayQ = useRef(state.activeQuestion?.question)
+  const lastCategoryName = useRef('')
+  const lastOverlayPhase = useRef(state.phase)
+  const lastIsDD = useRef(false)
+  const lastActiveMedia = useRef(state.activeMedia)
 
   const [myId] = useState(() => {
     const existing = useGameStore.getState().myPlayerId
@@ -208,6 +222,56 @@ export default function PlayerPage() {
     }
   }, [myPlayer?.name]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Board transition overlay — exit when host clears boardTransition
+  useEffect(() => {
+    if (state.boardTransition) {
+      setBoardTransitionLabel(state.boardTransition)
+      setBoardTransitionExiting(false)
+    } else if (boardTransitionLabel) {
+      setBoardTransitionExiting(true)
+    }
+  }, [state.boardTransition]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Question overlay mount / exit
+  const showOverlay = ['question', 'buzzing', 'revealed', 'dailyDouble', 'dailyDoubleBet'].includes(state.phase) && !!state.activeQuestion?.question
+
+  useEffect(() => {
+    if (showOverlay) {
+      setOverlayMounted(true)
+      setOverlayExiting(false)
+      lastOverlayPhase.current = state.phase
+    } else if (overlayMounted) {
+      setOverlayExiting(true)
+    }
+  }, [showOverlay, state.phase]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (showOverlay) {
+    lastOverlayPhase.current = state.phase
+    lastIsDD.current = state.dailyDouble !== null
+    if (state.activeMedia) lastActiveMedia.current = state.activeMedia
+  }
+
+  // Clue / answer reveal keys on phase transitions
+  useEffect(() => {
+    const prev = prevPhaseRef.current
+    if (state.phase === 'question' && prev !== 'question' && prev !== 'buzzing' && prev !== 'revealed') {
+      setClueRevealKey((k) => k + 1)
+    }
+    if (state.phase === 'revealed' && prev !== 'revealed') {
+      setAnswerRevealKey((k) => k + 1)
+    }
+    prevPhaseRef.current = state.phase
+  }, [state.phase])
+
+  // Pulse header score when it changes
+  useEffect(() => {
+    const score = myPlayer?.score
+    if (score !== undefined && prevScoreRef.current !== undefined && prevScoreRef.current !== score) {
+      setScorePulsing(true)
+    }
+    prevScoreRef.current = score
+  }, [myPlayer?.score])
+
   function handleBuzz() {
     if (hasBuzzed || state.phase !== 'buzzing') return
     setHasBuzzed(true)
@@ -247,11 +311,19 @@ export default function PlayerPage() {
   const isMyTurn = state.buzzQueue[0] === myId
   const activeQ = state.activeQuestion?.question
   const categoryName = state.board?.categories.find(c => c.id === state.activeQuestion?.categoryId)?.name ?? ''
-  const showOverlay = ['question', 'buzzing', 'revealed', 'dailyDouble', 'dailyDoubleBet'].includes(state.phase) && !!activeQ
-  const isDD = state.dailyDouble !== null
+
+  if (activeQ) lastOverlayQ.current = activeQ
+  if (categoryName) lastCategoryName.current = categoryName
+
+  const displayQ = activeQ ?? lastOverlayQ.current
+  const displayCategory = categoryName || lastCategoryName.current
+
+  const uiPhase = overlayExiting ? lastOverlayPhase.current : state.phase
+  const isDD = overlayExiting ? lastIsDD.current : state.dailyDouble !== null
+  const displayMedia = overlayExiting ? lastActiveMedia.current : state.activeMedia
   const isDDPlayer = state.dailyDouble?.playerId === myId
   const ddPlayerInfo = state.dailyDouble ? state.players.find(p => p.id === state.dailyDouble!.playerId) : null
-  const clueBlurred = settings.blurClueOnBuzz && state.phase === 'buzzing' && state.buzzQueue.length > 0
+  const clueBlurred = settings.blurClueOnBuzz && uiPhase === 'buzzing' && state.buzzQueue.length > 0
 
   function handleSubmitWager() {
     const wager = parseInt(ddWagerInput, 10)
@@ -284,7 +356,7 @@ export default function PlayerPage() {
 
   if (hostLeft) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ background: 'var(--navy)' }}>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 page-fade-in" style={{ background: 'var(--navy)' }}>
         <div className="font-display text-4xl" style={{ color: 'var(--gold-bright)' }}>JEOPARDY!</div>
         <div className="font-condensed text-xl" style={{ color: 'var(--red)' }}>
           Host has left the room.
@@ -307,7 +379,7 @@ export default function PlayerPage() {
 
   if (nameTaken) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ background: 'var(--navy)' }}>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 page-fade-in" style={{ background: 'var(--navy)' }}>
         <div className="font-display text-4xl" style={{ color: 'var(--gold-bright)' }}>JEOPARDY!</div>
         <div className="font-condensed text-xl" style={{ color: 'var(--red)' }}>
           That name is already taken.
@@ -330,7 +402,7 @@ export default function PlayerPage() {
 
   if (!connected) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ background: 'var(--navy)' }}>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 page-fade-in" style={{ background: 'var(--navy)' }}>
         <div className="font-display text-4xl" style={{ color: 'var(--gold-bright)' }}>JEOPARDY!</div>
         <div className="font-condensed text-lg animate-pulse" style={{ color: '#4a5580' }}>
           Connecting to room <span style={{ color: 'var(--gold)' }}>{roomCode}</span>…
@@ -341,7 +413,7 @@ export default function PlayerPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden" style={{ background: 'var(--navy)' }}>
+    <div className="h-screen flex flex-col overflow-hidden page-fade-in" style={{ background: 'var(--navy)' }}>
       {/* Top bar */}
       <div className="flex items-center justify-between border-b" style={{ borderColor: 'var(--navy-light)', background: 'var(--navy-mid)', padding: '10px 24px' }}>
         <div className="font-display text-2xl" style={{ color: 'var(--gold-bright)' }}>JEOPARDY!</div>
@@ -360,7 +432,11 @@ export default function PlayerPage() {
           )}
           <div className="text-right">
             <div className="font-condensed font-bold" style={{ color: 'var(--white)' }}>{myPlayer?.name ?? playerName}</div>
-            <div className="font-display text-xl" style={{ color: myScore < 0 ? '#e07070' : 'var(--gold-bright)' }}>
+            <div
+              className={`font-display text-xl${scorePulsing ? ' score-pulse' : ''}`}
+              style={{ color: myScore < 0 ? '#e07070' : 'var(--gold-bright)' }}
+              onAnimationEnd={() => setScorePulsing(false)}
+            >
               {formatScore(myScore)}
             </div>
           </div>
@@ -436,38 +512,52 @@ export default function PlayerPage() {
       </div>
 
       {/* Board transition overlay */}
-      {state.boardTransition && (
-        <div className="board-transition-overlay">
-          <div className="board-transition-title">{state.boardTransition}</div>
+      {boardTransitionLabel && (
+        <div
+          className={`board-transition-overlay${boardTransitionExiting ? ' board-transition-overlay--exit' : ''}`}
+          onAnimationEnd={(e) => {
+            if (boardTransitionExiting && e.animationName === 'overlayFadeOut') {
+              setBoardTransitionExiting(false)
+              setBoardTransitionLabel(null)
+            }
+          }}
+        >
+          <div className="board-transition-title">{boardTransitionLabel}</div>
         </div>
       )}
 
       {/* Question overlay — mirrors QuestionOverlay layout without host controls */}
-      {showOverlay && activeQ && (
+      {overlayMounted && displayQ && (
         <div
-          className="fixed inset-0 z-50 flex flex-col"
+          className={`fixed inset-0 z-50 flex flex-col${overlayExiting ? ' question-overlay--exit' : ' question-overlay-enter'}`}
           style={{ background: 'rgba(6,11,40,0.97)', backdropFilter: 'blur(4px)' }}
+          onAnimationEnd={(e) => {
+            if (overlayExiting && e.animationName === 'overlayFadeOut' && e.target === e.currentTarget) {
+              setOverlayExiting(false)
+              setOverlayMounted(false)
+            }
+          }}
         >
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--navy-light)' }}>
             <div className="font-condensed font-bold uppercase tracking-wider" style={{ color: 'var(--gold)', fontSize: 14 }}>
-              {categoryName}
-              {categoryName && <span style={{ opacity: 0.5 }}> &nbsp;·&nbsp; </span>}
-              <span className="font-display text-xl" style={{ color: 'var(--gold-bright)' }}>${activeQ.points}</span>
+              {displayCategory}
+              {displayCategory && <span style={{ opacity: 0.5 }}> &nbsp;·&nbsp; </span>}
+              <span className="font-display text-xl" style={{ color: 'var(--gold-bright)' }}>${displayQ.points}</span>
               {isDD && <span style={{ color: 'var(--gold-bright)', marginLeft: 8 }}>DAILY DOUBLE</span>}
             </div>
           </div>
 
           <div className="flex-1 flex gap-6 p-6 min-h-0">
             {/* Main area */}
-            <div className="flex-1 flex flex-col items-center justify-center text-center card-flip">
+            <div className={`flex-1 flex flex-col items-center justify-center text-center ${overlayExiting ? 'card-flip-exit' : 'card-flip'}`}>
               {/* DD title splash */}
-              {state.phase === 'dailyDouble' && (
+              {uiPhase === 'dailyDouble' && (
                 <div className="daily-double-title">DAILY DOUBLE!</div>
               )}
 
               {/* DD wager submitted — waiting for host to reveal clue */}
-              {state.phase === 'dailyDoubleBet' && (
+              {uiPhase === 'dailyDoubleBet' && (
                 <div className="flex flex-col items-center gap-4">
                   <div className="daily-double-title" style={{ fontSize: 'clamp(2rem, 5vw, 3.5rem)' }}>DAILY DOUBLE!</div>
                   {state.dailyDouble?.wager != null && (
@@ -482,30 +572,30 @@ export default function PlayerPage() {
               )}
 
               {/* Clue (shown in question/buzzing/revealed phases) */}
-              {(state.phase === 'question' || state.phase === 'buzzing' || state.phase === 'revealed') && (
-                <>
-                  {state.activeMedia && (
+              {(uiPhase === 'question' || uiPhase === 'buzzing' || uiPhase === 'revealed') && (
+                <div key={`clue-${clueRevealKey}`} className="flex flex-col items-center w-full max-w-2xl">
+                  {displayMedia && (
                     <div
-                      className="mb-6"
+                      className="mb-6 clue-reveal"
                       style={{
                         filter: clueBlurred ? 'blur(8px)' : 'none',
                         transition: 'filter 0.3s ease',
                       }}
                     >
-                      {state.activeMedia.type === 'image' && (
-                        <img src={state.activeMedia.dataUrl} className="max-h-48 rounded-lg object-contain mx-auto" alt="Question media" />
+                      {displayMedia.type === 'image' && (
+                        <img src={displayMedia.dataUrl} className="max-h-48 rounded-lg object-contain mx-auto" alt="Question media" />
                       )}
-                      {state.activeMedia.type === 'audio' && (
-                        <audio controls src={state.activeMedia.dataUrl} autoPlay className="mx-auto" />
+                      {displayMedia.type === 'audio' && (
+                        <audio controls src={displayMedia.dataUrl} autoPlay className="mx-auto" />
                       )}
-                      {state.activeMedia.type === 'video' && (
-                        <video controls src={state.activeMedia.dataUrl} autoPlay className="max-h-48 rounded-lg mx-auto" />
+                      {displayMedia.type === 'video' && (
+                        <video controls src={displayMedia.dataUrl} autoPlay className="max-h-48 rounded-lg mx-auto" />
                       )}
                     </div>
                   )}
 
                   <div
-                    className="font-condensed font-bold text-3xl md:text-4xl leading-snug mb-6 max-w-2xl"
+                    className={`font-condensed font-bold text-3xl md:text-4xl leading-snug mb-6 max-w-2xl${displayMedia ? '' : ' clue-reveal'}`}
                     style={{
                       color: 'var(--white)',
                       filter: clueBlurred ? 'blur(8px)' : 'none',
@@ -513,18 +603,19 @@ export default function PlayerPage() {
                       userSelect: clueBlurred ? 'none' : undefined,
                     }}
                   >
-                    {activeQ.question}
+                    {displayQ.question}
                   </div>
 
-                  {state.phase === 'revealed' && (
+                  {uiPhase === 'revealed' && (
                     <div
-                      className="font-display text-2xl md:text-3xl px-6 py-3 rounded-lg mt-2"
+                      key={`answer-${answerRevealKey}`}
+                      className="font-display text-2xl md:text-3xl px-6 py-3 rounded-lg mt-2 answer-reveal"
                       style={{ background: 'rgba(212,160,23,0.15)', border: '2px solid var(--gold)', color: 'var(--gold-bright)' }}
                     >
-                      {activeQ.answer || '—'}
+                      {displayQ.answer || '—'}
                     </div>
                   )}
-                </>
+                </div>
               )}
             </div>
 
@@ -532,7 +623,7 @@ export default function PlayerPage() {
             <div className="w-72 flex-shrink-0 flex flex-col gap-4">
               <div className="panel flex flex-col items-center gap-3">
                 {/* DD: title phase — wager input for DD player, waiting message for others */}
-                {state.phase === 'dailyDouble' && (
+                {uiPhase === 'dailyDouble' && (
                   isDDPlayer ? (
                     <div className="w-full flex flex-col gap-3">
                       <div className="font-condensed font-bold text-sm text-center" style={{ color: 'var(--gold-bright)' }}>
@@ -574,7 +665,7 @@ export default function PlayerPage() {
                 )}
 
                 {/* DD: bet phase — wager confirmed, waiting for host to reveal clue */}
-                {isDD && state.phase === 'dailyDoubleBet' && (
+                {isDD && uiPhase === 'dailyDoubleBet' && (
                   <div className="w-full flex flex-col gap-2 items-center">
                     {isDDPlayer ? (
                       <div className="font-condensed text-sm text-center" style={{ color: 'var(--gold-bright)' }}>
@@ -592,7 +683,7 @@ export default function PlayerPage() {
                 )}
 
                 {/* DD: question phase — waiting for host to judge */}
-                {isDD && state.phase === 'question' && (
+                {isDD && uiPhase === 'question' && (
                   <div className="w-full flex flex-col gap-2 items-center">
                     {state.dailyDouble?.wager != null && (
                       <div className="font-condensed text-sm" style={{ color: 'var(--gold-bright)' }}>
@@ -606,7 +697,7 @@ export default function PlayerPage() {
                 )}
 
                 {/* Normal: buzzing phase */}
-                {!isDD && state.phase === 'buzzing' && !judgeResult && !(hasBuzzed && !state.buzzQueue.includes(myId)) && (
+                {!isDD && uiPhase === 'buzzing' && !judgeResult && !(hasBuzzed && !state.buzzQueue.includes(myId)) && (
                   <>
                     <button
                       className={`w-32 h-32 rounded-full font-display transition-all ${!hasBuzzed ? 'buzz-btn' : ''}`}
@@ -639,13 +730,13 @@ export default function PlayerPage() {
                 )}
 
                 {/* Normal: question phase — waiting for buzzing */}
-                {!isDD && state.phase === 'question' && (
+                {!isDD && uiPhase === 'question' && (
                   <div className="font-condensed text-sm text-center" style={{ color: '#4a5580' }}>
                     Waiting for host to open buzzing…
                   </div>
                 )}
 
-                {state.phase === 'revealed' && (
+                {uiPhase === 'revealed' && (
                   <div className="font-condensed text-sm text-center" style={{ color: '#4a5580' }}>
                     Answer revealed
                   </div>
@@ -653,7 +744,8 @@ export default function PlayerPage() {
 
                 {judgeResult && (
                   <div
-                    className="font-display text-2xl text-center rounded-xl w-full py-3 card-flip"
+                    key={judgeResult}
+                    className="font-display text-2xl text-center rounded-xl w-full py-3 modal-enter"
                     style={{
                       background: judgeResult === 'correct' ? 'rgba(39,174,96,0.2)' : 'rgba(192,57,43,0.2)',
                       border: `2px solid ${judgeResult === 'correct' ? 'var(--green)' : 'var(--red)'}`,
