@@ -342,7 +342,7 @@ export default function HostPage() {
         </button>
       </div>
 
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-col flex-1 min-h-0">
         {tab === 'board' && (
           <div className="flex-1 flex flex-col p-4 gap-4 overflow-auto">
             {!editing && (
@@ -388,6 +388,41 @@ export default function HostPage() {
                 </div>
               </div>
             )}
+
+            {/* Horizontal scoreboard — shown below the board when not editing */}
+            {!editing && (
+              <div
+                className="flex-shrink-0 border-t pt-4"
+                style={{ borderColor: 'var(--navy-light)' }}
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="font-condensed font-bold uppercase tracking-widest text-xs" style={{ color: 'var(--gold)', opacity: 0.7 }}>
+                    Scoreboard
+                  </div>
+                  {state.players.some(p => p.isConnected) && (
+                    <button
+                      className="font-condensed text-xs px-2 py-1 rounded"
+                      style={{
+                        background: 'rgba(0,200,180,0.15)',
+                        color: '#40e0d0',
+                        border: '1px solid rgba(0,200,180,0.35)',
+                      }}
+                      title="Randomly select a player to have board control"
+                      onClick={() => {
+                        const connected = state.players.filter(p => p.isConnected)
+                        if (connected.length === 0) return
+                        const pick = pickRandom(connected)
+                        setBoardControl(pick.id)
+                        net.broadcast({ type: 'SET_BOARD_CONTROL', playerId: pick.id })
+                      }}
+                    >
+                      Randomize
+                    </button>
+                  )}
+                </div>
+                <Scoreboard players={state.players} buzzQueue={state.buzzQueue} boardControlId={state.boardControlId} />
+              </div>
+            )}
           </div>
         )}
 
@@ -402,35 +437,6 @@ export default function HostPage() {
             />
           </div>
         )}
-
-        <div className="w-64 flex-shrink-0 border-l p-4 overflow-auto" style={{ borderColor: 'var(--navy-light)' }}>
-          <div className="flex items-center justify-between mb-3">
-            <div className="font-condensed font-bold uppercase tracking-widest text-xs" style={{ color: 'var(--gold)', opacity: 0.7 }}>
-              Scoreboard
-            </div>
-            {state.players.some(p => p.isConnected) && (
-              <button
-                className="font-condensed text-xs px-2 py-1 rounded"
-                style={{
-                  background: 'rgba(0,200,180,0.15)',
-                  color: '#40e0d0',
-                  border: '1px solid rgba(0,200,180,0.35)',
-                }}
-                title="Randomly select a player to have board control"
-                onClick={() => {
-                  const connected = state.players.filter(p => p.isConnected)
-                  if (connected.length === 0) return
-                  const pick = pickRandom(connected)
-                  setBoardControl(pick.id)
-                  net.broadcast({ type: 'SET_BOARD_CONTROL', playerId: pick.id })
-                }}
-              >
-                Randomize
-              </button>
-            )}
-          </div>
-          <Scoreboard players={state.players} buzzQueue={state.buzzQueue} boardControlId={state.boardControlId} />
-        </div>
       </div>
 
       {/* Board picker modal */}
