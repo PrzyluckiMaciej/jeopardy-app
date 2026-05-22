@@ -190,16 +190,18 @@ export default function SettingsPanel({
                     {p.name}
                     {boardControlId === p.id && (
                       <span
-                        className="ml-2 font-condensed px-2 py-0.5 rounded"
+                        className="ml-2 inline-flex items-center justify-center rounded"
+                        title="Board control"
+                        aria-label="Board control"
                         style={{
                           background: 'rgba(0,200,180,0.2)',
                           color: '#40e0d0',
                           border: '1px solid rgba(0,200,180,0.45)',
-                          fontSize: '0.75rem',
+                          padding: '2px 5px',
                           verticalAlign: 'middle',
                         }}
                       >
-                        BOARD
+                        <Crown size={12} aria-hidden />
                       </span>
                     )}
                   </div>

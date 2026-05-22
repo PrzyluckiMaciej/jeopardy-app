@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Smile } from 'lucide-react'
+import { Smile, Crown } from 'lucide-react'
 import { formatScore } from '../lib/utils'
 import type { Player } from '../types'
 
@@ -113,15 +113,18 @@ function StatusBadges({
     <>
       {hasControl && (
         <span
-          className="font-condensed font-bold"
+          className="inline-flex items-center justify-center"
+          title="Board control"
+          aria-label="Board control"
           style={{
             ...badgeStyle,
             background: 'rgba(0,200,180,0.15)',
             color: '#40e0d0',
             border: '1px solid rgba(0,200,180,0.4)',
+            padding: '2px 5px',
           }}
         >
-          BOARD CONTROL
+          <Crown size={12} aria-hidden />
         </span>
       )}
       {isBuzzed && (
