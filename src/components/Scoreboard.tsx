@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { Smile } from 'lucide-react'
 import { formatScore } from '../lib/utils'
 import type { Player } from '../types'
 
@@ -168,19 +169,19 @@ export default function Scoreboard({
                     ref={emojiBtnRef}
                     onClick={() => setShowPicker((v) => !v)}
                     title="Send an emoji reaction"
+                    aria-label="Send an emoji reaction"
+                    className="flex items-center justify-center"
                     style={{
                       background: showPicker ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.07)',
                       border: `1px solid ${showPicker ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.15)'}`,
                       borderRadius: 6,
                       cursor: 'pointer',
-                      fontSize: '0.95rem',
-                      lineHeight: 1,
-                      padding: '2px 8px',
+                      padding: '4px 8px',
                       color: 'var(--white)',
                       transition: 'background 0.15s, border 0.15s',
                     }}
                   >
-                    😊
+                    <Smile size={16} aria-hidden />
                   </button>
 
                   {showPicker &&
