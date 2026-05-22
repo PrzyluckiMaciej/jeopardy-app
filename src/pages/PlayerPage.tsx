@@ -346,8 +346,8 @@ export default function PlayerPage() {
       </div>
 
       {/* Board view */}
-      <div className="flex flex-1 min-h-0">
-        <div className="flex-1 flex flex-col p-4 gap-4 overflow-auto">
+      <div className="flex flex-col flex-1 min-h-0 overflow-auto">
+        <div className="flex-1 flex flex-col p-4 gap-4">
           {state.board ? (
             <GameBoard
               board={state.board}
@@ -363,8 +363,11 @@ export default function PlayerPage() {
           )}
         </div>
 
-        {/* Scoreboard sidebar */}
-        <div className="w-64 flex-shrink-0 border-l p-4 overflow-auto" style={{ borderColor: 'var(--navy-light)' }}>
+        {/* Horizontal scoreboard */}
+        <div
+          className="flex-shrink-0 border-t px-4 py-4"
+          style={{ borderColor: 'var(--navy-light)' }}
+        >
           <div className="font-condensed font-bold uppercase tracking-widest text-xs mb-3" style={{ color: 'var(--gold)', opacity: 0.7 }}>
             Scoreboard
           </div>
