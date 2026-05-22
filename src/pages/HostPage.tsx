@@ -34,6 +34,7 @@ export default function HostPage() {
   const [showBoardPicker, setShowBoardPicker] = useState(false)
   const [copied, setCopied] = useState(false)
   const [showDdNoControlAlert, setShowDdNoControlAlert] = useState(false)
+  const [boardTransitionExiting, setBoardTransitionExiting] = useState(false)
 
   const [pickerGame, setPickerGame] = useState<string | null>(null)
   const [creatingGame, setCreatingGame] = useState(false)
@@ -186,6 +187,7 @@ export default function HostPage() {
 
     const b = { ...boardData }
     setActiveBoard(b)
+    setBoardTransitionExiting(false)
     setBoardTransition(b.name)
     patchState({ board: b, answeredCells: [], phase: 'board' })
     net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
@@ -193,10 +195,10 @@ export default function HostPage() {
     setTimeout(() => {
       const connectedPlayers = useGameStore.getState().state.players.filter(p => p.isConnected)
       const randomControl = connectedPlayers.length > 0 ? pickRandom(connectedPlayers).id : null
-      setBoardTransition(null)
+      setBoardTransitionExiting(true)
       patchState({ boardControlId: randomControl })
       net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
-    }, 2000)
+    }, 1600)
   }
 
   function handleNextBoard() {
@@ -212,6 +214,7 @@ export default function HostPage() {
 
     const b = { ...boardData }
     setActiveBoard(b)
+    setBoardTransitionExiting(false)
     patchState({ currentBoardIndex: nextIndex })
     setBoardTransition(b.name)
     patchState({ board: b, answeredCells: [], phase: 'board', activeQuestion: null, buzzQueue: [], activeMedia: null, dailyDouble: null })
@@ -220,10 +223,10 @@ export default function HostPage() {
     setTimeout(() => {
       const connectedPlayers = useGameStore.getState().state.players.filter(p => p.isConnected)
       const randomControl = connectedPlayers.length > 0 ? pickRandom(connectedPlayers).id : null
-      setBoardTransition(null)
+      setBoardTransitionExiting(true)
       patchState({ boardControlId: randomControl })
       net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
-    }, 2000)
+    }, 1600)
   }
 
   function handlePrevBoard() {
@@ -242,6 +245,7 @@ export default function HostPage() {
 
     const b = { ...boardData }
     setActiveBoard(b)
+    setBoardTransitionExiting(false)
     patchState({ currentBoardIndex: prevIndex })
     setBoardTransition(b.name)
     patchState({ board: b, answeredCells: [], phase: 'board', activeQuestion: null, buzzQueue: [], activeMedia: null, dailyDouble: null })
@@ -250,10 +254,10 @@ export default function HostPage() {
     setTimeout(() => {
       const connectedPlayers = useGameStore.getState().state.players.filter(p => p.isConnected)
       const randomControl = connectedPlayers.length > 0 ? pickRandom(connectedPlayers).id : null
-      setBoardTransition(null)
+      setBoardTransitionExiting(true)
       patchState({ boardControlId: randomControl })
       net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
-    }, 2000)
+    }, 1600)
   }
 
   function handleEndGame() {
@@ -437,7 +441,7 @@ export default function HostPage() {
     : boardStore.boards
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden" style={{ background: 'var(--navy)' }}>
+    <div className="h-screen flex flex-col overflow-hidden page-fade-in" style={{ background: 'var(--navy)' }}>
       {/* Top bar */}
       <div className="flex items-center gap-5 border-b" style={{ borderColor: 'var(--navy-light)', background: 'var(--navy-mid)', padding: '10px 24px' }}>
         <button className="font-display text-2xl" style={{ color: 'var(--gold-bright)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} onClick={() => setTab('board')}>JEOPARDY!</button>
@@ -474,7 +478,7 @@ export default function HostPage() {
 
       <div className="flex flex-col flex-1 min-h-0">
         {tab === 'board' && (
-          <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex-1 flex flex-col min-h-0 tab-fade-in">
             {/* Game start view */}
             {state.phase === 'gameStart' && activeGameData && (
               <div className="flex-1 flex flex-col items-center justify-center gap-6 p-4 overflow-auto">
@@ -654,7 +658,7 @@ export default function HostPage() {
 
         {tab === 'settings' && (
           <div
-            className="flex-1 overflow-auto"
+            className="flex-1 overflow-auto tab-fade-in"
             style={{
               paddingTop: 'var(--space-sm)',
               paddingBottom: 'var(--space-lg)',
@@ -678,7 +682,7 @@ export default function HostPage() {
       {/* Board picker modal */}
       {showBoardPicker && (
         <div className="fixed inset-0 z-40 flex items-center justify-center p-4" style={{ background: 'rgba(6,11,40,0.9)' }}>
-          <div className="panel w-full max-w-2xl flex flex-col" style={{ height: '70vh' }}>
+          <div className="panel modal-enter w-full max-w-2xl flex flex-col" style={{ height: '70vh' }}>
             <div className="flex items-center justify-between mb-4 flex-shrink-0">
               <h2 className="font-condensed font-bold text-lg uppercase" style={{ color: 'var(--gold)' }}>Select Board</h2>
               <button className="btn-ghost text-sm" onClick={closeBoardPicker}>✕</button>
@@ -926,7 +930,15 @@ export default function HostPage() {
 
       {/* Board transition overlay */}
       {state.boardTransition && (
-        <div className="board-transition-overlay">
+        <div
+          className={`board-transition-overlay${boardTransitionExiting ? ' board-transition-overlay--exit' : ''}`}
+          onAnimationEnd={(e) => {
+            if (boardTransitionExiting && e.animationName === 'overlayFadeOut') {
+              setBoardTransitionExiting(false)
+              setBoardTransition(null)
+            }
+          }}
+        >
           <div className="board-transition-title">{state.boardTransition}</div>
         </div>
       )}
@@ -941,7 +953,7 @@ export default function HostPage() {
 
       {showDdNoControlAlert && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(6,11,40,0.85)' }}>
-          <div className="panel flex flex-col gap-4 max-w-sm w-full text-center">
+          <div className="panel modal-enter flex flex-col gap-4 max-w-sm w-full text-center">
             <div className="font-display text-2xl" style={{ color: 'var(--gold-bright)' }}>DAILY DOUBLE</div>
             <div className="font-condensed text-base" style={{ color: 'var(--white)' }}>
               No player has board control.

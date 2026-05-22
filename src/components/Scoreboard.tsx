@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { formatScore } from '../lib/utils'
 import type { Player } from '../types'
@@ -33,6 +33,23 @@ export default function Scoreboard({
   const [pickerPos, setPickerPos] = useState({ top: 0, left: 0 })
   const emojiBtnRef = useRef<HTMLButtonElement>(null)
   const sorted = [...players].sort((a, b) => b.score - a.score)
+
+  // Track score changes to trigger the pulse animation
+  const prevScores = useRef<Record<string, number>>({})
+  const [pulsingIds, setPulsingIds] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    const changed = new Set<string>()
+    players.forEach((p) => {
+      if (prevScores.current[p.id] !== undefined && prevScores.current[p.id] !== p.score) {
+        changed.add(p.id)
+      }
+      prevScores.current[p.id] = p.score
+    })
+    if (changed.size > 0) {
+      setPulsingIds((prev) => new Set([...prev, ...changed]))
+    }
+  }, [players])
 
   useLayoutEffect(() => {
     if (!showPicker || !emojiBtnRef.current) return
@@ -217,12 +234,19 @@ export default function Scoreboard({
               </div>
 
               <div
-                className="font-display leading-none text-center"
+                className={`font-display leading-none text-center${pulsingIds.has(p.id) ? ' score-pulse' : ''}`}
                 style={{
                   fontSize: '1.6rem',
                   color: p.score < 0 ? '#e07070' : 'var(--gold-bright)',
                   fontVariantNumeric: 'tabular-nums',
                   letterSpacing: '-0.01em',
+                }}
+                onAnimationEnd={() => {
+                  setPulsingIds((prev) => {
+                    const next = new Set(prev)
+                    next.delete(p.id)
+                    return next
+                  })
                 }}
               >
                 {formatScore(p.score)}

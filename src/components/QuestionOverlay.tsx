@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react'
 import { Check, X } from 'lucide-react'
 import type { GameState, GameSettings } from '../types'
 import { cellId } from '../lib/utils'
@@ -15,6 +16,12 @@ export default function QuestionOverlay({ state, settings }: Props) {
   const { activeQuestion, phase, buzzQueue, players, activeMedia, dailyDouble } = state
   const store = useGameStore()
   const roomCode = useGameStore(s => s.roomCode) ?? ''
+
+  // Exit animation state
+  const [ddExiting, setDdExiting] = useState(false)
+  const [overlayExiting, setOverlayExiting] = useState(false)
+  const pendingOverlayAction = useRef<(() => void) | null>(null)
+  const pendingDdAction = useRef<(() => void) | null>(null)
 
   if (!activeQuestion) return null
   const { question, categoryId } = activeQuestion
@@ -65,8 +72,12 @@ export default function QuestionOverlay({ state, settings }: Props) {
   }
 
   function handleRevealDailyDoubleClue() {
-    store.revealDailyDoubleClue()
-    net.broadcast({ type: 'DAILY_DOUBLE_REVEAL_CLUE' })
+    // Trigger DD title exit animation; actual reveal happens in onAnimationEnd
+    pendingDdAction.current = () => {
+      store.revealDailyDoubleClue()
+      net.broadcast({ type: 'DAILY_DOUBLE_REVEAL_CLUE' })
+    }
+    setDdExiting(true)
   }
 
   function handleReveal() {
@@ -75,14 +86,22 @@ export default function QuestionOverlay({ state, settings }: Props) {
   }
 
   function handleDismiss() {
-    store.closeCard()
-    net.broadcast({ type: 'CLOSE_CARD' })
+    // Trigger overlay exit animation; actual close happens in onAnimationEnd
+    pendingOverlayAction.current = () => {
+      store.closeCard()
+      net.broadcast({ type: 'CLOSE_CARD' })
+    }
+    setOverlayExiting(true)
   }
 
   function handleClose() {
     const cId = cellId(categoryId, question.id)
-    store.markAnswered(cId)
-    net.broadcast({ type: 'MARK_ANSWERED', cellId: cId })
+    // Trigger overlay exit animation; actual mark-answered happens in onAnimationEnd
+    pendingOverlayAction.current = () => {
+      store.markAnswered(cId)
+      net.broadcast({ type: 'MARK_ANSWERED', cellId: cId })
+    }
+    setOverlayExiting(true)
   }
 
   const categoryName = state.board?.categories.find(c => c.id === categoryId)?.name ?? ''
@@ -90,8 +109,17 @@ export default function QuestionOverlay({ state, settings }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col"
+      className={`fixed inset-0 z-50 flex flex-col${overlayExiting ? ' question-overlay--exit' : ''}`}
       style={{ background: 'rgba(6,11,40,0.97)', backdropFilter: 'blur(4px)' }}
+      onAnimationEnd={(e) => {
+        if (overlayExiting && e.animationName === 'overlayFadeOut' && e.target === e.currentTarget) {
+          setOverlayExiting(false)
+          if (pendingOverlayAction.current) {
+            pendingOverlayAction.current()
+            pendingOverlayAction.current = null
+          }
+        }
+      }}
     >
       <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--navy-light)' }}>
         <div className="font-condensed font-bold uppercase tracking-wider" style={{ color: 'var(--gold)', fontSize: 14 }}>
@@ -112,9 +140,22 @@ export default function QuestionOverlay({ state, settings }: Props) {
 
       <div className="flex-1 flex gap-6 p-6 min-h-0">
         {/* Main area */}
-        <div className="flex-1 flex flex-col items-center justify-center text-center card-flip">
+        <div className={`flex-1 flex flex-col items-center justify-center text-center ${overlayExiting ? 'card-flip-exit' : 'card-flip'}`}>
           {(phase === 'dailyDouble' || phase === 'dailyDoubleBet') && (
-            <div className="daily-double-title">DAILY DOUBLE!</div>
+            <div
+              className={`daily-double-title${ddExiting ? ' daily-double-title--exit' : ''}`}
+              onAnimationEnd={(e) => {
+                if (ddExiting && e.animationName === 'ddRevealFadeOut') {
+                  setDdExiting(false)
+                  if (pendingDdAction.current) {
+                    pendingDdAction.current()
+                    pendingDdAction.current = null
+                  }
+                }
+              }}
+            >
+              DAILY DOUBLE!
+            </div>
           )}
 
           {showClue && (
