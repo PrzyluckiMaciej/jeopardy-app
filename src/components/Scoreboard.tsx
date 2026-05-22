@@ -1,14 +1,34 @@
+import { useState } from 'react'
 import { formatScore } from '../lib/utils'
 import type { Player } from '../types'
+
+const EMOJIS = ['😂', '😎', '😠', '🤡', '😮', '🤨', '😴', '😍', '👍', '👎']
+
+interface EmojiReaction {
+  emoji: string
+  seq: number
+}
 
 interface Props {
   players: Player[]
   buzzQueue?: string[]
   highlightId?: string
   boardControlId?: string | null
+  activeEmojis?: Record<string, EmojiReaction>
+  myPlayerId?: string
+  onEmojiSelect?: (emoji: string) => void
 }
 
-export default function Scoreboard({ players, buzzQueue = [], highlightId, boardControlId }: Props) {
+export default function Scoreboard({
+  players,
+  buzzQueue = [],
+  highlightId,
+  boardControlId,
+  activeEmojis = {},
+  myPlayerId,
+  onEmojiSelect,
+}: Props) {
+  const [showPicker, setShowPicker] = useState(false)
   const sorted = [...players].sort((a, b) => b.score - a.score)
 
   if (players.length === 0) {
@@ -19,6 +39,11 @@ export default function Scoreboard({ players, buzzQueue = [], highlightId, board
     )
   }
 
+  function handleEmojiClick(emoji: string) {
+    setShowPicker(false)
+    onEmojiSelect?.(emoji)
+  }
+
   return (
     <div className="flex flex-wrap gap-3 justify-center">
       {sorted.map((p) => {
@@ -27,6 +52,8 @@ export default function Scoreboard({ players, buzzQueue = [], highlightId, board
         const isFirst = buzzPos === 0
         const isHighlighted = p.id === highlightId
         const hasControl = boardControlId != null && p.id === boardControlId
+        const isMe = p.id === myPlayerId
+        const reaction = activeEmojis[p.id]
 
         const accentColor = isFirst
           ? 'var(--gold-bright)'
@@ -52,14 +79,92 @@ export default function Scoreboard({ players, buzzQueue = [], highlightId, board
                 : 'var(--navy)',
               border: `1px solid ${isFirst ? 'rgba(212,160,23,0.45)' : 'var(--navy-light)'}`,
               borderRadius: 10,
-              overflow: 'hidden',
+              position: 'relative',
             }}
           >
+            {/* Floating emoji reaction */}
+            {reaction && (
+              <div key={reaction.seq} className="emoji-float">
+                {reaction.emoji}
+              </div>
+            )}
+
             {/* Top accent bar */}
-            <div style={{ width: '100%', height: 4, background: accentColor, flexShrink: 0 }} />
+            <div style={{ width: '100%', height: 4, background: accentColor, flexShrink: 0, borderRadius: '10px 10px 0 0' }} />
 
             {/* Content */}
-            <div className="flex flex-col items-center gap-1 px-3 pt-3 pb-2 w-full">
+            <div className="flex flex-col items-center gap-1 px-3 pt-2 pb-2 w-full">
+              {/* Emoji picker button — only on the current player's own card */}
+              {isMe && onEmojiSelect && (
+                <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center' }}>
+                  <button
+                    onClick={() => setShowPicker((v) => !v)}
+                    title="Send an emoji reaction"
+                    style={{
+                      background: showPicker ? 'rgba(212,160,23,0.25)' : 'rgba(255,255,255,0.07)',
+                      border: `1px solid ${showPicker ? 'rgba(212,160,23,0.6)' : 'rgba(255,255,255,0.15)'}`,
+                      borderRadius: 6,
+                      cursor: 'pointer',
+                      fontSize: '0.95rem',
+                      lineHeight: 1,
+                      padding: '2px 8px',
+                      color: 'var(--white)',
+                      transition: 'background 0.15s, border 0.15s',
+                    }}
+                  >
+                    😊
+                  </button>
+
+                  {/* Emoji picker popup */}
+                  {showPicker && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        bottom: 'calc(100% + 6px)',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        background: '#0d1545',
+                        border: '1px solid var(--navy-light)',
+                        borderRadius: 10,
+                        padding: '6px 8px',
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: 4,
+                        width: 170,
+                        justifyContent: 'center',
+                        zIndex: 100,
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+                      }}
+                    >
+                      {EMOJIS.map((e) => (
+                        <button
+                          key={e}
+                          onClick={() => handleEmojiClick(e)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '1.4rem',
+                            padding: '3px 4px',
+                            borderRadius: 6,
+                            lineHeight: 1,
+                            transition: 'background 0.1s',
+                          }}
+                          onMouseEnter={(ev) => {
+                            ;(ev.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'
+                          }}
+                          onMouseLeave={(ev) => {
+                            ;(ev.currentTarget as HTMLButtonElement).style.background = 'transparent'
+                          }}
+                        >
+                          {e}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Name */}
               <div
                 className="font-condensed font-bold text-sm text-center w-full truncate"
@@ -119,6 +224,7 @@ export default function Scoreboard({ players, buzzQueue = [], highlightId, board
                 background: accentColor,
                 opacity: 0.35,
                 flexShrink: 0,
+                borderRadius: '0 0 10px 10px',
               }}
             />
           </div>

@@ -24,7 +24,9 @@ export default function PlayerPage() {
   const [ddWagerInput, setDdWagerInput] = useState('')
   const [ddWagerError, setDdWagerError] = useState('')
   const [ddWagerSubmitted, setDdWagerSubmitted] = useState(false)
+  const [activeEmojis, setActiveEmojis] = useState<Record<string, { emoji: string; seq: number }>>({})
   const hostPeerId = useRef<string | null>(null)
+  const emojiTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
   const [myId] = useState(() => {
     const existing = useGameStore.getState().myPlayerId
@@ -184,6 +186,9 @@ export default function PlayerPage() {
       if (msg.type === 'UPDATE_SETTINGS') {
         setSettings(msg.settings)
       }
+      if (msg.type === 'EMOJI_REACT') {
+        applyEmojiReaction(msg.playerId, msg.emoji)
+      }
     })
 
     return () => {
@@ -206,6 +211,26 @@ export default function PlayerPage() {
     if (hostPeerId.current) {
       net.send({ type: 'BUZZ', playerId: myId, playerName: myPlayer?.name ?? playerName }, hostPeerId.current)
     }
+  }
+
+  function applyEmojiReaction(playerId: string, emoji: string) {
+    if (emojiTimers.current[playerId]) clearTimeout(emojiTimers.current[playerId])
+    setActiveEmojis((prev) => ({
+      ...prev,
+      [playerId]: { emoji, seq: (prev[playerId]?.seq ?? 0) + 1 },
+    }))
+    emojiTimers.current[playerId] = setTimeout(() => {
+      setActiveEmojis((prev) => {
+        const next = { ...prev }
+        delete next[playerId]
+        return next
+      })
+    }, 3500)
+  }
+
+  function handleEmojiSelect(emoji: string) {
+    net.broadcast({ type: 'EMOJI_REACT', playerId: myId, emoji })
+    applyEmojiReaction(myId, emoji)
   }
 
   function handleExitRoom() {
@@ -398,7 +423,15 @@ export default function PlayerPage() {
             <div className="font-condensed font-bold uppercase tracking-widest text-xs mb-3" style={{ color: 'var(--gold)', opacity: 0.7 }}>
               Scoreboard
             </div>
-            <Scoreboard players={state.players} buzzQueue={state.buzzQueue} highlightId={myId} boardControlId={state.boardControlId} />
+            <Scoreboard
+              players={state.players}
+              buzzQueue={state.buzzQueue}
+              highlightId={myId}
+              boardControlId={state.boardControlId}
+              activeEmojis={activeEmojis}
+              myPlayerId={myId}
+              onEmojiSelect={handleEmojiSelect}
+            />
           </div>
         )}
       </div>
