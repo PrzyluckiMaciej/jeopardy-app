@@ -5,7 +5,9 @@ import { formatScore } from '../lib/utils'
 interface Props {
   settings: GameSettings
   players: Player[]
+  boardControlId: string | null
   onSettingsChange: (s: GameSettings) => void
+  onAssignBoardControl: (playerId: string | null) => void
   onUpdatePlayer: (p: Player) => void
   onRemovePlayer: (id: string) => void
 }
@@ -13,7 +15,9 @@ interface Props {
 export default function SettingsPanel({
   settings,
   players,
+  boardControlId,
   onSettingsChange,
+  onAssignBoardControl,
   onUpdatePlayer,
   onRemovePlayer,
 }: Props) {
@@ -77,6 +81,35 @@ export default function SettingsPanel({
         </div>
       </div>
 
+      {/* Board control */}
+      <div>
+        <div className="font-condensed font-bold uppercase tracking-widest text-xs mb-3" style={{ color: 'var(--gold)', opacity: 0.7 }}>
+          Board control
+        </div>
+        <div
+          className="px-3 py-2 rounded-lg"
+          style={{ background: 'var(--navy)', border: '1px solid var(--navy-light)' }}
+        >
+          <div className="text-xs mb-2" style={{ color: '#4a5580' }}>
+            The selected player picks the next clue (required for Daily Doubles).
+          </div>
+          <select
+            className="w-full text-sm"
+            value={boardControlId ?? ''}
+            onChange={(e) => onAssignBoardControl(e.target.value || null)}
+            disabled={players.length === 0}
+          >
+            <option value="">None</option>
+            {players.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+                {!p.isConnected ? ' (offline)' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
       {/* Players */}
       <div>
         <div className="font-condensed font-bold uppercase tracking-widest text-xs mb-3" style={{ color: 'var(--gold)', opacity: 0.7 }}>
@@ -121,11 +154,40 @@ export default function SettingsPanel({
                   title={p.isConnected ? 'Connected' : 'Not connected'}
                 />
                 <div className="flex-1 min-w-0">
-                  <div className="font-condensed font-bold text-sm truncate">{p.name}</div>
+                  <div className="font-condensed font-bold text-sm truncate">
+                    {p.name}
+                    {boardControlId === p.id && (
+                      <span
+                        className="ml-1.5 font-condensed text-xs px-1.5 py-0.5 rounded"
+                        style={{
+                          background: 'rgba(0,200,180,0.2)',
+                          color: '#40e0d0',
+                          border: '1px solid rgba(0,200,180,0.45)',
+                          verticalAlign: 'middle',
+                        }}
+                      >
+                        BOARD
+                      </span>
+                    )}
+                  </div>
                   <div className="text-xs" style={{ color: p.score < 0 ? '#e07070' : 'var(--gold)' }}>
                     {formatScore(p.score)}
                   </div>
                 </div>
+                <button
+                  className="text-xs py-1 px-2 rounded"
+                  style={{
+                    background: boardControlId === p.id ? 'rgba(0,200,180,0.2)' : 'rgba(0,200,180,0.08)',
+                    border: '1px solid rgba(0,200,180,0.35)',
+                    color: '#40e0d0',
+                    fontFamily: 'Barlow Condensed',
+                    fontWeight: 600,
+                  }}
+                  title={boardControlId === p.id ? 'This player has board control' : 'Give this player board control'}
+                  onClick={() => onAssignBoardControl(p.id)}
+                >
+                  {boardControlId === p.id ? 'Control' : 'Assign'}
+                </button>
                 <button className="btn-ghost text-xs py-1 px-2" onClick={() => startEdit(p)}>Edit</button>
                 <button
                   className="text-xs py-1 px-2 rounded"

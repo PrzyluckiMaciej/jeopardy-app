@@ -219,6 +219,11 @@ export default function HostPage() {
     net.broadcast({ type: 'UPDATE_SETTINGS', settings: s })
   }
 
+  function handleAssignBoardControl(playerId: string | null) {
+    setBoardControl(playerId)
+    net.broadcast({ type: 'SET_BOARD_CONTROL', playerId })
+  }
+
   function handleUpdatePlayer(p: Player) {
     const prev = state.players.find(pl => pl.id === p.id)
     updatePlayer(p)
@@ -435,7 +440,9 @@ export default function HostPage() {
             <SettingsPanel
               settings={settings}
               players={state.players}
+              boardControlId={state.boardControlId}
               onSettingsChange={handleSettingsChange}
+              onAssignBoardControl={handleAssignBoardControl}
               onUpdatePlayer={handleUpdatePlayer}
               onRemovePlayer={handleRemovePlayer}
             />
@@ -688,7 +695,7 @@ export default function HostPage() {
               No player has board control.
             </div>
             <div className="text-sm" style={{ color: '#4a5580' }}>
-              Assign board control to a player before opening a Daily Double question. Use the <span style={{ color: 'var(--gold)' }}>Randomize</span> button or click a player's name in the scoreboard settings.
+              Assign board control to a player before opening a Daily Double question. Use the <span style={{ color: 'var(--gold)' }}>Randomize</span> button on the board tab, or choose a player under Board control in Settings.
             </div>
             <button className="btn-gold w-full" onClick={() => setShowDdNoControlAlert(false)}>
               OK
