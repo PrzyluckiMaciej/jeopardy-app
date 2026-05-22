@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, X } from 'lucide-react'
+import { Check, X, ArrowLeft, CheckCircle, Bell, Eye } from 'lucide-react'
 import type { GameState, GameSettings } from '../types'
 import { cellId } from '../lib/utils'
 import * as net from '../lib/network'
@@ -143,11 +143,22 @@ export default function QuestionOverlay({ state, settings }: Props) {
           {isDD && <span style={{ color: 'var(--gold-bright)', marginLeft: 8 }}>DAILY DOUBLE</span>}
         </div>
         <div className="flex items-center gap-2">
-          <button className="btn-ghost text-sm" onClick={handleDismiss} title="Return to board without marking this question as used">
-            Dismiss
+          <button
+            className="btn-ghost text-sm btn-with-icon"
+            onClick={handleDismiss}
+            title="Return to board without marking this question as used"
+          >
+            <ArrowLeft size={16} aria-hidden />
+            <span>Dismiss</span>
           </button>
-          <button className="btn-ghost text-sm" style={{ color: 'var(--gold)' }} onClick={handleClose} title="Return to board and mark this question as answered">
-            Mark answered
+          <button
+            className="btn-ghost text-sm btn-with-icon"
+            style={{ color: 'var(--gold)' }}
+            onClick={handleClose}
+            title="Return to board and mark this question as answered"
+          >
+            <CheckCircle size={16} aria-hidden />
+            <span>Answered</span>
           </button>
         </div>
       </div>
@@ -265,8 +276,13 @@ export default function QuestionOverlay({ state, settings }: Props) {
 
             {/* Normal: question phase — open for buzzing */}
             {!isDD && phase === 'question' && !settings.autoBuzzQueue && (
-              <button className="btn-gold w-full py-3" onClick={handleStartBuzzing}>
-                Open for buzzing
+              <button
+                className="btn-gold w-full py-3 btn-with-icon justify-center"
+                onClick={handleStartBuzzing}
+                title="Allow players to buzz in"
+              >
+                <Bell size={18} aria-hidden />
+                <span>Open buzzing</span>
               </button>
             )}
 
@@ -278,8 +294,13 @@ export default function QuestionOverlay({ state, settings }: Props) {
             )}
 
             {phase !== 'revealed' && phase !== 'dailyDouble' && phase !== 'dailyDoubleBet' && (
-              <button className="btn-outline w-full" onClick={handleReveal}>
-                Reveal answer
+              <button
+                className="btn-outline w-full btn-with-icon justify-center"
+                onClick={handleReveal}
+                title="Show the answer to players"
+              >
+                <Eye size={16} aria-hidden />
+                <span>Reveal answer</span>
               </button>
             )}
           </div>

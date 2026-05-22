@@ -271,6 +271,23 @@ button {
 }
 .btn-ghost:hover { border-color: var(--border-emphasis); background: rgba(255,255,255,0.04); }
 
+/* Icon + short label (Phase 5 toolbar / controls) */
+.btn-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Icon-only control with tooltip via title / aria-label */
+.btn-icon-only {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  min-width: 36px;
+  min-height: 36px;
+}
+
 .btn-icon {
   background: transparent;
   border: none;
