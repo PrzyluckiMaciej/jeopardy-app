@@ -92,4 +92,6 @@ export type NetMessage =
 export interface GameSettings {
   pointDeduction: boolean
   allowNegativeScore: boolean
+  autoBuzzQueue: boolean
+  blurClueOnBuzz: boolean
 }

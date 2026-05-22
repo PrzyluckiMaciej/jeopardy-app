@@ -13,7 +13,7 @@ export default function PlayerPage() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const playerName = params.get('name') || 'Player'
-  const { roomCode, state, setState, setMyPlayerId,
+  const { roomCode, state, settings, setState, setMyPlayerId,
     addBuzz, patchState, updatePlayer, removePlayer, setSettings } = useGameStore()
 
   const [connected, setConnected] = useState(false)
@@ -222,6 +222,7 @@ export default function PlayerPage() {
   const isDD = state.dailyDouble !== null
   const isDDPlayer = state.dailyDouble?.playerId === myId
   const ddPlayerInfo = state.dailyDouble ? state.players.find(p => p.id === state.dailyDouble!.playerId) : null
+  const clueBlurred = settings.blurClueOnBuzz && state.phase === 'buzzing' && state.buzzQueue.length > 0
 
   function handleSubmitWager() {
     const wager = parseInt(ddWagerInput, 10)
@@ -414,7 +415,13 @@ export default function PlayerPage() {
               {(state.phase === 'question' || state.phase === 'buzzing' || state.phase === 'revealed') && (
                 <>
                   {state.activeMedia && (
-                    <div className="mb-6">
+                    <div
+                      className="mb-6"
+                      style={{
+                        filter: clueBlurred ? 'blur(8px)' : 'none',
+                        transition: 'filter 0.3s ease',
+                      }}
+                    >
                       {state.activeMedia.type === 'image' && (
                         <img src={state.activeMedia.dataUrl} className="max-h-48 rounded-lg object-contain mx-auto" alt="Question media" />
                       )}
@@ -429,7 +436,12 @@ export default function PlayerPage() {
 
                   <div
                     className="font-condensed font-bold text-3xl md:text-4xl leading-snug mb-6 max-w-2xl"
-                    style={{ color: 'var(--white)' }}
+                    style={{
+                      color: 'var(--white)',
+                      filter: clueBlurred ? 'blur(8px)' : 'none',
+                      transition: 'filter 0.3s ease',
+                      userSelect: clueBlurred ? 'none' : undefined,
+                    }}
                   >
                     {activeQ.question}
                   </div>

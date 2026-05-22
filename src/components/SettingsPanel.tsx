@@ -22,7 +22,11 @@ export default function SettingsPanel({
   const [editScore, setEditScore] = useState('')
 
   function toggle(key: keyof GameSettings) {
-    onSettingsChange({ ...settings, [key]: !settings[key] })
+    const updated = { ...settings, [key]: !settings[key] }
+    if (key === 'autoBuzzQueue' && !updated.autoBuzzQueue) {
+      updated.blurClueOnBuzz = false
+    }
+    onSettingsChange(updated)
   }
 
   function startEdit(p: Player) {
@@ -56,6 +60,19 @@ export default function SettingsPanel({
             value={settings.allowNegativeScore}
             onChange={() => toggle('allowNegativeScore')}
             disabled={!settings.pointDeduction}
+          />
+          <Toggle
+            label="Auto buzz queue"
+            description="Players can buzz immediately after the clue is revealed"
+            value={settings.autoBuzzQueue}
+            onChange={() => toggle('autoBuzzQueue')}
+          />
+          <Toggle
+            label="Blur clue on buzz"
+            description="Blurs the clue when any player buzzes in"
+            value={settings.blurClueOnBuzz}
+            onChange={() => toggle('blurClueOnBuzz')}
+            disabled={!settings.autoBuzzQueue}
           />
         </div>
       </div>

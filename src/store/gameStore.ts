@@ -129,6 +129,8 @@ const defaultState: GameState = {
 const defaultSettings: GameSettings = {
   pointDeduction: false,
   allowNegativeScore: false,
+  autoBuzzQueue: false,
+  blurClueOnBuzz: false,
 }
 
 export const useGameStore = create<GameStore>()(
