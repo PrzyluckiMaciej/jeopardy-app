@@ -421,9 +421,6 @@ export default function PlayerPage() {
             </div>
 
             <div className="flex-shrink-0 relative z-20 overflow-visible">
-              <div className="font-condensed font-bold uppercase tracking-widest text-xs mb-3" style={{ color: 'var(--gold)', opacity: 0.7 }}>
-                Scoreboard
-              </div>
               <Scoreboard
                 players={state.players}
                 buzzQueue={state.buzzQueue}

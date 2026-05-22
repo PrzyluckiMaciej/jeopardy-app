@@ -616,11 +616,8 @@ export default function HostPage() {
                   {/* Scoreboard — pinned below board, always visible */}
                   {!editing && (
                     <div className="flex-shrink-0 relative z-20 overflow-visible">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="font-condensed font-bold uppercase tracking-widest text-xs" style={{ color: 'var(--gold)', opacity: 0.7 }}>
-                          Scoreboard
-                        </div>
-                        {state.players.some(p => p.isConnected) && (
+                      {state.players.some(p => p.isConnected) && (
+                        <div className="flex justify-end mb-2">
                           <button
                             className="font-condensed text-xs px-2 py-0.5 rounded"
                             style={{
@@ -639,8 +636,8 @@ export default function HostPage() {
                           >
                             Randomize
                           </button>
-                        )}
-                      </div>
+                        </div>
+                      )}
                       <Scoreboard
                         players={state.players}
                         buzzQueue={state.buzzQueue}
