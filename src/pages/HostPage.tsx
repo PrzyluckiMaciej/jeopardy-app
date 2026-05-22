@@ -583,8 +583,8 @@ export default function HostPage() {
                 )}
 
                 <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                  {/* Board — scrolls inside remaining viewport height */}
-                  <div className="flex-1 min-h-0 overflow-auto px-4 pt-2">
+                  {/* Board — grows to fill space above scoreboard */}
+                  <div className="flex-1 min-h-0 min-w-0 overflow-x-auto overflow-y-hidden px-4 pt-2">
                     {editing && board ? (
                       <BoardEditor board={board} onChange={handleBoardChange} onClose={() => {
                         setEditing(false)
@@ -597,7 +597,7 @@ export default function HostPage() {
                         answeredCells={state.answeredCells}
                         onOpenCell={handleOpenCell}
                         dailyDoubleQuestionId={board.dailyDoubleQuestionId}
-                        compact
+                        fill
                       />
                     ) : (
                       <div className="h-full flex flex-col items-center justify-center gap-4">
@@ -648,7 +648,6 @@ export default function HostPage() {
                         buzzQueue={state.buzzQueue}
                         boardControlId={state.boardControlId}
                         activeEmojis={activeEmojis}
-                        compact
                       />
                     </div>
                   )}
