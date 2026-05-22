@@ -165,6 +165,8 @@ export const useGameStore = create<GameStore>()(
             ...s.state,
             players: s.state.players.filter((p) => p.id !== id),
             buzzQueue: s.state.buzzQueue.filter((pid) => pid !== id),
+            boardControlId:
+              s.state.boardControlId === id ? null : s.state.boardControlId,
           },
         })),
 

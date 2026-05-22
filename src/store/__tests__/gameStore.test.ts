@@ -127,6 +127,21 @@ describe('useGameStore', () => {
       useGameStore.getState().removePlayer('player-1')
       expect(useGameStore.getState().state.buzzQueue).not.toContain('player-1')
     })
+
+    it('clears board control when the controlling player is removed', () => {
+      useGameStore.getState().addPlayer(makePlayer())
+      useGameStore.getState().setBoardControl('player-1')
+      useGameStore.getState().removePlayer('player-1')
+      expect(useGameStore.getState().state.boardControlId).toBeNull()
+    })
+
+    it('keeps board control when a different player is removed', () => {
+      useGameStore.getState().addPlayer(makePlayer())
+      useGameStore.getState().addPlayer(makePlayer({ id: 'player-2', name: 'Bob' }))
+      useGameStore.getState().setBoardControl('player-1')
+      useGameStore.getState().removePlayer('player-2')
+      expect(useGameStore.getState().state.boardControlId).toBe('player-1')
+    })
   })
 
   describe('updatePlayer', () => {
