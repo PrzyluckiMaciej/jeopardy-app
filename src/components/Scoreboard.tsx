@@ -152,7 +152,17 @@ export default function Scoreboard({
 }: Props) {
   const [showPicker, setShowPicker] = useState(false)
   const [pickerPos, setPickerPos] = useState({ top: 0, left: 0 })
-  const emojiBtnRef = useRef<HTMLButtonElement>(null)
+  const emojiBtnCardsRef = useRef<HTMLButtonElement>(null)
+  const emojiBtnListRef = useRef<HTMLButtonElement>(null)
+
+  function visibleEmojiButton(): HTMLButtonElement | null {
+    for (const btn of [emojiBtnCardsRef.current, emojiBtnListRef.current]) {
+      if (!btn) continue
+      const { width, height } = btn.getBoundingClientRect()
+      if (width > 0 && height > 0) return btn
+    }
+    return null
+  }
   const sorted = [...players].sort((a, b) => b.score - a.score)
 
   const prevScores = useRef<Record<string, number>>({})
@@ -172,12 +182,19 @@ export default function Scoreboard({
   }, [players])
 
   useLayoutEffect(() => {
-    if (!showPicker || !emojiBtnRef.current) return
-    const rect = emojiBtnRef.current.getBoundingClientRect()
-    setPickerPos({
-      top: rect.top - 8,
-      left: rect.left + rect.width / 2,
-    })
+    if (!showPicker) return
+    const updatePos = () => {
+      const btn = visibleEmojiButton()
+      if (!btn) return
+      const rect = btn.getBoundingClientRect()
+      setPickerPos({
+        top: rect.top - 8,
+        left: rect.left + rect.width / 2,
+      })
+    }
+    updatePos()
+    window.addEventListener('resize', updatePos)
+    return () => window.removeEventListener('resize', updatePos)
   }, [showPicker])
 
   if (players.length === 0) {
@@ -300,7 +317,7 @@ export default function Scoreboard({
                 {st.isMe && onEmojiSelect && (
                   <div className="relative flex justify-center w-full">
                     <button
-                      ref={emojiBtnRef}
+                      ref={emojiBtnCardsRef}
                       type="button"
                       onClick={() => setShowPicker((v) => !v)}
                       title="Send an emoji reaction"
@@ -395,7 +412,7 @@ export default function Scoreboard({
                   </span>
                   {st.isMe && onEmojiSelect && (
                     <button
-                      ref={emojiBtnRef}
+                      ref={emojiBtnListRef}
                       type="button"
                       onClick={() => setShowPicker((v) => !v)}
                       aria-label="Send an emoji reaction"
