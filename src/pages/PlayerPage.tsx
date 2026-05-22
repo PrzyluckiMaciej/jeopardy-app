@@ -15,7 +15,7 @@ export default function PlayerPage() {
   const [params, setParams] = useSearchParams()
   const playerName = params.get('name') || 'Player'
   const { roomCode, state, settings, setState, setMyPlayerId,
-    addBuzz, patchState, updatePlayer, removePlayer, setSettings } = useGameStore()
+    addBuzz, patchState, updatePlayer, removePlayer, setSettings, setPlayerConnected } = useGameStore()
 
   const [connected, setConnected] = useState(false)
   const [hasBuzzed, setHasBuzzed] = useState(false)
@@ -164,6 +164,9 @@ export default function PlayerPage() {
         setDdWagerInput('')
         setDdWagerError('')
         setDdWagerSubmitted(false)
+      }
+      if (msg.type === 'PLAYER_LEAVE') {
+        setPlayerConnected(msg.playerId, false)
       }
       if (msg.type === 'UPDATE_PLAYER') {
         updatePlayer(msg.player)
@@ -385,7 +388,7 @@ export default function PlayerPage() {
 
         {/* Board area + scoreboard (all phases except podium) */}
         {state.phase !== 'podium' && (
-          <div className="flex-1 flex flex-col min-h-0 overflow-hidden gap-4 px-4 pb-4">
+          <div className="flex-1 flex flex-col min-h-0 gap-4 px-4 pb-4">
             <div className="flex-1 min-h-0 min-w-0 overflow-x-auto overflow-y-hidden">
               {state.phase === 'gameStart' && (
                 <div className="h-full flex flex-col items-center justify-center gap-4">
@@ -417,10 +420,7 @@ export default function PlayerPage() {
               )}
             </div>
 
-            <div className="flex-shrink-0">
-              <div className="font-condensed font-bold uppercase tracking-widest text-xs mb-3" style={{ color: 'var(--gold)', opacity: 0.7 }}>
-                Scoreboard
-              </div>
+            <div className="flex-shrink-0 relative z-20 overflow-visible">
               <Scoreboard
                 players={state.players}
                 buzzQueue={state.buzzQueue}
