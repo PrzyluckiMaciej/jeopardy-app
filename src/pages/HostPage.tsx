@@ -40,8 +40,10 @@ export default function HostPage() {
   const [newGameName, setNewGameName] = useState('')
   const [editingGameId, setEditingGameId] = useState<string | null>(null)
   const [editingGameName, setEditingGameName] = useState('')
+  const [activeEmojis, setActiveEmojis] = useState<Record<string, { emoji: string; seq: number }>>({})
 
   const peerToClient = useRef(new Map<string, string>())
+  const emojiTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
   useEffect(() => {
     if (!roomCode) { navigate('/'); return }
@@ -132,6 +134,21 @@ export default function HostPage() {
         const wager = Math.max(1, Math.min(msg.wager, maxWager))
         setDailyDoubleBet(wager)
         net.broadcast({ type: 'DAILY_DOUBLE_ACCEPT_BET', wager })
+      }
+      if (msg.type === 'EMOJI_REACT') {
+        const { playerId, emoji } = msg
+        if (emojiTimers.current[playerId]) clearTimeout(emojiTimers.current[playerId])
+        setActiveEmojis((prev) => ({
+          ...prev,
+          [playerId]: { emoji, seq: (prev[playerId]?.seq ?? 0) + 1 },
+        }))
+        emojiTimers.current[playerId] = setTimeout(() => {
+          setActiveEmojis((prev) => {
+            const next = { ...prev }
+            delete next[playerId]
+            return next
+          })
+        }, 3500)
       }
     })
 
@@ -592,7 +609,12 @@ export default function HostPage() {
                     </button>
                   )}
                 </div>
-                <Scoreboard players={state.players} buzzQueue={state.buzzQueue} boardControlId={state.boardControlId} />
+                <Scoreboard
+                  players={state.players}
+                  buzzQueue={state.buzzQueue}
+                  boardControlId={state.boardControlId}
+                  activeEmojis={activeEmojis}
+                />
               </div>
             )}
           </div>

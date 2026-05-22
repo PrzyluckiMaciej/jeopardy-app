@@ -94,6 +94,7 @@ export type NetMessage =
   | { type: 'DAILY_DOUBLE_BET'; wager: number; playerId: string }
   | { type: 'DAILY_DOUBLE_ACCEPT_BET'; wager: number }
   | { type: 'DAILY_DOUBLE_REVEAL_CLUE' }
+  | { type: 'EMOJI_REACT'; playerId: string; emoji: string }
 
 export interface GameSettings {
   pointDeduction: boolean
