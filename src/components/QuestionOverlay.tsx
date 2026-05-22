@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { Check, X } from 'lucide-react'
 import type { GameState, GameSettings } from '../types'
 import { cellId } from '../lib/utils'
@@ -15,6 +16,26 @@ export default function QuestionOverlay({ state, settings }: Props) {
   const { activeQuestion, phase, buzzQueue, players, activeMedia, dailyDouble } = state
   const store = useGameStore()
   const roomCode = useGameStore(s => s.roomCode) ?? ''
+
+  // Exit animation state
+  const [ddExiting, setDdExiting] = useState(false)
+  const [overlayExiting, setOverlayExiting] = useState(false)
+  const pendingOverlayAction = useRef<(() => void) | null>(null)
+  const pendingDdAction = useRef<(() => void) | null>(null)
+  const prevPhaseRef = useRef(phase)
+  const [clueRevealKey, setClueRevealKey] = useState(0)
+  const [answerRevealKey, setAnswerRevealKey] = useState(0)
+
+  useEffect(() => {
+    const prev = prevPhaseRef.current
+    if (phase === 'question' && prev !== 'question' && prev !== 'buzzing' && prev !== 'revealed') {
+      setClueRevealKey((k) => k + 1)
+    }
+    if (phase === 'revealed' && prev !== 'revealed') {
+      setAnswerRevealKey((k) => k + 1)
+    }
+    prevPhaseRef.current = phase
+  }, [phase])
 
   if (!activeQuestion) return null
   const { question, categoryId } = activeQuestion
@@ -65,8 +86,12 @@ export default function QuestionOverlay({ state, settings }: Props) {
   }
 
   function handleRevealDailyDoubleClue() {
-    store.revealDailyDoubleClue()
-    net.broadcast({ type: 'DAILY_DOUBLE_REVEAL_CLUE' })
+    // Trigger DD title exit animation; actual reveal happens in onAnimationEnd
+    pendingDdAction.current = () => {
+      store.revealDailyDoubleClue()
+      net.broadcast({ type: 'DAILY_DOUBLE_REVEAL_CLUE' })
+    }
+    setDdExiting(true)
   }
 
   function handleReveal() {
@@ -75,14 +100,22 @@ export default function QuestionOverlay({ state, settings }: Props) {
   }
 
   function handleDismiss() {
-    store.closeCard()
-    net.broadcast({ type: 'CLOSE_CARD' })
+    // Trigger overlay exit animation; actual close happens in onAnimationEnd
+    pendingOverlayAction.current = () => {
+      store.closeCard()
+      net.broadcast({ type: 'CLOSE_CARD' })
+    }
+    setOverlayExiting(true)
   }
 
   function handleClose() {
     const cId = cellId(categoryId, question.id)
-    store.markAnswered(cId)
-    net.broadcast({ type: 'MARK_ANSWERED', cellId: cId })
+    // Trigger overlay exit animation; actual mark-answered happens in onAnimationEnd
+    pendingOverlayAction.current = () => {
+      store.markAnswered(cId)
+      net.broadcast({ type: 'MARK_ANSWERED', cellId: cId })
+    }
+    setOverlayExiting(true)
   }
 
   const categoryName = state.board?.categories.find(c => c.id === categoryId)?.name ?? ''
@@ -90,8 +123,17 @@ export default function QuestionOverlay({ state, settings }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col"
+      className={`fixed inset-0 z-50 flex flex-col${overlayExiting ? ' question-overlay--exit' : ' question-overlay-enter'}`}
       style={{ background: 'rgba(6,11,40,0.97)', backdropFilter: 'blur(4px)' }}
+      onAnimationEnd={(e) => {
+        if (overlayExiting && e.animationName === 'overlayFadeOut' && e.target === e.currentTarget) {
+          setOverlayExiting(false)
+          if (pendingOverlayAction.current) {
+            pendingOverlayAction.current()
+            pendingOverlayAction.current = null
+          }
+        }
+      }}
     >
       <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--navy-light)' }}>
         <div className="font-condensed font-bold uppercase tracking-wider" style={{ color: 'var(--gold)', fontSize: 14 }}>
@@ -112,17 +154,30 @@ export default function QuestionOverlay({ state, settings }: Props) {
 
       <div className="flex-1 flex gap-6 p-6 min-h-0">
         {/* Main area */}
-        <div className="flex-1 flex flex-col items-center justify-center text-center card-flip">
+        <div className={`flex-1 flex flex-col items-center justify-center text-center ${overlayExiting ? 'card-flip-exit' : 'card-flip'}`}>
           {(phase === 'dailyDouble' || phase === 'dailyDoubleBet') && (
-            <div className="daily-double-title">DAILY DOUBLE!</div>
+            <div
+              className={`daily-double-title${ddExiting ? ' daily-double-title--exit' : ''}`}
+              onAnimationEnd={(e) => {
+                if (ddExiting && e.animationName === 'ddRevealFadeOut') {
+                  setDdExiting(false)
+                  if (pendingDdAction.current) {
+                    pendingDdAction.current()
+                    pendingDdAction.current = null
+                  }
+                }
+              }}
+            >
+              DAILY DOUBLE!
+            </div>
           )}
 
           {showClue && (
-            <>
+            <div key={`clue-${clueRevealKey}`} className="flex flex-col items-center w-full max-w-2xl">
               {activeMedia && (
-                <div className="mb-6">
+                <div className="mb-6 clue-reveal">
                   {activeMedia.type === 'image' && (
-                    <img src={activeMedia.dataUrl} className="max-h-48 rounded-lg object-contain mx-auto" />
+                    <img src={activeMedia.dataUrl} className="max-h-48 rounded-lg object-contain mx-auto" alt="" />
                   )}
                   {activeMedia.type === 'audio' && (
                     <audio controls src={activeMedia.dataUrl} autoPlay className="mx-auto" />
@@ -134,7 +189,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
               )}
 
               <div
-                className="font-condensed font-bold text-3xl md:text-4xl leading-snug mb-6 max-w-2xl"
+                className={`font-condensed font-bold text-3xl md:text-4xl leading-snug mb-6 max-w-2xl${activeMedia ? '' : ' clue-reveal'}`}
                 style={{ color: 'var(--white)' }}
               >
                 {question.question || <span style={{ color: '#4a5580' }}>No question text</span>}
@@ -142,13 +197,14 @@ export default function QuestionOverlay({ state, settings }: Props) {
 
               {phase === 'revealed' && (
                 <div
-                  className="font-display text-2xl md:text-3xl px-6 py-3 rounded-lg mt-2"
+                  key={`answer-${answerRevealKey}`}
+                  className="font-display text-2xl md:text-3xl px-6 py-3 rounded-lg mt-2 answer-reveal"
                   style={{ background: 'rgba(212,160,23,0.15)', border: '2px solid var(--gold)', color: 'var(--gold-bright)' }}
                 >
                   {question.answer || '—'}
                 </div>
               )}
-            </>
+            </div>
           )}
         </div>
 
