@@ -203,6 +203,10 @@ export default function HostPage() {
     } else {
       openCard(categoryId, question, mediaDataUrl)
       net.broadcast({ type: 'OPEN_CARD', categoryId, question, mediaDataUrl })
+      if (settings.autoBuzzQueue) {
+        store.startBuzzing()
+        net.broadcast({ type: 'START_BUZZING' })
+      }
     }
   }
 

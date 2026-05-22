@@ -208,7 +208,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
             )}
 
             {/* Normal: question phase — open for buzzing */}
-            {!isDD && phase === 'question' && (
+            {!isDD && phase === 'question' && !settings.autoBuzzQueue && (
               <button className="btn-gold w-full py-3" onClick={handleStartBuzzing}>
                 Open for buzzing
               </button>
