@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Pencil, Trash2, Crown, Check, X } from 'lucide-react'
 import type { GameSettings, Player } from '../types'
 import { formatScore } from '../lib/utils'
 
@@ -153,11 +154,21 @@ export default function SettingsPanel({
                   style={{ fontSize: '1rem' }}
                 />
                 <div className="flex gap-3">
-                  <button className="btn-gold flex-1" style={{ fontSize: '0.9375rem', padding: '10px 16px' }} onClick={() => saveEdit(p)}>
-                    Save
+                  <button
+                    className="btn-gold flex-1 btn-with-icon justify-center"
+                    style={{ fontSize: '0.9375rem', padding: '10px 16px' }}
+                    onClick={() => saveEdit(p)}
+                  >
+                    <Check size={16} aria-hidden />
+                    <span>Save</span>
                   </button>
-                  <button className="btn-ghost flex-1" style={{ fontSize: '0.9375rem', padding: '10px 16px' }} onClick={() => setEditingId(null)}>
-                    Cancel
+                  <button
+                    className="btn-ghost flex-1 btn-with-icon justify-center"
+                    style={{ fontSize: '0.9375rem', padding: '10px 16px' }}
+                    onClick={() => setEditingId(null)}
+                  >
+                    <X size={16} aria-hidden />
+                    <span>Cancel</span>
                   </button>
                 </div>
               </div>
@@ -200,42 +211,38 @@ export default function SettingsPanel({
                   </div>
                 </div>
                 <button
-                  className="rounded"
+                  className="btn-icon-only rounded"
                   style={{
                     background: boardControlId === p.id ? 'rgba(0,200,180,0.2)' : 'rgba(0,200,180,0.08)',
                     border: '1px solid rgba(0,200,180,0.35)',
                     color: '#40e0d0',
-                    fontFamily: 'Barlow Condensed',
-                    fontWeight: 600,
-                    fontSize: '0.875rem',
-                    padding: '8px 12px',
                   }}
                   title={boardControlId === p.id ? 'This player has board control' : 'Give this player board control'}
+                  aria-label={boardControlId === p.id ? 'Has board control' : 'Assign board control'}
                   onClick={() => onAssignBoardControl(p.id)}
                 >
-                  {boardControlId === p.id ? 'Control' : 'Assign'}
+                  <Crown size={16} aria-hidden />
                 </button>
                 <button
-                  className="btn-ghost"
-                  style={{ fontSize: '0.875rem', padding: '8px 12px' }}
+                  className="btn-ghost btn-icon-only"
+                  title="Edit player name and score"
+                  aria-label="Edit player"
                   onClick={() => startEdit(p)}
                 >
-                  Edit
+                  <Pencil size={16} aria-hidden />
                 </button>
                 <button
-                  className="rounded"
+                  className="btn-icon-only rounded"
                   style={{
                     background: 'rgba(192,57,43,0.15)',
                     border: '1px solid rgba(192,57,43,0.3)',
                     color: '#e07070',
-                    fontFamily: 'Barlow Condensed',
-                    fontWeight: 600,
-                    fontSize: '0.875rem',
-                    padding: '8px 12px',
                   }}
+                  title="Remove player from game"
+                  aria-label="Remove player"
                   onClick={() => onRemovePlayer(p.id)}
                 >
-                  Remove
+                  <Trash2 size={16} aria-hidden />
                 </button>
               </div>
             )

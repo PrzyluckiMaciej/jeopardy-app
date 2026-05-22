@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Settings, Trash2, Pencil, Check, FolderOpen, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play } from 'lucide-react'
+import { Settings, Trash2, Pencil, Check, FolderOpen, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, Plus, RotateCcw, Shuffle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useGameStore, useBoardStore } from '../store/gameStore'
 import * as net from '../lib/network'
@@ -525,14 +525,21 @@ export default function HostPage() {
                   >
                     {/* Left: primary actions + labels */}
                     <div className="flex items-center gap-2 flex-wrap flex-1">
-                      <button className="btn-outline text-sm" onClick={openBoardPicker}>
-                        Select board
+                      <button
+                        className="btn-outline text-sm btn-with-icon"
+                        onClick={openBoardPicker}
+                        title="Select a board from your library"
+                      >
+                        <LayoutGrid size={16} aria-hidden />
+                        <span>Select</span>
                       </button>
                       <button
-                        className="btn-ghost text-sm"
+                        className="btn-ghost text-sm btn-with-icon"
                         onClick={() => { if (board) setEditing(true); else handleNewBoard() }}
+                        title={board ? 'Edit the current board' : 'Create a new board'}
                       >
-                        {board ? 'Edit board' : 'New board'}
+                        {board ? <Pencil size={16} aria-hidden /> : <Plus size={16} aria-hidden />}
+                        <span>{board ? 'Edit' : 'New'}</span>
                       </button>
                       {board && (
                         <span className="font-condensed font-bold" style={{ color: 'var(--gold)' }}>
@@ -553,20 +560,20 @@ export default function HostPage() {
                     {inGame && (
                       <div className="flex items-center gap-1 flex-shrink-0">
                         <button
-                          className="btn-ghost text-sm py-1 px-2 flex items-center gap-1"
+                          className="btn-ghost text-sm btn-icon-only"
                           onClick={handlePrevBoard}
                           title={state.currentBoardIndex === 0 ? 'Back to start' : 'Previous board'}
+                          aria-label={state.currentBoardIndex === 0 ? 'Back to start' : 'Previous board'}
                         >
-                          <ChevronLeft size={16} />
-                          Prev
+                          <ChevronLeft size={18} aria-hidden />
                         </button>
                         <button
-                          className="btn-ghost text-sm py-1 px-2 flex items-center gap-1"
+                          className="btn-ghost text-sm btn-icon-only"
                           onClick={handleNextBoard}
                           title={state.currentBoardIndex >= state.gameBoardIds.length - 1 ? 'Go to podium' : 'Next board'}
+                          aria-label={state.currentBoardIndex >= state.gameBoardIds.length - 1 ? 'Go to podium' : 'Next board'}
                         >
-                          Next
-                          <ChevronRight size={16} />
+                          <ChevronRight size={18} aria-hidden />
                         </button>
                       </div>
                     )}
@@ -575,12 +582,13 @@ export default function HostPage() {
                     <div className="flex items-center gap-2 flex-shrink-0">
                       {board && !inGame && (
                         <button
-                          className="btn-ghost text-sm"
+                          className="btn-ghost text-sm btn-icon-only"
                           style={{ color: 'var(--red)', borderColor: 'var(--red)' }}
                           onClick={handleResetBoard}
                           title="Mark all questions as unanswered and reset all scores to 0"
+                          aria-label="Reset board"
                         >
-                          Reset board
+                          <RotateCcw size={18} aria-hidden />
                         </button>
                       )}
                     </div>
@@ -623,7 +631,7 @@ export default function HostPage() {
                       {state.players.some(p => p.isConnected) && (
                         <div className="flex justify-end mb-2">
                           <button
-                            className="font-condensed text-xs px-2 py-0.5 rounded"
+                            className="font-condensed text-xs px-2 py-1 rounded btn-with-icon"
                             style={{
                               background: 'rgba(0,200,180,0.15)',
                               color: '#40e0d0',
@@ -638,7 +646,8 @@ export default function HostPage() {
                               net.broadcast({ type: 'SET_BOARD_CONTROL', playerId: pick.id })
                             }}
                           >
-                            Randomize
+                            <Shuffle size={14} aria-hidden />
+                            <span>Randomize</span>
                           </button>
                         </div>
                       )}

@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Trash2, Upload } from 'lucide-react'
 import type { Board, Category, Question } from '../types'
 import { generateId } from '../lib/utils'
 import { saveMedia, deleteMedia, getMedia, blobToDataUrl } from '../lib/db'
@@ -440,8 +440,13 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                       )}
                     </>
                   )}
-                  <button className="btn-ghost text-xs w-full" onClick={removeMedia}>
-                    Remove media
+                  <button
+                    className="btn-ghost text-xs w-full btn-with-icon justify-center"
+                    onClick={removeMedia}
+                    title="Remove attached media from this question"
+                  >
+                    <Trash2 size={14} aria-hidden />
+                    <span>Remove</span>
                   </button>
                 </div>
               ) : (
@@ -456,9 +461,11 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                   />
                   <label
                     htmlFor="media-upload"
-                    className="btn-ghost text-sm w-full block text-center py-2 cursor-pointer"
+                    className="btn-ghost text-sm w-full btn-with-icon justify-center py-2 cursor-pointer"
+                    title="Attach an image, audio clip, or video to this question"
                   >
-                    Attach image / audio / video
+                    <Upload size={16} aria-hidden />
+                    <span>Attach media</span>
                   </label>
                 </>
               )}
