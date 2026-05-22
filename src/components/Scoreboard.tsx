@@ -19,6 +19,12 @@ interface Props {
   onEmojiSelect?: (emoji: string) => void
 }
 
+const RANK_COLORS = ['#ffe066', '#c8c8c8', '#cd7f32']
+
+function getRankColor(rank: number): string {
+  return RANK_COLORS[rank - 1] ?? '#4a5580'
+}
+
 export default function Scoreboard({
   players,
   buzzQueue = [],
@@ -30,6 +36,16 @@ export default function Scoreboard({
 }: Props) {
   const [showPicker, setShowPicker] = useState(false)
   const sorted = [...players].sort((a, b) => b.score - a.score)
+
+  // Build rank map — tied scores share the same rank
+  const rankMap = new Map<string, number>()
+  let currentRank = 1
+  sorted.forEach((p, i) => {
+    if (i > 0 && sorted[i - 1].score > p.score) {
+      currentRank = i + 1
+    }
+    rankMap.set(p.id, currentRank)
+  })
 
   if (players.length === 0) {
     return (
@@ -54,32 +70,52 @@ export default function Scoreboard({
         const hasControl = boardControlId != null && p.id === boardControlId
         const isMe = p.id === myPlayerId
         const reaction = activeEmojis[p.id]
+        const rank = rankMap.get(p.id) ?? 1
 
-        const accentColor = isFirst
-          ? 'var(--gold-bright)'
+        // Left accent stripe color — priority: buzzed first > board control > me > default
+        const stripeColor = isFirst
+          ? 'var(--gold)'
           : hasControl
           ? '#40e0d0'
-          : isHighlighted
-          ? 'var(--gold)'
-          : 'var(--navy-light)'
+          : isMe
+          ? 'var(--accent-blue)'
+          : 'var(--border-subtle)'
+
+        // Card border — matches stripe priority
+        const cardBorderColor = isFirst
+          ? 'rgba(212,160,23,0.55)'
+          : isMe
+          ? 'rgba(59,130,246,0.5)'
+          : hasControl
+          ? 'rgba(0,200,180,0.45)'
+          : 'var(--border-default)'
+
+        // Extra CSS class for animated states
+        const cardAnimClass = isFirst
+          ? 'scoreboard-card--buzzed-first'
+          : isMe
+          ? 'scoreboard-card--me'
+          : ''
 
         return (
           <div
             key={p.id}
-            className="flex flex-col items-center transition-all"
+            className={`flex transition-all ${cardAnimClass}`}
             style={{
               minWidth: 110,
               maxWidth: 180,
               flex: '1 1 110px',
-              opacity: p.isConnected ? 1 : 0.5,
-              background: isHighlighted
-                ? 'rgba(212,160,23,0.13)'
-                : isFirst
+              background: isFirst
                 ? 'rgba(212,160,23,0.07)'
-                : 'var(--navy)',
-              border: `1px solid ${isFirst ? 'rgba(212,160,23,0.45)' : 'var(--navy-light)'}`,
+                : isHighlighted
+                ? 'rgba(212,160,23,0.10)'
+                : hasControl
+                ? 'rgba(0,200,180,0.05)'
+                : 'var(--bg-elevated)',
+              border: `1px solid ${cardBorderColor}`,
               borderRadius: 10,
               position: 'relative',
+              overflow: 'hidden',
             }}
           >
             {reaction && (
@@ -88,9 +124,52 @@ export default function Scoreboard({
               </div>
             )}
 
-            <div style={{ width: '100%', height: 4, background: accentColor, flexShrink: 0, borderRadius: '10px 10px 0 0' }} />
+            {/* Left accent stripe */}
+            <div
+              style={{
+                width: 4,
+                background: stripeColor,
+                flexShrink: 0,
+                borderRadius: '10px 0 0 10px',
+                transition: 'background 0.3s',
+              }}
+            />
 
-            <div className="flex flex-col items-center gap-1 px-3 pt-2 pb-2 w-full">
+            {/* Card content */}
+            <div className="flex flex-col gap-1 px-2.5 pt-2 pb-2 w-full min-w-0">
+
+              {/* Top row: rank badge + connection dot */}
+              <div className="flex items-center justify-between">
+                <span
+                  className="font-condensed font-bold leading-none"
+                  style={{
+                    fontSize: 11,
+                    color: getRankColor(rank),
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  #{rank}
+                </span>
+
+                {/* Connection status dot */}
+                <span
+                  title={p.isConnected ? 'Online' : 'Offline'}
+                  style={{
+                    display: 'inline-block',
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: p.isConnected ? 'var(--success)' : '#3a3f5c',
+                    boxShadow: p.isConnected
+                      ? '0 0 5px rgba(34,197,94,0.55)'
+                      : 'none',
+                    flexShrink: 0,
+                    transition: 'background 0.3s',
+                  }}
+                />
+              </div>
+
+              {/* Emoji picker button (only for own card when callback provided) */}
               {isMe && onEmojiSelect && (
                 <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center' }}>
                   <button
@@ -160,46 +239,83 @@ export default function Scoreboard({
                 </div>
               )}
 
-              <div
-                className="font-condensed font-bold text-sm text-center w-full truncate"
-                style={{ color: isHighlighted ? 'var(--gold-bright)' : 'var(--white)' }}
-                title={p.name}
-              >
-                {p.name}
-                {!p.isConnected && (
-                  <span className="ml-1 text-xs" style={{ color: '#4a5580', fontWeight: 400 }}>
-                    (offline)
+              {/* Name row */}
+              <div className="flex items-center gap-1 min-w-0">
+                <span
+                  className="font-condensed font-bold text-sm truncate flex-1"
+                  style={{ color: isHighlighted ? 'var(--gold-bright)' : 'var(--white)' }}
+                  title={p.name}
+                >
+                  {p.name}
+                </span>
+
+                {/* YOU tag */}
+                {isHighlighted && (
+                  <span
+                    className="font-condensed font-bold shrink-0"
+                    style={{
+                      fontSize: 9,
+                      letterSpacing: '0.06em',
+                      background: 'rgba(212,160,23,0.2)',
+                      color: 'var(--gold-bright)',
+                      border: '1px solid rgba(212,160,23,0.45)',
+                      borderRadius: 3,
+                      padding: '1px 4px',
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    YOU
                   </span>
                 )}
               </div>
 
+              {/* Score */}
               <div
-                className="font-display text-2xl leading-none"
-                style={{ color: p.score < 0 ? '#e07070' : 'var(--gold-bright)' }}
+                className="font-display leading-none"
+                style={{
+                  fontSize: '1.6rem',
+                  color: p.score < 0 ? '#e07070' : 'var(--gold-bright)',
+                  fontVariantNumeric: 'tabular-nums',
+                  letterSpacing: '-0.01em',
+                }}
               >
                 {formatScore(p.score)}
               </div>
 
-              <div className="flex flex-wrap gap-1 justify-center mt-1" style={{ minHeight: 22 }}>
+              {/* State badges */}
+              <div className="flex flex-wrap gap-1 mt-0.5" style={{ minHeight: 20 }}>
                 {hasControl && (
                   <span
-                    className="font-condensed text-xs px-2 py-0.5 rounded"
+                    className="font-condensed font-bold"
                     style={{
-                      background: 'rgba(0,200,180,0.2)',
+                      fontSize: 9,
+                      letterSpacing: '0.07em',
+                      textTransform: 'uppercase',
+                      background: 'rgba(0,200,180,0.15)',
                       color: '#40e0d0',
-                      border: '1px solid rgba(0,200,180,0.45)',
+                      border: '1px solid rgba(0,200,180,0.4)',
+                      borderRadius: 3,
+                      padding: '1px 5px',
+                      lineHeight: 1.5,
+                      whiteSpace: 'nowrap',
                     }}
                   >
-                    BOARD
+                    BOARD CONTROL
                   </span>
                 )}
                 {isBuzzed && (
                   <span
-                    className="font-condensed text-xs px-2 py-0.5 rounded"
+                    className="font-condensed font-bold"
                     style={{
-                      background: isFirst ? 'rgba(212,160,23,0.3)' : 'rgba(74,85,128,0.3)',
+                      fontSize: 9,
+                      letterSpacing: '0.07em',
+                      textTransform: 'uppercase',
+                      background: isFirst ? 'rgba(212,160,23,0.25)' : 'rgba(74,85,128,0.25)',
                       color: isFirst ? 'var(--gold-bright)' : '#8899cc',
-                      border: `1px solid ${isFirst ? 'rgba(212,160,23,0.5)' : 'rgba(74,85,128,0.5)'}`,
+                      border: `1px solid ${isFirst ? 'rgba(212,160,23,0.5)' : 'rgba(74,85,128,0.4)'}`,
+                      borderRadius: 3,
+                      padding: '1px 5px',
+                      lineHeight: 1.5,
                     }}
                   >
                     {isFirst ? 'BUZZED' : `#${buzzPos + 1}`}
@@ -207,17 +323,6 @@ export default function Scoreboard({
                 )}
               </div>
             </div>
-
-            <div
-              style={{
-                width: '100%',
-                height: 6,
-                background: accentColor,
-                opacity: 0.35,
-                flexShrink: 0,
-                borderRadius: '0 0 10px 10px',
-              }}
-            />
           </div>
         )
       })}
