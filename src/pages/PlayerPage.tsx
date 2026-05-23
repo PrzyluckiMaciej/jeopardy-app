@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, X, LogOut, ListOrdered } from 'lucide-react'
+import { LogOut } from 'lucide-react'
+import PlayerActionZone from '../components/PlayerActionZone'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useGameStore } from '../store/gameStore'
 import * as net from '../lib/network'
@@ -376,13 +377,13 @@ export default function PlayerPage() {
   const ddPlayerInfo = state.dailyDouble ? state.players.find(p => p.id === state.dailyDouble!.playerId) : null
   const clueBlurred = settings.blurClueOnBuzz && uiPhase === 'buzzing' && state.buzzQueue.length > 0
   const buzzingOpen = uiPhase === 'buzzing'
-  const showBuzzDock =
-    !isDD && (uiPhase === 'question' || buzzingOpen) && !judgeResult && !buzzedOut
-  const showPlayerActionZone = judgeResult != null || (!isDD && showBuzzDock)
+  const canShowBuzzDock =
+    !isDD && (uiPhase === 'question' || buzzingOpen) && !buzzedOut
+  const showPlayerActionZone = judgeResult != null || canShowBuzzDock
   const showSidebarPanel =
     uiPhase === 'dailyDouble' ||
     (isDD && (uiPhase === 'dailyDoubleBet' || uiPhase === 'question')) ||
-    showPlayerActionZone
+    (showPlayerActionZone && !isMobileViewport)
   const showBuzzQueuePanel = !isDD && state.buzzQueue.length > 0
   const showBuzzQueueInSidebar = showBuzzQueuePanel && !isMobileViewport
   const showBuzzQueueMobileToggle = showBuzzQueuePanel && isMobileViewport
@@ -424,6 +425,26 @@ export default function PlayerPage() {
     if (e.target !== e.currentTarget || e.propertyName !== 'opacity') return
     if (!buzzQueuePopupVisible) setBuzzQueuePopupActive(false)
   }
+
+  const playerActionZoneProps = {
+    canShowBuzzDock,
+    judgeResult,
+    buzzingOpen,
+    hasBuzzed,
+    isMyTurn,
+    myQueuePosition,
+    buzzQueueLength: state.buzzQueue.length,
+    onBuzz: handleBuzz,
+    showBuzzQueueMobileToggle,
+    buzzQueuePopupActive,
+    buzzQueuePopupVisible,
+    onToggleBuzzQueuePopup: toggleBuzzQueuePopup,
+    onBuzzQueuePopupTransitionEnd: handleBuzzQueuePopupTransitionEnd,
+    buzzQueue: state.buzzQueue,
+    players: state.players,
+    myId,
+  }
+
   const reservePlayerBuzzSpace =
     !isDD && ['question', 'buzzing', 'revealed'].includes(uiPhase)
 
@@ -799,117 +820,9 @@ export default function PlayerPage() {
                   </div>
                 )}
 
-                {/* Buzzer + judge feedback share a fixed-size zone */}
-                {showPlayerActionZone && (
-                  <div className="player-action-zone" data-mobile-dock>
-                    <div className="player-action-zone__cluster">
-                      {showBuzzQueueMobileToggle && buzzQueuePopupActive && (
-                        <div
-                          className={`player-buzz-queue-popup panel flex flex-col gap-2${buzzQueuePopupVisible ? ' player-buzz-queue-popup--visible' : ''}`}
-                          role="dialog"
-                          aria-label="Buzz queue"
-                          aria-hidden={!buzzQueuePopupVisible}
-                          onTransitionEnd={handleBuzzQueuePopupTransitionEnd}
-                        >
-                          <div className="buzz-queue-panel__label font-condensed text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--gold)', opacity: 0.7 }}>
-                            Buzz queue
-                          </div>
-                          {state.buzzQueue.map((pid, idx) => {
-                            const p = state.players.find((pl) => pl.id === pid)
-                            if (!p) return null
-                            return (
-                              <div key={pid} className="buzz-queue-entry">
-                                <span className="buzz-queue-entry__score text-xs">
-                                  {p.score < 0 ? `-$${Math.abs(p.score)}` : `$${p.score}`}
-                                </span>
-                                <span
-                                  className="buzz-queue-entry__name font-condensed font-bold text-sm"
-                                  style={{ color: pid === myId ? 'var(--gold-bright)' : undefined }}
-                                >
-                                  {p.name}{pid === myId ? ' (you)' : ''}
-                                </span>
-                                <span className="buzz-queue-entry__rank text-xs">#{idx + 1}</span>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
-                      <div className="player-action-zone__row">
-                        {showBuzzDock && (
-                          <div className="player-buzz-dock">
-                            <button
-                              type="button"
-                              className={[
-                                'player-buzz-btn font-display',
-                                !buzzingOpen
-                                  ? 'player-buzz-btn--waiting'
-                                  : hasBuzzed
-                                    ? isMyTurn
-                                      ? 'player-buzz-btn--my-turn'
-                                      : 'player-buzz-btn--queued'
-                                    : 'player-buzz-btn--ready buzz-btn',
-                              ].join(' ')}
-                              onClick={handleBuzz}
-                              disabled={!buzzingOpen || hasBuzzed}
-                              aria-disabled={!buzzingOpen || hasBuzzed}
-                            >
-                              {hasBuzzed
-                                ? isMyTurn
-                                  ? (
-                                    <span className="player-buzz-btn__turn-label">
-                                      <span>Your</span>
-                                      <span>turn</span>
-                                    </span>
-                                  )
-                                  : `#${myQueuePosition} in queue`
-                                : 'BUZZ!'}
-                            </button>
-                            <div className="player-buzz-dock__hint font-condensed text-sm text-center">
-                              {!buzzingOpen
-                                ? 'Waiting for host to open buzzing…'
-                                : !hasBuzzed
-                                  ? state.buzzQueue.length > 0
-                                    ? `${state.buzzQueue.length} player${state.buzzQueue.length > 1 ? 's' : ''} buzzed`
-                                    : 'Be first to buzz!'
-                                  : null}
-                            </div>
-                          </div>
-                        )}
-                        {judgeResult && (
-                          <div
-                            key={judgeResult}
-                            className="player-judge-result overlay-sidebar-enter font-display text-2xl text-center rounded-xl"
-                            data-result={judgeResult}
-                          >
-                            {judgeResult === 'correct' ? (
-                              <span className="inline-flex items-center justify-center gap-2">
-                                <Check size={22} aria-hidden />
-                                Correct!
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center justify-center gap-2">
-                                <X size={22} aria-hidden />
-                                Wrong
-                              </span>
-                            )}
-                          </div>
-                        )}
-                        {showBuzzQueueMobileToggle && (
-                          <button
-                            type="button"
-                            className="player-buzz-queue-toggle"
-                            onClick={toggleBuzzQueuePopup}
-                            aria-expanded={buzzQueuePopupVisible}
-                            aria-label={buzzQueuePopupVisible ? 'Hide buzz queue' : 'Show buzz queue'}
-                            title={buzzQueuePopupVisible ? 'Hide buzz queue' : 'Show buzz queue'}
-                          >
-                            <ListOrdered size={20} aria-hidden />
-                            <span className="player-buzz-queue-toggle__count">{state.buzzQueue.length}</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                {/* Buzzer + judge feedback (desktop — in sidebar) */}
+                {showPlayerActionZone && !isMobileViewport && (
+                  <PlayerActionZone {...playerActionZoneProps} />
                 )}
               </div>
               )}
@@ -943,6 +856,11 @@ export default function PlayerPage() {
             </aside>
             )}
           </div>
+
+          {/* Buzzer + judge feedback (mobile — fixed dock, outside sidebar flow) */}
+          {showPlayerActionZone && !isDD && isMobileViewport && (
+            <PlayerActionZone {...playerActionZoneProps} />
+          )}
         </div>
       )}
     </div>
