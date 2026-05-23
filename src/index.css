@@ -748,8 +748,8 @@ select:focus-visible {
 
 /* ── Host board toolbar ─────────────────────────────────────── */
 .host-board-toolbar {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: var(--space-sm);
   flex-shrink: 0;
@@ -758,20 +758,110 @@ select:focus-visible {
   padding-left: max(24px, env(safe-area-inset-left, 0px));
   padding-right: max(24px, env(safe-area-inset-right, 0px));
 }
-.host-board-toolbar__primary {
+.host-board-toolbar__left,
+.host-board-toolbar__right {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
   flex-wrap: wrap;
-  flex: 1 1 auto;
   min-width: 0;
 }
-.host-board-toolbar__nav,
-.host-board-toolbar__destructive {
+.host-board-toolbar__left {
+  justify-content: flex-start;
+}
+.host-board-toolbar__right {
+  justify-content: flex-end;
+}
+.host-board-toolbar__center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  min-width: 0;
+  text-align: center;
+}
+.host-board-toolbar__title {
+  color: var(--gold);
+  font-size: 1.125rem;
+  letter-spacing: 0.04em;
+  max-width: min(420px, 100%);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.host-board-toolbar__nav {
   display: flex;
   align-items: center;
   gap: var(--space-xs);
   flex-shrink: 0;
+}
+
+/* Board editor — edit mode toolbar */
+.board-editor-toolbar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-lg);
+  flex-shrink: 0;
+  background: rgba(59, 130, 246, 0.09);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+.board-editor-toolbar__left,
+.board-editor-toolbar__right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.board-editor-toolbar__left {
+  justify-content: flex-start;
+}
+.board-editor-toolbar__right {
+  justify-content: flex-end;
+}
+.board-editor-toolbar__center {
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+.board-editor-toolbar__badge {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 0.8125rem;
+  line-height: 1;
+  padding: 0.45rem 0.75rem;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: rgba(59, 130, 246, 0.28);
+  border: 1px solid rgba(96, 165, 250, 0.65);
+  color: #93c5fd;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.2);
+}
+.board-editor-toolbar__name {
+  width: min(360px, 100%);
+  text-align: center;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid rgba(59, 130, 246, 0.4);
+  color: var(--gold-bright);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  border-radius: 0;
+  padding: 0.15rem 0;
+  box-shadow: none;
+}
+.board-editor-toolbar__name:focus {
+  outline: none;
+  border-bottom-color: rgba(96, 165, 250, 0.75);
 }
 
 /* ── Board horizontal scroll with edge fade hint ────────────── */
@@ -1738,20 +1828,27 @@ select:focus-visible {
     min-height: 44px;
   }
 
-  .host-board-toolbar {
-    flex-direction: column;
-    align-items: stretch;
+  .host-board-toolbar,
+  .board-editor-toolbar {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
   }
-  .host-board-toolbar__primary,
-  .host-board-toolbar__nav,
-  .host-board-toolbar__destructive {
-    justify-content: flex-start;
+  .host-board-toolbar__left,
+  .host-board-toolbar__center,
+  .host-board-toolbar__right,
+  .board-editor-toolbar__left,
+  .board-editor-toolbar__center,
+  .board-editor-toolbar__right {
+    justify-content: center;
     width: 100%;
   }
-  .host-board-toolbar__nav {
-    justify-content: center;
+  .host-board-toolbar__right {
     padding-top: var(--space-xs);
     border-top: 1px solid var(--border-subtle);
+  }
+  .board-editor-toolbar__right {
+    padding-top: var(--space-xs);
+    border-top: 1px solid rgba(59, 130, 246, 0.2);
   }
 
   .board-picker-overlay {

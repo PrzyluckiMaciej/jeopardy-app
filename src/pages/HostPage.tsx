@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Settings, Trash2, Pencil, Check, FolderOpen, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, Plus, RotateCcw, Shuffle, X } from 'lucide-react'
+import { Settings, Trash2, Pencil, Check, FolderOpen, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, RotateCcw, Shuffle, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useGameStore, useBoardStore } from '../store/gameStore'
 import * as net from '../lib/network'
@@ -577,7 +577,7 @@ export default function HostPage() {
                 {/* Toolbar — sits directly below top bar with fixed spacing */}
                 {!editing && (
                   <div className="host-board-toolbar">
-                    <div className="host-board-toolbar__primary">
+                    <div className="host-board-toolbar__left">
                       <button
                         className="btn-outline text-sm btn-with-icon"
                         onClick={openBoardPicker}
@@ -586,16 +586,21 @@ export default function HostPage() {
                         <LayoutGrid size={16} aria-hidden />
                         <span>Select</span>
                       </button>
-                      <button
-                        className="btn-ghost text-sm btn-with-icon"
-                        onClick={() => { if (board) setEditing(true); else handleNewBoard() }}
-                        title={board ? 'Edit the current board' : 'Create a new board'}
-                      >
-                        {board ? <Pencil size={16} aria-hidden /> : <Plus size={16} aria-hidden />}
-                        <span>{board ? 'Edit' : 'New'}</span>
-                      </button>
                       {board && (
-                        <span className="font-condensed font-bold" style={{ color: 'var(--gold)' }}>
+                        <button
+                          className="btn-ghost text-sm btn-with-icon"
+                          onClick={() => setEditing(true)}
+                          title="Edit the current board"
+                        >
+                          <Pencil size={16} aria-hidden />
+                          <span>Edit</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="host-board-toolbar__center">
+                      {board && (
+                        <span className="host-board-toolbar__title font-condensed font-bold">
                           {board.name}
                         </span>
                       )}
@@ -609,28 +614,27 @@ export default function HostPage() {
                       )}
                     </div>
 
-                    {inGame && (
-                      <div className="host-board-toolbar__nav">
-                        <button
-                          className="btn-ghost text-sm btn-icon-only"
-                          onClick={handlePrevBoard}
-                          title={state.currentBoardIndex === 0 ? 'Back to start' : 'Previous board'}
-                          aria-label={state.currentBoardIndex === 0 ? 'Back to start' : 'Previous board'}
-                        >
-                          <ChevronLeft size={18} aria-hidden />
-                        </button>
-                        <button
-                          className="btn-ghost text-sm btn-icon-only"
-                          onClick={handleNextBoard}
-                          title={state.currentBoardIndex >= state.gameBoardIds.length - 1 ? 'Go to podium' : 'Next board'}
-                          aria-label={state.currentBoardIndex >= state.gameBoardIds.length - 1 ? 'Go to podium' : 'Next board'}
-                        >
-                          <ChevronRight size={18} aria-hidden />
-                        </button>
-                      </div>
-                    )}
-
-                    <div className="host-board-toolbar__destructive">
+                    <div className="host-board-toolbar__right">
+                      {inGame && (
+                        <div className="host-board-toolbar__nav">
+                          <button
+                            className="btn-ghost text-sm btn-icon-only"
+                            onClick={handlePrevBoard}
+                            title={state.currentBoardIndex === 0 ? 'Back to start' : 'Previous board'}
+                            aria-label={state.currentBoardIndex === 0 ? 'Back to start' : 'Previous board'}
+                          >
+                            <ChevronLeft size={18} aria-hidden />
+                          </button>
+                          <button
+                            className="btn-ghost text-sm btn-icon-only"
+                            onClick={handleNextBoard}
+                            title={state.currentBoardIndex >= state.gameBoardIds.length - 1 ? 'Go to podium' : 'Next board'}
+                            aria-label={state.currentBoardIndex >= state.gameBoardIds.length - 1 ? 'Go to podium' : 'Next board'}
+                          >
+                            <ChevronRight size={18} aria-hidden />
+                          </button>
+                        </div>
+                      )}
                       {board && !inGame && (
                         <button
                           className="btn-ghost text-sm btn-icon-only"
