@@ -172,7 +172,6 @@ export default function PlayerPage() {
         })
         if (playerId === myId) {
           setJudgeResult(correct ? 'correct' : 'wrong')
-          setTimeout(() => setJudgeResult(null), 2500)
         }
       }
       if (msg.type === 'REVEAL_ANSWER') {
@@ -374,7 +373,7 @@ export default function PlayerPage() {
   const buzzingOpen = uiPhase === 'buzzing'
   const showBuzzDock =
     !isDD && (uiPhase === 'question' || buzzingOpen) && !judgeResult && !buzzedOut
-  const showPlayerActionZone = !isDD && (showBuzzDock || judgeResult != null)
+  const showPlayerActionZone = judgeResult != null || (!isDD && showBuzzDock)
   const showSidebarPanel =
     uiPhase === 'dailyDouble' ||
     (isDD && (uiPhase === 'dailyDoubleBet' || uiPhase === 'question')) ||
