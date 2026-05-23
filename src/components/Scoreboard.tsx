@@ -344,11 +344,6 @@ export default function Scoreboard({
                   title={p.name}
                 >
                   {p.name}
-                  {st.isMe && (
-                    <span className="ml-1 opacity-60" style={{ fontSize: 10 }}>
-                      YOU
-                    </span>
-                  )}
                 </div>
 
                 <div
@@ -411,7 +406,6 @@ export default function Scoreboard({
                   />
                   <span className="scoreboard-list-item__name" title={p.name}>
                     {p.name}
-                    {st.isMe && <span className="opacity-60"> (you)</span>}
                   </span>
                   {st.isMe && onEmojiSelect && (
                     <button
