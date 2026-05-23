@@ -387,6 +387,16 @@ export default function PlayerPage() {
   const showBuzzQueueInSidebar = showBuzzQueuePanel && !isMobileViewport
   const showBuzzQueueMobileToggle = showBuzzQueuePanel && isMobileViewport
   const showSidebar = showSidebarPanel || showBuzzQueueInSidebar
+  const buzzQueuePopupVisible = buzzQueuePopupOpen && showBuzzQueuePanel
+
+  const [prevShowBuzzQueuePanel, setPrevShowBuzzQueuePanel] = useState(showBuzzQueuePanel)
+  if (showBuzzQueuePanel !== prevShowBuzzQueuePanel) {
+    setPrevShowBuzzQueuePanel(showBuzzQueuePanel)
+    if (!showBuzzQueuePanel) {
+      setBuzzQueuePopupOpen(false)
+      setBuzzQueuePopupActive(false)
+    }
+  }
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)')
@@ -396,12 +406,8 @@ export default function PlayerPage() {
     return () => mq.removeEventListener('change', onChange)
   }, [])
 
-  useEffect(() => {
-    if (!showBuzzQueuePanel) setBuzzQueuePopupOpen(false)
-  }, [showBuzzQueuePanel])
-
   function toggleBuzzQueuePopup() {
-    if (buzzQueuePopupOpen) {
+    if (buzzQueuePopupVisible) {
       setBuzzQueuePopupOpen(false)
       if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
         setBuzzQueuePopupActive(false)
@@ -416,7 +422,7 @@ export default function PlayerPage() {
 
   function handleBuzzQueuePopupTransitionEnd(e: React.TransitionEvent<HTMLDivElement>) {
     if (e.target !== e.currentTarget || e.propertyName !== 'opacity') return
-    if (!buzzQueuePopupOpen) setBuzzQueuePopupActive(false)
+    if (!buzzQueuePopupVisible) setBuzzQueuePopupActive(false)
   }
   const reservePlayerBuzzSpace =
     !isDD && ['question', 'buzzing', 'revealed'].includes(uiPhase)
@@ -799,10 +805,10 @@ export default function PlayerPage() {
                     <div className="player-action-zone__cluster">
                       {showBuzzQueueMobileToggle && buzzQueuePopupActive && (
                         <div
-                          className={`player-buzz-queue-popup panel flex flex-col gap-2${buzzQueuePopupOpen ? ' player-buzz-queue-popup--visible' : ''}`}
+                          className={`player-buzz-queue-popup panel flex flex-col gap-2${buzzQueuePopupVisible ? ' player-buzz-queue-popup--visible' : ''}`}
                           role="dialog"
                           aria-label="Buzz queue"
-                          aria-hidden={!buzzQueuePopupOpen}
+                          aria-hidden={!buzzQueuePopupVisible}
                           onTransitionEnd={handleBuzzQueuePopupTransitionEnd}
                         >
                           <div className="buzz-queue-panel__label font-condensed text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--gold)', opacity: 0.7 }}>
@@ -893,9 +899,9 @@ export default function PlayerPage() {
                             type="button"
                             className="player-buzz-queue-toggle"
                             onClick={toggleBuzzQueuePopup}
-                            aria-expanded={buzzQueuePopupOpen}
-                            aria-label={buzzQueuePopupOpen ? 'Hide buzz queue' : 'Show buzz queue'}
-                            title={buzzQueuePopupOpen ? 'Hide buzz queue' : 'Show buzz queue'}
+                            aria-expanded={buzzQueuePopupVisible}
+                            aria-label={buzzQueuePopupVisible ? 'Hide buzz queue' : 'Show buzz queue'}
+                            title={buzzQueuePopupVisible ? 'Hide buzz queue' : 'Show buzz queue'}
                           >
                             <ListOrdered size={20} aria-hidden />
                             <span className="player-buzz-queue-toggle__count">{state.buzzQueue.length}</span>
