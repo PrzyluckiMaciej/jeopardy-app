@@ -1314,11 +1314,37 @@ select:focus-visible {
   mask-composite: exclude;
   pointer-events: none;
 }
+.landing-card__body {
+  overflow: hidden;
+  transition: height 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes landingPanelIn {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+.landing-card-panel--enter {
+  animation: landingPanelIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-card__body {
+    transition: none;
+  }
+  .landing-card-panel--enter {
+    animation: none;
+  }
+}
 
 .landing-join-fields {
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
+}
+.landing-back-btn {
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+.landing-back-btn:focus:not(:focus-visible) {
+  outline: none;
 }
 .landing-join-field {
   display: flex;
