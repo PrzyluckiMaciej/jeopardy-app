@@ -376,10 +376,10 @@ export default function PlayerPage() {
   const showPlayerActionZone = judgeResult != null || (!isDD && showBuzzDock)
   const showSidebarPanel =
     uiPhase === 'dailyDouble' ||
-    (isDD && (uiPhase === 'dailyDoubleBet' || uiPhase === 'question')) ||
-    showPlayerActionZone
+    (isDD && (uiPhase === 'dailyDoubleBet' || uiPhase === 'question'))
   const showBuzzQueuePanel = !isDD && state.buzzQueue.length > 0
   const showSidebar = showSidebarPanel || showBuzzQueuePanel
+  const showPlayerDock = showPlayerActionZone
 
   function handleSubmitWager() {
     const wager = parseInt(ddWagerInput, 10)
@@ -608,7 +608,7 @@ export default function PlayerPage() {
             </div>
           </header>
 
-          <div className={`question-overlay-layout question-overlay-layout--player${showPlayerActionZone ? ' question-overlay-layout--has-buzz' : ''}`}>
+          <div className="question-overlay-layout question-overlay-layout--player">
             <div className={`question-overlay-main ${overlayExiting ? 'card-flip-exit' : 'card-flip'}`}>
               {/* DD title splash */}
               {uiPhase === 'dailyDouble' && (
@@ -632,10 +632,10 @@ export default function PlayerPage() {
 
               {/* Clue (shown in question/buzzing/revealed phases) */}
               {(uiPhase === 'question' || uiPhase === 'buzzing' || uiPhase === 'revealed') && (
-                <div key={`clue-${clueRevealKey}`} className="flex flex-col items-center w-full max-w-2xl">
+                <div key={`clue-${clueRevealKey}`} className="player-overlay-clue flex flex-col items-center w-full max-w-2xl">
                   {displayMedia && (
                     <div
-                      className="mb-6 clue-reveal"
+                      className="player-overlay-clue__media clue-reveal"
                       style={{
                         filter: clueBlurred ? 'blur(8px)' : 'none',
                         transition: 'filter 0.3s ease',
@@ -654,7 +654,7 @@ export default function PlayerPage() {
                   )}
 
                   <div
-                    className={`font-condensed font-bold text-3xl md:text-4xl leading-snug mb-6 max-w-2xl${displayMedia ? '' : ' clue-reveal'}`}
+                    className={`player-overlay-clue__text font-condensed font-bold text-3xl md:text-4xl leading-snug max-w-2xl${displayMedia ? '' : ' clue-reveal'}`}
                     style={{
                       color: 'var(--white)',
                       filter: clueBlurred ? 'blur(8px)' : 'none',
@@ -668,7 +668,7 @@ export default function PlayerPage() {
                   {uiPhase === 'revealed' && (
                     <div
                       key={`answer-${answerRevealKey}`}
-                      className="font-display text-2xl md:text-3xl px-6 py-3 rounded-lg mt-2 answer-reveal"
+                      className="player-overlay-clue__answer font-display text-2xl md:text-3xl px-6 py-3 rounded-lg answer-reveal"
                       style={{ background: 'rgba(212,160,23,0.15)', border: '2px solid var(--gold)', color: 'var(--gold-bright)' }}
                     >
                       {displayQ.answer || '—'}
@@ -677,6 +677,72 @@ export default function PlayerPage() {
                 </div>
               )}
             </div>
+
+            {showPlayerDock && (
+              <div className="player-overlay-dock">
+                <div className="player-action-zone">
+                  {showBuzzDock && (
+                    <div className="player-buzz-dock">
+                      <button
+                        type="button"
+                        className={[
+                          'player-buzz-btn font-display',
+                          !buzzingOpen
+                            ? 'player-buzz-btn--waiting'
+                            : hasBuzzed
+                              ? isMyTurn
+                                ? 'player-buzz-btn--my-turn'
+                                : 'player-buzz-btn--queued'
+                              : 'player-buzz-btn--ready buzz-btn',
+                        ].join(' ')}
+                        onClick={handleBuzz}
+                        disabled={!buzzingOpen || hasBuzzed}
+                        aria-disabled={!buzzingOpen || hasBuzzed}
+                      >
+                        {hasBuzzed
+                          ? isMyTurn
+                            ? (
+                              <span className="player-buzz-btn__turn-label">
+                                <span>Your</span>
+                                <span>turn</span>
+                              </span>
+                            )
+                            : `#${myQueuePosition} in queue`
+                          : 'BUZZ!'}
+                      </button>
+                      <div className="player-buzz-dock__hint font-condensed text-sm text-center">
+                        {!buzzingOpen
+                          ? 'Waiting for host to open buzzing…'
+                          : !hasBuzzed
+                            ? state.buzzQueue.length > 0
+                              ? `${state.buzzQueue.length} player${state.buzzQueue.length > 1 ? 's' : ''} buzzed`
+                              : 'Be first to buzz!'
+                            : null}
+                      </div>
+                    </div>
+                  )}
+                  {judgeResult && (
+                    <div
+                      key={judgeResult}
+                      className="player-judge-result overlay-sidebar-enter font-display text-2xl text-center rounded-xl w-full"
+                      data-result={judgeResult}
+                    >
+                      {judgeResult === 'correct' ? (
+                        <span className="inline-flex items-center justify-center gap-2">
+                          <Check size={22} aria-hidden />
+                          Correct!
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center justify-center gap-2">
+                          <X size={22} aria-hidden />
+                          Wrong
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {showSidebar && (
             <aside className="question-overlay-sidebar">
@@ -756,70 +822,6 @@ export default function PlayerPage() {
                   </div>
                 )}
 
-                {/* Buzzer + judge feedback share a fixed-size zone */}
-                {showPlayerActionZone && (
-                  <div className="player-action-zone" data-mobile-dock>
-                    {showBuzzDock && (
-                      <div className="player-buzz-dock">
-                        <button
-                          type="button"
-                          className={[
-                            'player-buzz-btn font-display',
-                            !buzzingOpen
-                              ? 'player-buzz-btn--waiting'
-                              : hasBuzzed
-                                ? isMyTurn
-                                  ? 'player-buzz-btn--my-turn'
-                                  : 'player-buzz-btn--queued'
-                                : 'player-buzz-btn--ready buzz-btn',
-                          ].join(' ')}
-                          onClick={handleBuzz}
-                          disabled={!buzzingOpen || hasBuzzed}
-                          aria-disabled={!buzzingOpen || hasBuzzed}
-                        >
-                          {hasBuzzed
-                            ? isMyTurn
-                              ? (
-                                <span className="player-buzz-btn__turn-label">
-                                  <span>Your</span>
-                                  <span>turn</span>
-                                </span>
-                              )
-                              : `#${myQueuePosition} in queue`
-                            : 'BUZZ!'}
-                        </button>
-                        <div className="player-buzz-dock__hint font-condensed text-sm text-center">
-                          {!buzzingOpen
-                            ? 'Waiting for host to open buzzing…'
-                            : !hasBuzzed
-                              ? state.buzzQueue.length > 0
-                                ? `${state.buzzQueue.length} player${state.buzzQueue.length > 1 ? 's' : ''} buzzed`
-                                : 'Be first to buzz!'
-                              : null}
-                        </div>
-                      </div>
-                    )}
-                    {judgeResult && (
-                      <div
-                        key={judgeResult}
-                        className="player-judge-result overlay-sidebar-enter font-display text-2xl text-center rounded-xl w-full"
-                        data-result={judgeResult}
-                      >
-                        {judgeResult === 'correct' ? (
-                          <span className="inline-flex items-center justify-center gap-2">
-                            <Check size={22} aria-hidden />
-                            Correct!
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center justify-center gap-2">
-                            <X size={22} aria-hidden />
-                            Wrong
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
               )}
 
