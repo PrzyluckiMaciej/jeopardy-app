@@ -480,9 +480,6 @@ export default function PlayerPage() {
           JEOPARDY!
         </div>
         <div className="player-topbar__meta">
-          {state.boardControlId === myId && (
-            <span className="player-topbar__turn-badge">YOUR TURN</span>
-          )}
           <div className="player-topbar__identity">
             <span className="player-topbar__name font-condensed font-bold" style={{ color: 'var(--white)' }}>
               {myPlayer?.name ?? playerName}
