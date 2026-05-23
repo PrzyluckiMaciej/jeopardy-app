@@ -92,7 +92,6 @@ export default function HostPage() {
     }
 
     net.onPeerJoin((peerId) => {
-      pruneStalePlayers(peerToClient.current, setPlayerConnected, markPlayerLeft)
       const current = useGameStore.getState()
       net.send({ type: 'SYNC_STATE', state: current.state }, peerId)
     })
@@ -116,29 +115,36 @@ export default function HostPage() {
 
     net.onMessage((msg: NetMessage, peerId: string) => {
       if (msg.type === 'PLAYER_JOIN') {
-        pruneStalePlayers(peerToClient.current, setPlayerConnected, markPlayerLeft)
-
         const joiningId = msg.player.id
         const players = useGameStore.getState().state.players
         const livePeers = new Set(net.getConnectedPeerIds())
+        const peerMap = peerToClient.current
+
+        const liveOccupant = players.find(
+          p => p.name === msg.player.name && isClientPeerLive(peerMap, p.id, livePeers)
+        )
+        if (liveOccupant && liveOccupant.id !== joiningId) {
+          net.send({ type: 'JOIN_REJECTED', reason: 'NAME_TAKEN' }, peerId)
+          return
+        }
+        if (liveOccupant?.id === joiningId) {
+          const currentPeer = findPeerForClient(peerMap, joiningId)
+          if (currentPeer && livePeers.has(currentPeer) && currentPeer !== peerId) {
+            net.send({ type: 'JOIN_REJECTED', reason: 'NAME_TAKEN' }, peerId)
+            return
+          }
+        }
+
         const existingById = players.find(p => p.id === joiningId)
         const existingByName = players.find(
           p => p.name === msg.player.name && !p.isConnected
         )
-        const staleByName = players.find(
+        const ghostByName = players.find(
           p => p.name === msg.player.name && p.isConnected
-            && !isClientPeerLive(peerToClient.current, p.id, livePeers)
+            && !isClientPeerLive(peerMap, p.id, livePeers)
         )
-        const existing = existingById ?? existingByName ?? staleByName
+        const existing = existingById ?? existingByName ?? ghostByName
         const playerId = existing?.id ?? joiningId
-
-        const nameTaken = !existing && players.some(
-          p => p.name === msg.player.name && p.isConnected
-        )
-        if (nameTaken) {
-          net.send({ type: 'JOIN_REJECTED', reason: 'NAME_TAKEN' }, peerId)
-          return
-        }
 
         for (const [oldPeerId, cid] of peerToClient.current.entries()) {
           if ((cid === playerId || cid === joiningId) && oldPeerId !== peerId) {
