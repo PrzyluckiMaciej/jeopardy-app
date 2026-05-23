@@ -172,7 +172,6 @@ export default function PlayerPage() {
         })
         if (playerId === myId) {
           setJudgeResult(correct ? 'correct' : 'wrong')
-          setTimeout(() => setJudgeResult(null), 2500)
         }
       }
       if (msg.type === 'REVEAL_ANSWER') {
@@ -374,8 +373,15 @@ export default function PlayerPage() {
   const buzzingOpen = uiPhase === 'buzzing'
   const showBuzzDock =
     !isDD && (uiPhase === 'question' || buzzingOpen) && !judgeResult && !buzzedOut
-  const showPlayerActionZone =
-    !isDD && (uiPhase === 'question' || uiPhase === 'buzzing' || judgeResult != null)
+  const showPlayerActionZone = judgeResult != null || (!isDD && showBuzzDock)
+  const showSidebarPanel =
+    uiPhase === 'dailyDouble' ||
+    (isDD && (uiPhase === 'dailyDoubleBet' || uiPhase === 'question')) ||
+    showPlayerActionZone
+  const showBuzzQueuePanel = !isDD && state.buzzQueue.length > 0
+  const showSidebar = showSidebarPanel || showBuzzQueuePanel
+  const reservePlayerBuzzSpace =
+    !isDD && ['question', 'buzzing', 'revealed'].includes(uiPhase)
 
   function handleSubmitWager() {
     const wager = parseInt(ddWagerInput, 10)
@@ -604,7 +610,7 @@ export default function PlayerPage() {
             </div>
           </header>
 
-          <div className={`question-overlay-layout question-overlay-layout--player${showPlayerActionZone ? ' question-overlay-layout--has-buzz' : ''}`}>
+          <div className={`question-overlay-layout question-overlay-layout--player${reservePlayerBuzzSpace ? ' question-overlay-layout--has-buzz' : ''}`}>
             <div className={`question-overlay-main ${overlayExiting ? 'card-flip-exit' : 'card-flip'}`}>
               {/* DD title splash */}
               {uiPhase === 'dailyDouble' && (
@@ -631,7 +637,7 @@ export default function PlayerPage() {
                 <div key={`clue-${clueRevealKey}`} className="flex flex-col items-center w-full max-w-2xl">
                   {displayMedia && (
                     <div
-                      className="mb-6 clue-reveal"
+                      className="mb-3 clue-reveal"
                       style={{
                         filter: clueBlurred ? 'blur(8px)' : 'none',
                         transition: 'filter 0.3s ease',
@@ -650,7 +656,7 @@ export default function PlayerPage() {
                   )}
 
                   <div
-                    className={`font-condensed font-bold text-3xl md:text-4xl leading-snug mb-6 max-w-2xl${displayMedia ? '' : ' clue-reveal'}`}
+                    className={`font-condensed font-bold text-3xl md:text-4xl leading-snug mb-3 max-w-2xl${displayMedia ? '' : ' clue-reveal'}`}
                     style={{
                       color: 'var(--white)',
                       filter: clueBlurred ? 'blur(8px)' : 'none',
@@ -674,7 +680,9 @@ export default function PlayerPage() {
               )}
             </div>
 
+            {showSidebar && (
             <aside className="question-overlay-sidebar">
+              {showSidebarPanel && (
               <div className="panel flex flex-col items-center gap-3">
                 {/* DD: title phase — wager input for DD player, waiting message for others */}
                 {uiPhase === 'dailyDouble' && (
@@ -750,16 +758,6 @@ export default function PlayerPage() {
                   </div>
                 )}
 
-                {uiPhase === 'revealed' && (
-                  <div
-                    key="answer-revealed"
-                    className="overlay-status-enter font-condensed text-sm text-center"
-                    style={{ color: '#4a5580' }}
-                  >
-                    Answer revealed
-                  </div>
-                )}
-
                 {/* Buzzer + judge feedback share a fixed-size zone */}
                 {showPlayerActionZone && (
                   <div className="player-action-zone" data-mobile-dock>
@@ -825,9 +823,10 @@ export default function PlayerPage() {
                   </div>
                 )}
               </div>
+              )}
 
               {/* Buzz queue (hidden during DD) */}
-              {!isDD && state.buzzQueue.length > 0 && (
+              {showBuzzQueuePanel && (
                 <div key="buzz-queue" className="panel panel--buzz-queue overlay-sidebar-enter flex flex-col gap-2">
                   <div className="font-condensed text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--gold)', opacity: 0.7 }}>
                     Buzz queue
@@ -852,6 +851,7 @@ export default function PlayerPage() {
                 </div>
               )}
             </aside>
+            )}
           </div>
         </div>
       )}
