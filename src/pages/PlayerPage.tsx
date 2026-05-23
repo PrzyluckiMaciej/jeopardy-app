@@ -374,8 +374,13 @@ export default function PlayerPage() {
   const buzzingOpen = uiPhase === 'buzzing'
   const showBuzzDock =
     !isDD && (uiPhase === 'question' || buzzingOpen) && !judgeResult && !buzzedOut
-  const showPlayerActionZone =
-    !isDD && (uiPhase === 'question' || uiPhase === 'buzzing' || judgeResult != null)
+  const showPlayerActionZone = !isDD && (showBuzzDock || judgeResult != null)
+  const showSidebarPanel =
+    uiPhase === 'dailyDouble' ||
+    (isDD && (uiPhase === 'dailyDoubleBet' || uiPhase === 'question')) ||
+    showPlayerActionZone
+  const showBuzzQueuePanel = !isDD && state.buzzQueue.length > 0
+  const showSidebar = showSidebarPanel || showBuzzQueuePanel
 
   function handleSubmitWager() {
     const wager = parseInt(ddWagerInput, 10)
@@ -674,7 +679,9 @@ export default function PlayerPage() {
               )}
             </div>
 
+            {showSidebar && (
             <aside className="question-overlay-sidebar">
+              {showSidebarPanel && (
               <div className="panel flex flex-col items-center gap-3">
                 {/* DD: title phase — wager input for DD player, waiting message for others */}
                 {uiPhase === 'dailyDouble' && (
@@ -815,9 +822,10 @@ export default function PlayerPage() {
                   </div>
                 )}
               </div>
+              )}
 
               {/* Buzz queue (hidden during DD) */}
-              {!isDD && state.buzzQueue.length > 0 && (
+              {showBuzzQueuePanel && (
                 <div key="buzz-queue" className="panel panel--buzz-queue overlay-sidebar-enter flex flex-col gap-2">
                   <div className="font-condensed text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--gold)', opacity: 0.7 }}>
                     Buzz queue
@@ -842,6 +850,7 @@ export default function PlayerPage() {
                 </div>
               )}
             </aside>
+            )}
           </div>
         </div>
       )}
