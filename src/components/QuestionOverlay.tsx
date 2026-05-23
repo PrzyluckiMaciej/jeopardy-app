@@ -241,21 +241,21 @@ export default function QuestionOverlay({ state, settings }: Props) {
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    className="relative group w-8 h-8 rounded flex items-center justify-center judge-btn--accept"
+                    className="w-8 h-8 rounded flex items-center justify-center judge-btn--accept"
                     onClick={() => handleJudge(ddPlayer.id, true)}
+                    title="Accept answer"
                     aria-label="Accept answer"
                   >
                     <Check size={16} />
-                    <span className="judge-tooltip judge-tooltip--accept" role="tooltip">Accept</span>
                   </button>
                   <button
                     type="button"
-                    className="relative group w-8 h-8 rounded flex items-center justify-center judge-btn--decline"
+                    className="w-8 h-8 rounded flex items-center justify-center judge-btn--decline"
                     onClick={() => handleJudge(ddPlayer.id, false)}
+                    title="Decline answer"
                     aria-label="Decline answer"
                   >
                     <X size={16} />
-                    <span className="judge-tooltip judge-tooltip--decline" role="tooltip">Decline</span>
                   </button>
                 </div>
               </div>
@@ -312,25 +312,21 @@ export default function QuestionOverlay({ state, settings }: Props) {
                       <div className="flex gap-2">
                         <button
                           type="button"
-                          className="relative group w-8 h-8 rounded flex items-center justify-center judge-btn--accept"
+                          className="w-8 h-8 rounded flex items-center justify-center judge-btn--accept"
                           onClick={() => handleJudge(pid, true)}
+                          title="Accept answer"
                           aria-label="Accept answer"
                         >
                           <Check size={16} />
-                          <span className="judge-tooltip judge-tooltip--accept" role="tooltip">
-                            Accept
-                          </span>
                         </button>
                         <button
                           type="button"
-                          className="relative group w-8 h-8 rounded flex items-center justify-center judge-btn--decline"
+                          className="w-8 h-8 rounded flex items-center justify-center judge-btn--decline"
                           onClick={() => handleJudge(pid, false)}
+                          title="Decline answer"
                           aria-label="Decline answer"
                         >
                           <X size={16} />
-                          <span className="judge-tooltip judge-tooltip--decline" role="tooltip">
-                            Decline
-                          </span>
                         </button>
                       </div>
                     )}
