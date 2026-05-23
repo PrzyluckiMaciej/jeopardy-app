@@ -19,6 +19,7 @@ export default function PlayerPage() {
 
   const [connected, setConnected] = useState(false)
   const [hasBuzzed, setHasBuzzed] = useState(false)
+  const wasInBuzzQueueRef = useRef(false)
   const [judgeResult, setJudgeResult] = useState<'correct' | 'wrong' | null>(null)
   const [hostLeft, setHostLeft] = useState(false)
   const [ddWagerInput, setDdWagerInput] = useState('')
@@ -81,6 +82,7 @@ export default function PlayerPage() {
       }
       if (msg.type === 'OPEN_CARD') {
         setHasBuzzed(false)
+        wasInBuzzQueueRef.current = false
         setJudgeResult(null)
         let mediaType: 'image' | 'audio' | 'video' | undefined
         if (msg.mediaDataUrl) {
@@ -100,6 +102,7 @@ export default function PlayerPage() {
       if (msg.type === 'CLOSE_CARD') {
         patchState({ phase: 'board', activeQuestion: null, buzzQueue: [], activeMedia: null, dailyDouble: null })
         setHasBuzzed(false)
+        wasInBuzzQueueRef.current = false
         setJudgeResult(null)
         setDdWagerInput('')
         setDdWagerError('')
@@ -107,6 +110,7 @@ export default function PlayerPage() {
       }
       if (msg.type === 'DAILY_DOUBLE_REVEAL') {
         setHasBuzzed(false)
+        wasInBuzzQueueRef.current = false
         setJudgeResult(null)
         setDdWagerInput('')
         setDdWagerError('')
@@ -141,6 +145,7 @@ export default function PlayerPage() {
       if (msg.type === 'START_BUZZING') {
         patchState({ phase: 'buzzing', buzzQueue: [] })
         setHasBuzzed(false)
+        wasInBuzzQueueRef.current = false
       }
       if (msg.type === 'BUZZ' && peerId === hostPeerId.current) {
         addBuzz(msg.playerId)
@@ -175,6 +180,7 @@ export default function PlayerPage() {
           dailyDouble: null,
         })
         setHasBuzzed(false)
+        wasInBuzzQueueRef.current = false
         setJudgeResult(null)
         setDdWagerInput('')
         setDdWagerError('')
@@ -302,7 +308,17 @@ export default function PlayerPage() {
   }
 
   const myScore = myPlayer?.score ?? 0
-  const isMyTurn = state.buzzQueue[0] === myId
+  const isInBuzzQueue = state.buzzQueue.includes(myId)
+  if (isInBuzzQueue) wasInBuzzQueueRef.current = true
+  const buzzPending = hasBuzzed && !isInBuzzQueue && !wasInBuzzQueueRef.current
+  const buzzedOut = hasBuzzed && !isInBuzzQueue && wasInBuzzQueueRef.current
+  const isMyTurn =
+    state.buzzQueue[0] === myId || (buzzPending && state.buzzQueue.length === 0)
+  const myQueuePosition = isInBuzzQueue
+    ? state.buzzQueue.indexOf(myId) + 1
+    : buzzPending
+      ? state.buzzQueue.length + 1
+      : 0
   const activeQ = state.activeQuestion?.question
   const categoryName = state.board?.categories.find(c => c.id === state.activeQuestion?.categoryId)?.name ?? ''
   const showOverlay = ['question', 'buzzing', 'revealed', 'dailyDouble', 'dailyDoubleBet'].includes(state.phase) && !!state.activeQuestion?.question
@@ -572,7 +588,7 @@ export default function PlayerPage() {
             </div>
           </header>
 
-          <div className={`question-overlay-layout question-overlay-layout--player${!isDD && uiPhase === 'buzzing' && !judgeResult && !(hasBuzzed && !state.buzzQueue.includes(myId)) ? ' question-overlay-layout--has-buzz' : ''}`}>
+          <div className={`question-overlay-layout question-overlay-layout--player${!isDD && uiPhase === 'buzzing' && !judgeResult && !buzzedOut ? ' question-overlay-layout--has-buzz' : ''}`}>
             <div className={`question-overlay-main ${overlayExiting ? 'card-flip-exit' : 'card-flip'}`}>
               {/* DD title splash */}
               {uiPhase === 'dailyDouble' && (
@@ -719,7 +735,7 @@ export default function PlayerPage() {
                 )}
 
                 {/* Normal: buzzing phase — inline on desktop, docked on mobile via .player-buzz-dock */}
-                {!isDD && uiPhase === 'buzzing' && !judgeResult && !(hasBuzzed && !state.buzzQueue.includes(myId)) && (
+                {!isDD && uiPhase === 'buzzing' && !judgeResult && !buzzedOut && (
                   <div className="player-buzz-dock" data-mobile-dock>
                     <button
                       type="button"
@@ -739,7 +755,7 @@ export default function PlayerPage() {
                       {hasBuzzed
                         ? isMyTurn
                           ? 'YOUR TURN'
-                          : `#${state.buzzQueue.indexOf(myId) + 1} in queue`
+                          : `#${myQueuePosition} in queue`
                         : 'BUZZ!'}
                     </button>
                     {!hasBuzzed && (
