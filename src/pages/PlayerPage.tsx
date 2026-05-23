@@ -44,13 +44,14 @@ export default function PlayerPage() {
   const overlayOpenRef = useRef(false)
   const overlayExitingRef = useRef(false)
 
-  const [myId] = useState(() => {
-    const existing = useGameStore.getState().myPlayerId
-    if (existing) return existing
-    return generateId()
-  })
+  const fallbackIdRef = useRef(
+    useGameStore.getState().myPlayerId ?? generateId()
+  )
+  const storedPlayerId = useGameStore((s) => s.myPlayerId)
+  const myId = storedPlayerId ?? fallbackIdRef.current
   const [nameTaken, setNameTaken] = useState(false)
   const hasLoggedJoin = useRef(false)
+  const hasAnnouncedJoin = useRef(false)
 
   useEffect(() => {
     if (!roomCode) { navigate('/'); return }
@@ -60,8 +61,6 @@ export default function PlayerPage() {
 
     net.onPeerJoin(() => {
       setConnected(true)
-      const me: Player = { id: myId, name: playerName, score: 0, isConnected: true }
-      net.broadcast({ type: 'PLAYER_JOIN', player: me })
     })
 
     net.onPeerLeave((peerId) => {
@@ -74,7 +73,16 @@ export default function PlayerPage() {
       if (msg.type === 'SYNC_STATE') {
         if (!hostPeerId.current) hostPeerId.current = peerId
         setState(msg.state)
+        const me = msg.state.players.find(
+          (p) => p.name === playerName && p.isConnected
+        )
+        if (me) setMyPlayerId(me.id)
         setConnected(true)
+        if (!hasAnnouncedJoin.current && hostPeerId.current) {
+          hasAnnouncedJoin.current = true
+          const meJoin: Player = { id: myId, name: playerName, score: 0, isConnected: true }
+          net.send({ type: 'PLAYER_JOIN', player: meJoin }, hostPeerId.current)
+        }
         if (!hasLoggedJoin.current) {
           hasLoggedJoin.current = true
           logEvent({ role: 'player', roomCode, actor: playerName, event: 'Joined room successfully' })
@@ -193,7 +201,10 @@ export default function PlayerPage() {
         updatePlayer(msg.player)
       }
       if (msg.type === 'JOIN_REJECTED') {
-        if (msg.reason === 'NAME_TAKEN') setNameTaken(true)
+        if (msg.reason === 'NAME_TAKEN') {
+          setNameTaken(true)
+          net.leaveRoom()
+        }
       }
       if (msg.type === 'REMOVE_PLAYER') {
         if (msg.playerId === myId) {

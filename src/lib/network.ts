@@ -72,6 +72,12 @@ export function getSelfId(): string {
   return selfId
 }
 
+/** Trystero peer IDs with an active WebRTC connection to this client. */
+export function getConnectedPeerIds(): string[] {
+  if (!room?.getPeers) return []
+  return Object.keys(room.getPeers())
+}
+
 export function leaveRoom() {
   room?.leave()
   room = null
