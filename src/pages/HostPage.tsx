@@ -7,7 +7,11 @@ import type { Board, Player, NetMessage, Question, GameSettings } from '../types
 import { createDefaultBoard, cellId } from '../lib/utils'
 import { getMedia, blobToDataUrl } from '../lib/db'
 import { logEvent } from '../lib/logger'
-import { evaluatePlayerJoin, isClientSessionActive } from '../lib/playerJoin'
+import {
+  evaluatePlayerJoin,
+  normalizePlayerName,
+  type NameSession,
+} from '../lib/playerJoin'
 import BoardEditor from '../components/BoardEditor'
 import GameBoard from '../components/GameBoard'
 import QuestionOverlay from '../components/QuestionOverlay'
@@ -23,17 +27,22 @@ function pickRandom<T>(arr: T[]): T {
 
 function pruneStalePlayers(
   peerToClient: Map<string, string>,
+  nameSessions: Map<string, NameSession>,
   setPlayerConnected: (id: string, connected: boolean) => void,
   onStale: (playerId: string) => void,
 ) {
   const livePeers = new Set(net.getConnectedPeerIds())
+  if (livePeers.size === 0) return
+
   for (const player of useGameStore.getState().state.players) {
     if (!player.isConnected) continue
-    if (isClientSessionActive(peerToClient, player.id, livePeers)) continue
+    const peerId = [...peerToClient.entries()].find(([, cid]) => cid === player.id)?.[0]
+    if (!peerId || livePeers.has(peerId)) continue
     setPlayerConnected(player.id, false)
     onStale(player.id)
-    for (const [peerId, cid] of [...peerToClient.entries()]) {
-      if (cid === player.id) peerToClient.delete(peerId)
+    nameSessions.delete(normalizePlayerName(player.name))
+    for (const [pid, cid] of [...peerToClient.entries()]) {
+      if (cid === player.id) peerToClient.delete(pid)
     }
   }
 }
@@ -62,6 +71,7 @@ export default function HostPage() {
   const [activeEmojis, setActiveEmojis] = useState<Record<string, { emoji: string; seq: number }>>({})
 
   const peerToClient = useRef(new Map<string, string>())
+  const nameSessions = useRef(new Map<string, NameSession>())
   const emojiTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
   useEffect(() => {
@@ -91,8 +101,16 @@ export default function HostPage() {
           event: `Player disconnected: ${leavingPlayer?.name ?? clientId}`,
         })
         peerToClient.current.delete(peerId)
+        if (leavingPlayer) {
+          nameSessions.current.delete(normalizePlayerName(leavingPlayer.name))
+        }
       }
-      pruneStalePlayers(peerToClient.current, setPlayerConnected, markPlayerLeft)
+      pruneStalePlayers(
+        peerToClient.current,
+        nameSessions.current,
+        setPlayerConnected,
+        markPlayerLeft,
+      )
     })
 
     net.onMessage((msg: NetMessage, peerId: string) => {
@@ -102,8 +120,8 @@ export default function HostPage() {
           joiningName: msg.player.name,
           players: useGameStore.getState().state.players,
           peerToClient: peerToClient.current,
-          livePeerIds: net.getConnectedPeerIds(),
           joiningPeerId: peerId,
+          nameSessions: nameSessions.current,
         })
 
         if (decision.action === 'reject') {
@@ -117,9 +135,17 @@ export default function HostPage() {
         for (const [oldPeerId, cid] of peerToClient.current.entries()) {
           if ((cid === playerId || cid === joiningId) && oldPeerId !== peerId) {
             peerToClient.current.delete(oldPeerId)
+            const oldPlayer = useGameStore.getState().state.players.find((p) => p.id === cid)
+            if (oldPlayer) {
+              nameSessions.current.delete(normalizePlayerName(oldPlayer.name))
+            }
           }
         }
         peerToClient.current.set(peerId, playerId)
+        nameSessions.current.set(normalizePlayerName(msg.player.name), {
+          peerId,
+          clientId: playerId,
+        })
 
         if (decision.action === 'reconnect') {
           setPlayerConnected(playerId, true)

@@ -61,10 +61,6 @@ export default function PlayerPage() {
 
     net.onPeerJoin(() => {
       setConnected(true)
-      if (hasAnnouncedJoin.current) return
-      hasAnnouncedJoin.current = true
-      const me: Player = { id: myId, name: playerName, score: 0, isConnected: true }
-      net.broadcast({ type: 'PLAYER_JOIN', player: me })
     })
 
     net.onPeerLeave((peerId) => {
@@ -82,6 +78,11 @@ export default function PlayerPage() {
         )
         if (me) setMyPlayerId(me.id)
         setConnected(true)
+        if (!hasAnnouncedJoin.current && hostPeerId.current) {
+          hasAnnouncedJoin.current = true
+          const meJoin: Player = { id: myId, name: playerName, score: 0, isConnected: true }
+          net.send({ type: 'PLAYER_JOIN', player: meJoin }, hostPeerId.current)
+        }
         if (!hasLoggedJoin.current) {
           hasLoggedJoin.current = true
           logEvent({ role: 'player', roomCode, actor: playerName, event: 'Joined room successfully' })

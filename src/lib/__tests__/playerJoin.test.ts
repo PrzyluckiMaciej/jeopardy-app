@@ -18,7 +18,6 @@ describe('evaluatePlayerJoin', () => {
       joiningName: 'ABC',
       players: [player({ id: 'id-1', name: 'ABC' })],
       peerToClient,
-      livePeerIds: ['peer-a'],
       joiningPeerId: 'peer-b',
     })
     expect(decision).toEqual({ action: 'reject', reason: 'NAME_TAKEN' })
@@ -31,20 +30,45 @@ describe('evaluatePlayerJoin', () => {
       joiningName: 'ABC',
       players: [player({ id: 'id-1', name: 'ABC' })],
       peerToClient,
-      livePeerIds: ['peer-a'],
       joiningPeerId: 'peer-b',
     })
     expect(decision).toEqual({ action: 'reject', reason: 'NAME_TAKEN' })
   })
 
-  it('rejects duplicate names when peer map shows an active session even if getPeers is empty', () => {
+  it('rejects duplicate names when occupant peer is mapped but missing from getPeers', () => {
     const peerToClient = new Map([['peer-a', 'id-1']])
     const decision = evaluatePlayerJoin({
       joiningId: 'id-2',
       joiningName: 'ABC',
       players: [player({ id: 'id-1', name: 'ABC' })],
       peerToClient,
-      livePeerIds: [],
+      joiningPeerId: 'peer-b',
+    })
+    expect(decision).toEqual({ action: 'reject', reason: 'NAME_TAKEN' })
+  })
+
+  it('rejects via name session registry before players state updates', () => {
+    const nameSessions = new Map([
+      ['abc', { peerId: 'peer-a', clientId: 'id-1' }],
+    ])
+    const decision = evaluatePlayerJoin({
+      joiningId: 'id-2',
+      joiningName: 'ABC',
+      players: [],
+      peerToClient: new Map([['peer-a', 'id-1']]),
+      joiningPeerId: 'peer-b',
+      nameSessions,
+    })
+    expect(decision).toEqual({ action: 'reject', reason: 'NAME_TAKEN' })
+  })
+
+  it('matches names case-insensitively', () => {
+    const peerToClient = new Map([['peer-a', 'id-1']])
+    const decision = evaluatePlayerJoin({
+      joiningId: 'id-2',
+      joiningName: 'abc',
+      players: [player({ id: 'id-1', name: 'ABC' })],
+      peerToClient,
       joiningPeerId: 'peer-b',
     })
     expect(decision).toEqual({ action: 'reject', reason: 'NAME_TAKEN' })
@@ -56,7 +80,6 @@ describe('evaluatePlayerJoin', () => {
       joiningName: 'ABC',
       players: [player({ id: 'id-1', name: 'ABC', isConnected: false })],
       peerToClient: new Map(),
-      livePeerIds: [],
       joiningPeerId: 'peer-b',
     })
     expect(decision).toEqual({ action: 'reconnect', playerId: 'id-1' })
@@ -68,20 +91,6 @@ describe('evaluatePlayerJoin', () => {
       joiningName: 'ABC',
       players: [player({ id: 'id-1', name: 'ABC' })],
       peerToClient: new Map(),
-      livePeerIds: [],
-      joiningPeerId: 'peer-b',
-    })
-    expect(decision).toEqual({ action: 'reconnect', playerId: 'id-1' })
-  })
-
-  it('allows reclaiming when the peer left but getPeers still lists them', () => {
-    const peerToClient = new Map()
-    const decision = evaluatePlayerJoin({
-      joiningId: 'id-2',
-      joiningName: 'ABC',
-      players: [player({ id: 'id-1', name: 'ABC' })],
-      peerToClient,
-      livePeerIds: ['peer-a'],
       joiningPeerId: 'peer-b',
     })
     expect(decision).toEqual({ action: 'reconnect', playerId: 'id-1' })
@@ -93,7 +102,6 @@ describe('evaluatePlayerJoin', () => {
       joiningName: 'ABC',
       players: [],
       peerToClient: new Map(),
-      livePeerIds: [],
       joiningPeerId: 'peer-a',
     })
     expect(decision).toEqual({ action: 'add', playerId: 'id-1' })
