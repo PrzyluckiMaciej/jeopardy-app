@@ -658,15 +658,70 @@ select:focus-visible {
   flex-shrink: 0;
 }
 .host-topbar__room-code {
-  font-family: 'Anton', sans-serif;
-  font-size: 1.25rem;
-  letter-spacing: 0.08em;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Barlow', ui-sans-serif, system-ui, sans-serif;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  font-variant-numeric: tabular-nums;
+  text-transform: uppercase;
   padding: 6px 12px;
   border-radius: 6px;
   background: rgba(212, 160, 23, 0.1);
   border: 1px solid rgba(212, 160, 23, 0.3);
   color: var(--gold-bright);
   flex-shrink: 0;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.host-topbar__room-code:hover {
+  background: rgba(212, 160, 23, 0.16);
+  border-color: rgba(212, 160, 23, 0.45);
+}
+.host-topbar__copy-icon {
+  flex-shrink: 0;
+  opacity: 0.65;
+  transition: opacity 0.15s ease;
+}
+.host-topbar__room-code:hover .host-topbar__copy-icon {
+  opacity: 1;
+}
+.host-topbar__room-code-text {
+  line-height: 1;
+}
+.host-topbar__copied {
+  font-family: 'Barlow', sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--green);
+  flex-shrink: 0;
+}
+.host-topbar__copied--enter {
+  animation: hostCopiedIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.host-topbar__copied--exit {
+  animation: hostCopiedOut 0.32s ease-in forwards;
+}
+@keyframes hostCopiedIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes hostCopiedOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(6px);
+  }
 }
 .host-topbar__actions {
   display: flex;
