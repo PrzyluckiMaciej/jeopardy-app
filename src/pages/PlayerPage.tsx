@@ -31,6 +31,7 @@ export default function PlayerPage() {
   const [answerRevealKey, setAnswerRevealKey] = useState(0)
   const [scorePulsing, setScorePulsing] = useState(false)
   const [buzzQueuePopupOpen, setBuzzQueuePopupOpen] = useState(false)
+  const [buzzQueuePopupActive, setBuzzQueuePopupActive] = useState(false)
   const [isMobileViewport, setIsMobileViewport] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches,
   )
@@ -398,6 +399,25 @@ export default function PlayerPage() {
   useEffect(() => {
     if (!showBuzzQueuePanel) setBuzzQueuePopupOpen(false)
   }, [showBuzzQueuePanel])
+
+  function toggleBuzzQueuePopup() {
+    if (buzzQueuePopupOpen) {
+      setBuzzQueuePopupOpen(false)
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        setBuzzQueuePopupActive(false)
+      }
+      return
+    }
+    setBuzzQueuePopupActive(true)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => setBuzzQueuePopupOpen(true))
+    })
+  }
+
+  function handleBuzzQueuePopupTransitionEnd(e: React.TransitionEvent<HTMLDivElement>) {
+    if (e.target !== e.currentTarget || e.propertyName !== 'opacity') return
+    if (!buzzQueuePopupOpen) setBuzzQueuePopupActive(false)
+  }
   const reservePlayerBuzzSpace =
     !isDD && ['question', 'buzzing', 'revealed'].includes(uiPhase)
 
@@ -777,11 +797,13 @@ export default function PlayerPage() {
                 {showPlayerActionZone && (
                   <div className="player-action-zone" data-mobile-dock>
                     <div className="player-action-zone__cluster">
-                      {showBuzzQueueMobileToggle && buzzQueuePopupOpen && (
+                      {showBuzzQueueMobileToggle && buzzQueuePopupActive && (
                         <div
-                          className="player-buzz-queue-popup panel flex flex-col gap-2"
+                          className={`player-buzz-queue-popup panel flex flex-col gap-2${buzzQueuePopupOpen ? ' player-buzz-queue-popup--visible' : ''}`}
                           role="dialog"
                           aria-label="Buzz queue"
+                          aria-hidden={!buzzQueuePopupOpen}
+                          onTransitionEnd={handleBuzzQueuePopupTransitionEnd}
                         >
                           <div className="font-condensed text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--gold)', opacity: 0.7 }}>
                             Buzz queue
@@ -869,7 +891,7 @@ export default function PlayerPage() {
                           <button
                             type="button"
                             className="player-buzz-queue-toggle"
-                            onClick={() => setBuzzQueuePopupOpen((open) => !open)}
+                            onClick={toggleBuzzQueuePopup}
                             aria-expanded={buzzQueuePopupOpen}
                             aria-label={buzzQueuePopupOpen ? 'Hide buzz queue' : 'Show buzz queue'}
                             title={buzzQueuePopupOpen ? 'Hide buzz queue' : 'Show buzz queue'}
