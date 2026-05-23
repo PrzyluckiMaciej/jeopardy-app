@@ -750,16 +750,6 @@ export default function PlayerPage() {
                   </div>
                 )}
 
-                {uiPhase === 'revealed' && (
-                  <div
-                    key="answer-revealed"
-                    className="overlay-status-enter font-condensed text-sm text-center"
-                    style={{ color: '#4a5580' }}
-                  >
-                    Answer revealed
-                  </div>
-                )}
-
                 {/* Buzzer + judge feedback share a fixed-size zone */}
                 {showPlayerActionZone && (
                   <div className="player-action-zone" data-mobile-dock>
