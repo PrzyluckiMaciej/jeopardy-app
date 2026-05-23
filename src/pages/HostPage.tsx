@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Settings, Trash2, Pencil, Check, FolderOpen, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, RotateCcw, Shuffle, X } from 'lucide-react'
+import { Settings, Trash2, Pencil, Check, Copy, FolderOpen, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, RotateCcw, Shuffle, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useGameStore, useBoardStore } from '../store/gameStore'
 import * as net from '../lib/network'
@@ -59,7 +59,7 @@ export default function HostPage() {
   const [editing, setEditing] = useState(false)
   const [activeBoard, setActiveBoard] = useState<Board | null>(null)
   const [showBoardPicker, setShowBoardPicker] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [copyFeedback, setCopyFeedback] = useState<'hidden' | 'visible' | 'hiding'>('hidden')
   const [showDdNoControlAlert, setShowDdNoControlAlert] = useState(false)
   const [boardTransitionExiting, setBoardTransitionExiting] = useState(false)
 
@@ -73,6 +73,11 @@ export default function HostPage() {
   const peerToClient = useRef(new Map<string, string>())
   const nameSessions = useRef(new Map<string, NameSession>())
   const emojiTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const copyFeedbackTimers = useRef<ReturnType<typeof setTimeout>[]>([])
+
+  useEffect(() => () => {
+    copyFeedbackTimers.current.forEach(clearTimeout)
+  }, [])
 
   useEffect(() => {
     if (!roomCode) { navigate('/'); return }
@@ -436,8 +441,12 @@ export default function HostPage() {
 
   function copyCode() {
     navigator.clipboard.writeText(roomCode ?? '')
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+    copyFeedbackTimers.current.forEach(clearTimeout)
+    copyFeedbackTimers.current = []
+    setCopyFeedback('visible')
+    const hideTimer = setTimeout(() => setCopyFeedback('hiding'), 1400)
+    const resetTimer = setTimeout(() => setCopyFeedback('hidden'), 1750)
+    copyFeedbackTimers.current = [hideTimer, resetTimer]
   }
 
   function handleExitRoom() {
@@ -510,10 +519,19 @@ export default function HostPage() {
             className="host-topbar__room-code"
             onClick={copyCode}
             title="Click to copy room code"
+            aria-label={`Copy room code ${roomCode}`}
           >
-            {roomCode}
+            <Copy size={15} className="host-topbar__copy-icon" aria-hidden />
+            <span className="host-topbar__room-code-text">{roomCode}</span>
           </button>
-          {copied && <span className="host-topbar__copied text-sm" style={{ color: 'var(--green)' }}>Copied!</span>}
+          {copyFeedback !== 'hidden' && (
+            <span
+              className={`host-topbar__copied${copyFeedback === 'hiding' ? ' host-topbar__copied--exit' : ' host-topbar__copied--enter'}`}
+              role="status"
+            >
+              Copied!
+            </span>
+          )}
         </div>
         <div className="host-topbar__actions">
           <button
