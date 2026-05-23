@@ -779,7 +779,7 @@ export default function PlayerPage() {
                     <div className="player-action-zone__cluster">
                       {showBuzzQueueMobileToggle && buzzQueuePopupOpen && (
                         <div
-                          className="player-buzz-queue-popup panel panel--buzz-queue overlay-sidebar-enter flex flex-col gap-2"
+                          className="player-buzz-queue-popup panel flex flex-col gap-2"
                           role="dialog"
                           aria-label="Buzz queue"
                         >

@@ -1908,12 +1908,14 @@ select:focus-visible {
     background: linear-gradient(to top, rgba(6, 11, 40, 0.98) 65%, transparent);
     pointer-events: none;
     box-sizing: border-box;
+    overflow: visible;
   }
   .player-action-zone[data-mobile-dock] > * {
     pointer-events: auto;
   }
   .player-action-zone[data-mobile-dock] .player-action-zone__cluster {
     position: relative;
+    overflow: visible;
     width: 100%;
     max-width: min(100%, calc(280px + 44px + var(--space-sm)));
     margin: 0 auto;
@@ -1972,17 +1974,18 @@ select:focus-visible {
     line-height: 1;
     color: var(--gold);
   }
-  .player-buzz-queue-popup {
+  .player-action-zone[data-mobile-dock] .player-buzz-queue-popup {
     display: flex;
     position: absolute;
     bottom: calc(100% + var(--space-sm));
-    left: 50%;
-    transform: translateX(-50%);
+    left: 0;
+    right: 0;
     width: min(calc(100vw - 2rem), 320px);
+    max-width: 100%;
     max-height: min(40vh, 240px);
+    margin-inline: auto;
     overflow-y: auto;
     z-index: 56;
-    margin: 0;
     box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.45);
   }
   .player-action-zone[data-mobile-dock] .player-buzz-btn--queued {
@@ -1999,7 +2002,8 @@ select:focus-visible {
     gap: var(--space-sm);
     padding-top: var(--space-sm);
   }
-  .player-question-overlay .question-overlay-sidebar .panel--buzz-queue {
+  /* Sidebar queue only — not the mobile dock popup (also uses panel--buzz-queue) */
+  .player-question-overlay .question-overlay-sidebar > .panel--buzz-queue {
     display: none;
   }
   .player-question-overlay .question-overlay-layout--player {
