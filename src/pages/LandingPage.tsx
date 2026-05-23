@@ -60,12 +60,12 @@ export default function LandingPage() {
               </button>
             </div>
           ) : (
-            <div className="flex flex-col gap-4">
-              <button className="btn-ghost self-start text-sm mb-1" onClick={() => setMode('pick')}>
+            <div className="landing-join-fields">
+              <button className="btn-ghost self-start text-sm" onClick={() => setMode('pick')}>
                 ← Back
               </button>
-              <div>
-                <label className="font-condensed text-sm uppercase tracking-wider mb-1 block text-gold">
+              <div className="landing-join-field">
+                <label className="font-condensed text-sm uppercase tracking-wider text-gold">
                   Your name
                 </label>
                 <input
@@ -77,8 +77,8 @@ export default function LandingPage() {
                   autoFocus
                 />
               </div>
-              <div>
-                <label className="font-condensed text-sm uppercase tracking-wider mb-1 block text-gold">
+              <div className="landing-join-field">
+                <label className="font-condensed text-sm uppercase tracking-wider text-gold">
                   Room code
                 </label>
                 <input
