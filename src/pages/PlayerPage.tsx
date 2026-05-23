@@ -51,6 +51,7 @@ export default function PlayerPage() {
   const myId = storedPlayerId ?? fallbackIdRef.current
   const [nameTaken, setNameTaken] = useState(false)
   const hasLoggedJoin = useRef(false)
+  const hasAnnouncedJoin = useRef(false)
 
   useEffect(() => {
     if (!roomCode) { navigate('/'); return }
@@ -60,6 +61,8 @@ export default function PlayerPage() {
 
     net.onPeerJoin(() => {
       setConnected(true)
+      if (hasAnnouncedJoin.current) return
+      hasAnnouncedJoin.current = true
       const me: Player = { id: myId, name: playerName, score: 0, isConnected: true }
       net.broadcast({ type: 'PLAYER_JOIN', player: me })
     })
@@ -197,7 +200,10 @@ export default function PlayerPage() {
         updatePlayer(msg.player)
       }
       if (msg.type === 'JOIN_REJECTED') {
-        if (msg.reason === 'NAME_TAKEN') setNameTaken(true)
+        if (msg.reason === 'NAME_TAKEN') {
+          setNameTaken(true)
+          net.leaveRoom()
+        }
       }
       if (msg.type === 'REMOVE_PLAYER') {
         if (msg.playerId === myId) {

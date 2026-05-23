@@ -20,6 +20,42 @@ function pickRandom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
 }
 
+function findPeerForClient(
+  peerToClient: Map<string, string>,
+  clientId: string,
+): string | undefined {
+  for (const [peerId, cid] of peerToClient) {
+    if (cid === clientId) return peerId
+  }
+  return undefined
+}
+
+function isClientPeerLive(
+  peerToClient: Map<string, string>,
+  clientId: string,
+  livePeers: Set<string>,
+): boolean {
+  const peerId = findPeerForClient(peerToClient, clientId)
+  return peerId !== undefined && livePeers.has(peerId)
+}
+
+function pruneStalePlayers(
+  peerToClient: Map<string, string>,
+  setPlayerConnected: (id: string, connected: boolean) => void,
+  onStale: (playerId: string) => void,
+) {
+  const livePeers = new Set(net.getConnectedPeerIds())
+  for (const player of useGameStore.getState().state.players) {
+    if (!player.isConnected) continue
+    if (isClientPeerLive(peerToClient, player.id, livePeers)) continue
+    setPlayerConnected(player.id, false)
+    onStale(player.id)
+    for (const [peerId, cid] of [...peerToClient.entries()]) {
+      if (cid === player.id) peerToClient.delete(peerId)
+    }
+  }
+}
+
 export default function HostPage() {
   const navigate = useNavigate()
   const store = useGameStore()
@@ -51,7 +87,12 @@ export default function HostPage() {
 
     net.createRoom(roomCode)
 
+    const markPlayerLeft = (playerId: string) => {
+      net.broadcast({ type: 'PLAYER_LEAVE', playerId })
+    }
+
     net.onPeerJoin((peerId) => {
+      pruneStalePlayers(peerToClient.current, setPlayerConnected, markPlayerLeft)
       const current = useGameStore.getState()
       net.send({ type: 'SYNC_STATE', state: current.state }, peerId)
     })
@@ -60,7 +101,7 @@ export default function HostPage() {
       const clientId = peerToClient.current.get(peerId)
       if (clientId) {
         setPlayerConnected(clientId, false)
-        net.broadcast({ type: 'PLAYER_LEAVE', playerId: clientId })
+        markPlayerLeft(clientId)
         const leavingPlayer = useGameStore.getState().state.players.find(p => p.id === clientId)
         logEvent({
           role: 'host',
@@ -70,18 +111,34 @@ export default function HostPage() {
         })
         peerToClient.current.delete(peerId)
       }
+      pruneStalePlayers(peerToClient.current, setPlayerConnected, markPlayerLeft)
     })
 
     net.onMessage((msg: NetMessage, peerId: string) => {
       if (msg.type === 'PLAYER_JOIN') {
+        pruneStalePlayers(peerToClient.current, setPlayerConnected, markPlayerLeft)
+
         const joiningId = msg.player.id
         const players = useGameStore.getState().state.players
+        const livePeers = new Set(net.getConnectedPeerIds())
         const existingById = players.find(p => p.id === joiningId)
         const existingByName = players.find(
           p => p.name === msg.player.name && !p.isConnected
         )
-        const existing = existingById ?? existingByName
+        const staleByName = players.find(
+          p => p.name === msg.player.name && p.isConnected
+            && !isClientPeerLive(peerToClient.current, p.id, livePeers)
+        )
+        const existing = existingById ?? existingByName ?? staleByName
         const playerId = existing?.id ?? joiningId
+
+        const nameTaken = !existing && players.some(
+          p => p.name === msg.player.name && p.isConnected
+        )
+        if (nameTaken) {
+          net.send({ type: 'JOIN_REJECTED', reason: 'NAME_TAKEN' }, peerId)
+          return
+        }
 
         for (const [oldPeerId, cid] of peerToClient.current.entries()) {
           if ((cid === playerId || cid === joiningId) && oldPeerId !== peerId) {
@@ -101,14 +158,6 @@ export default function HostPage() {
           setTimeout(() => {
             net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
           }, 100)
-          return
-        }
-
-        const nameTaken = players.some(
-          p => p.name === msg.player.name && p.isConnected
-        )
-        if (nameTaken) {
-          net.send({ type: 'JOIN_REJECTED', reason: 'NAME_TAKEN' }, peerId)
           return
         }
 
