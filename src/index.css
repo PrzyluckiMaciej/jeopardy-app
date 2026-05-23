@@ -1315,6 +1315,20 @@ select:focus-visible {
   pointer-events: none;
 }
 
+.landing-join-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+.landing-join-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.landing-join-field label {
+  display: block;
+}
+
 /* ── Question overlay: stack on mobile ──────────────────────── */
 .question-overlay-layout {
   flex: 1;
