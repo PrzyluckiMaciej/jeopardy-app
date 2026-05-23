@@ -380,6 +380,8 @@ export default function PlayerPage() {
     showPlayerActionZone
   const showBuzzQueuePanel = !isDD && state.buzzQueue.length > 0
   const showSidebar = showSidebarPanel || showBuzzQueuePanel
+  const reservePlayerBuzzSpace =
+    !isDD && ['question', 'buzzing', 'revealed'].includes(uiPhase)
 
   function handleSubmitWager() {
     const wager = parseInt(ddWagerInput, 10)
@@ -608,7 +610,7 @@ export default function PlayerPage() {
             </div>
           </header>
 
-          <div className={`question-overlay-layout question-overlay-layout--player${showPlayerActionZone ? ' question-overlay-layout--has-buzz' : ''}`}>
+          <div className={`question-overlay-layout question-overlay-layout--player${reservePlayerBuzzSpace ? ' question-overlay-layout--has-buzz' : ''}`}>
             <div className={`question-overlay-main ${overlayExiting ? 'card-flip-exit' : 'card-flip'}`}>
               {/* DD title splash */}
               {uiPhase === 'dailyDouble' && (
@@ -635,7 +637,7 @@ export default function PlayerPage() {
                 <div key={`clue-${clueRevealKey}`} className="flex flex-col items-center w-full max-w-2xl">
                   {displayMedia && (
                     <div
-                      className="mb-6 clue-reveal"
+                      className="mb-3 clue-reveal"
                       style={{
                         filter: clueBlurred ? 'blur(8px)' : 'none',
                         transition: 'filter 0.3s ease',
@@ -654,7 +656,7 @@ export default function PlayerPage() {
                   )}
 
                   <div
-                    className={`font-condensed font-bold text-3xl md:text-4xl leading-snug mb-6 max-w-2xl${displayMedia ? '' : ' clue-reveal'}`}
+                    className={`font-condensed font-bold text-3xl md:text-4xl leading-snug mb-3 max-w-2xl${displayMedia ? '' : ' clue-reveal'}`}
                     style={{
                       color: 'var(--white)',
                       filter: clueBlurred ? 'blur(8px)' : 'none',
