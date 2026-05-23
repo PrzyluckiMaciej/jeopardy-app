@@ -371,6 +371,9 @@ export default function PlayerPage() {
   const isDDPlayer = state.dailyDouble?.playerId === myId
   const ddPlayerInfo = state.dailyDouble ? state.players.find(p => p.id === state.dailyDouble!.playerId) : null
   const clueBlurred = settings.blurClueOnBuzz && uiPhase === 'buzzing' && state.buzzQueue.length > 0
+  const buzzingOpen = uiPhase === 'buzzing'
+  const showBuzzDock =
+    !isDD && (uiPhase === 'question' || buzzingOpen) && !judgeResult && !buzzedOut
 
   function handleSubmitWager() {
     const wager = parseInt(ddWagerInput, 10)
@@ -599,7 +602,7 @@ export default function PlayerPage() {
             </div>
           </header>
 
-          <div className={`question-overlay-layout question-overlay-layout--player${!isDD && uiPhase === 'buzzing' && !judgeResult && !buzzedOut ? ' question-overlay-layout--has-buzz' : ''}`}>
+          <div className={`question-overlay-layout question-overlay-layout--player${showBuzzDock ? ' question-overlay-layout--has-buzz' : ''}`}>
             <div className={`question-overlay-main ${overlayExiting ? 'card-flip-exit' : 'card-flip'}`}>
               {/* DD title splash */}
               {uiPhase === 'dailyDouble' && (
@@ -745,44 +748,45 @@ export default function PlayerPage() {
                   </div>
                 )}
 
-                {/* Normal: buzzing phase — inline on desktop, docked on mobile via .player-buzz-dock */}
-                {!isDD && uiPhase === 'buzzing' && !judgeResult && !buzzedOut && (
+                {/* Normal: buzz dock — visible during question (disabled) and buzzing */}
+                {showBuzzDock && (
                   <div className="player-buzz-dock" data-mobile-dock>
                     <button
                       type="button"
-                      className={`player-buzz-btn font-display transition-all ${!hasBuzzed ? 'buzz-btn' : ''}`}
-                      style={{
-                        background: hasBuzzed
-                          ? isMyTurn ? 'rgba(212,160,23,0.3)' : 'rgba(74,85,128,0.2)'
-                          : 'var(--gold)',
-                        border: `4px solid ${hasBuzzed ? (isMyTurn ? 'var(--gold)' : 'var(--navy-light)') : 'var(--gold-bright)'}`,
-                        color: hasBuzzed ? (isMyTurn ? 'var(--gold-bright)' : '#4a5580') : 'var(--navy)',
-                        fontSize: hasBuzzed ? 13 : 22,
-                        cursor: hasBuzzed ? 'default' : 'pointer',
-                      }}
+                      className={[
+                        'player-buzz-btn font-display',
+                        !buzzingOpen
+                          ? 'player-buzz-btn--waiting'
+                          : hasBuzzed
+                            ? isMyTurn
+                              ? 'player-buzz-btn--my-turn'
+                              : 'player-buzz-btn--queued'
+                            : 'player-buzz-btn--ready buzz-btn',
+                      ].join(' ')}
                       onClick={handleBuzz}
-                      disabled={hasBuzzed}
+                      disabled={!buzzingOpen || hasBuzzed}
+                      aria-disabled={!buzzingOpen || hasBuzzed}
                     >
                       {hasBuzzed
                         ? isMyTurn
-                          ? 'YOUR TURN'
+                          ? (
+                            <span className="player-buzz-btn__turn-label">
+                              <span>Your</span>
+                              <span>turn</span>
+                            </span>
+                          )
                           : `#${myQueuePosition} in queue`
                         : 'BUZZ!'}
                     </button>
-                    {!hasBuzzed && (
-                      <div className="font-condensed text-sm text-center" style={{ color: '#4a5580' }}>
-                        {state.buzzQueue.length > 0
-                          ? `${state.buzzQueue.length} player${state.buzzQueue.length > 1 ? 's' : ''} buzzed`
-                          : 'Be first to buzz!'}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Normal: question phase — waiting for buzzing */}
-                {!isDD && uiPhase === 'question' && (
-                  <div className="font-condensed text-sm text-center" style={{ color: '#4a5580' }}>
-                    Waiting for host to open buzzing…
+                    <div className="player-buzz-dock__hint font-condensed text-sm text-center">
+                      {!buzzingOpen
+                        ? 'Waiting for host to open buzzing…'
+                        : !hasBuzzed
+                          ? state.buzzQueue.length > 0
+                            ? `${state.buzzQueue.length} player${state.buzzQueue.length > 1 ? 's' : ''} buzzed`
+                            : 'Be first to buzz!'
+                          : null}
+                    </div>
                   </div>
                 )}
 
