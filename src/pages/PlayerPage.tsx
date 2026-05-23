@@ -19,7 +19,7 @@ export default function PlayerPage() {
 
   const [connected, setConnected] = useState(false)
   const [hasBuzzed, setHasBuzzed] = useState(false)
-  const [buzzPending, setBuzzPending] = useState(false)
+  const wasInBuzzQueueRef = useRef(false)
   const [judgeResult, setJudgeResult] = useState<'correct' | 'wrong' | null>(null)
   const [hostLeft, setHostLeft] = useState(false)
   const [ddWagerInput, setDdWagerInput] = useState('')
@@ -82,7 +82,7 @@ export default function PlayerPage() {
       }
       if (msg.type === 'OPEN_CARD') {
         setHasBuzzed(false)
-        setBuzzPending(false)
+        wasInBuzzQueueRef.current = false
         setJudgeResult(null)
         let mediaType: 'image' | 'audio' | 'video' | undefined
         if (msg.mediaDataUrl) {
@@ -102,7 +102,7 @@ export default function PlayerPage() {
       if (msg.type === 'CLOSE_CARD') {
         patchState({ phase: 'board', activeQuestion: null, buzzQueue: [], activeMedia: null, dailyDouble: null })
         setHasBuzzed(false)
-        setBuzzPending(false)
+        wasInBuzzQueueRef.current = false
         setJudgeResult(null)
         setDdWagerInput('')
         setDdWagerError('')
@@ -110,7 +110,7 @@ export default function PlayerPage() {
       }
       if (msg.type === 'DAILY_DOUBLE_REVEAL') {
         setHasBuzzed(false)
-        setBuzzPending(false)
+        wasInBuzzQueueRef.current = false
         setJudgeResult(null)
         setDdWagerInput('')
         setDdWagerError('')
@@ -145,7 +145,7 @@ export default function PlayerPage() {
       if (msg.type === 'START_BUZZING') {
         patchState({ phase: 'buzzing', buzzQueue: [] })
         setHasBuzzed(false)
-        setBuzzPending(false)
+        wasInBuzzQueueRef.current = false
       }
       if (msg.type === 'BUZZ' && peerId === hostPeerId.current) {
         addBuzz(msg.playerId)
@@ -180,7 +180,7 @@ export default function PlayerPage() {
           dailyDouble: null,
         })
         setHasBuzzed(false)
-        setBuzzPending(false)
+        wasInBuzzQueueRef.current = false
         setJudgeResult(null)
         setDdWagerInput('')
         setDdWagerError('')
@@ -262,12 +262,6 @@ export default function PlayerPage() {
     prevScoreRef.current = score
   }, [myPlayer?.score])
 
-  useEffect(() => {
-    if (buzzPending && state.buzzQueue.includes(myId)) {
-      setBuzzPending(false)
-    }
-  }, [buzzPending, state.buzzQueue, myId])
-
   const [boardFill, setBoardFill] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches,
   )
@@ -281,7 +275,6 @@ export default function PlayerPage() {
   function handleBuzz() {
     if (hasBuzzed || state.phase !== 'buzzing') return
     setHasBuzzed(true)
-    setBuzzPending(true)
     if (hostPeerId.current) {
       net.send({ type: 'BUZZ', playerId: myId, playerName: myPlayer?.name ?? playerName }, hostPeerId.current)
     }
@@ -316,7 +309,9 @@ export default function PlayerPage() {
 
   const myScore = myPlayer?.score ?? 0
   const isInBuzzQueue = state.buzzQueue.includes(myId)
-  const buzzedOut = hasBuzzed && !isInBuzzQueue && !buzzPending
+  if (isInBuzzQueue) wasInBuzzQueueRef.current = true
+  const buzzPending = hasBuzzed && !isInBuzzQueue && !wasInBuzzQueueRef.current
+  const buzzedOut = hasBuzzed && !isInBuzzQueue && wasInBuzzQueueRef.current
   const isMyTurn =
     state.buzzQueue[0] === myId || (buzzPending && state.buzzQueue.length === 0)
   const myQueuePosition = isInBuzzQueue
