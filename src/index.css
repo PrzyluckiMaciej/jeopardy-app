@@ -1696,6 +1696,37 @@ select:focus-visible {
 .player-buzz-queue-popup {
   display: none;
 }
+
+.buzz-queue-panel__label {
+  text-align: center;
+  width: 100%;
+}
+.buzz-queue-entry {
+  display: grid;
+  grid-template-columns: minmax(2.75rem, auto) 1fr minmax(1.75rem, auto);
+  align-items: center;
+  column-gap: var(--space-sm);
+}
+.buzz-queue-entry__score {
+  justify-self: start;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.buzz-queue-entry__name {
+  justify-self: center;
+  text-align: center;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.buzz-queue-entry__rank {
+  justify-self: end;
+  color: #4a5580;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 .player-buzz-btn {
   width: 8rem;
   height: 8rem;
@@ -2020,7 +2051,7 @@ select:focus-visible {
   .player-action-zone[data-mobile-dock] .player-buzz-btn--my-turn .player-buzz-btn__turn-label span {
     font-size: 1.0625rem;
   }
-  .player-action-zone[data-mobile-dock] .font-condensed {
+  .player-action-zone[data-mobile-dock] .player-buzz-dock .font-condensed {
     text-align: center;
     width: 100%;
   }

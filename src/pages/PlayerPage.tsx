@@ -805,23 +805,24 @@ export default function PlayerPage() {
                           aria-hidden={!buzzQueuePopupOpen}
                           onTransitionEnd={handleBuzzQueuePopupTransitionEnd}
                         >
-                          <div className="font-condensed text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--gold)', opacity: 0.7 }}>
+                          <div className="buzz-queue-panel__label font-condensed text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--gold)', opacity: 0.7 }}>
                             Buzz queue
                           </div>
                           {state.buzzQueue.map((pid, idx) => {
                             const p = state.players.find((pl) => pl.id === pid)
                             if (!p) return null
                             return (
-                              <div key={pid} className="flex items-center gap-2">
-                                <div className="flex-1">
-                                  <div className="font-condensed font-bold text-sm" style={{ color: pid === myId ? 'var(--gold-bright)' : undefined }}>
-                                    {p.name}{pid === myId ? ' (you)' : ''}
-                                  </div>
-                                  <div className="text-xs" style={{ color: 'var(--gold)' }}>
-                                    {p.score < 0 ? `-$${Math.abs(p.score)}` : `$${p.score}`}
-                                  </div>
-                                </div>
-                                <div className="text-xs" style={{ color: '#4a5580' }}>#{idx + 1}</div>
+                              <div key={pid} className="buzz-queue-entry">
+                                <span className="buzz-queue-entry__score text-xs">
+                                  {p.score < 0 ? `-$${Math.abs(p.score)}` : `$${p.score}`}
+                                </span>
+                                <span
+                                  className="buzz-queue-entry__name font-condensed font-bold text-sm"
+                                  style={{ color: pid === myId ? 'var(--gold-bright)' : undefined }}
+                                >
+                                  {p.name}{pid === myId ? ' (you)' : ''}
+                                </span>
+                                <span className="buzz-queue-entry__rank text-xs">#{idx + 1}</span>
                               </div>
                             )
                           })}
@@ -910,23 +911,24 @@ export default function PlayerPage() {
               {/* Buzz queue in sidebar (desktop; mobile uses dock popup) */}
               {showBuzzQueueInSidebar && (
                 <div key="buzz-queue" className="panel panel--buzz-queue overlay-sidebar-enter flex flex-col gap-2">
-                  <div className="font-condensed text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--gold)', opacity: 0.7 }}>
+                  <div className="buzz-queue-panel__label font-condensed text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--gold)', opacity: 0.7 }}>
                     Buzz queue
                   </div>
                   {state.buzzQueue.map((pid, idx) => {
                     const p = state.players.find((pl) => pl.id === pid)
                     if (!p) return null
                     return (
-                      <div key={pid} className="flex items-center gap-2">
-                        <div className="flex-1">
-                          <div className="font-condensed font-bold text-sm" style={{ color: pid === myId ? 'var(--gold-bright)' : undefined }}>
-                            {p.name}{pid === myId ? ' (you)' : ''}
-                          </div>
-                          <div className="text-xs" style={{ color: 'var(--gold)' }}>
-                            {p.score < 0 ? `-$${Math.abs(p.score)}` : `$${p.score}`}
-                          </div>
-                        </div>
-                        <div className="text-xs" style={{ color: '#4a5580' }}>#{idx + 1}</div>
+                      <div key={pid} className="buzz-queue-entry">
+                        <span className="buzz-queue-entry__score text-xs">
+                          {p.score < 0 ? `-$${Math.abs(p.score)}` : `$${p.score}`}
+                        </span>
+                        <span
+                          className="buzz-queue-entry__name font-condensed font-bold text-sm"
+                          style={{ color: pid === myId ? 'var(--gold-bright)' : undefined }}
+                        >
+                          {p.name}{pid === myId ? ' (you)' : ''}
+                        </span>
+                        <span className="buzz-queue-entry__rank text-xs">#{idx + 1}</span>
                       </div>
                     )
                   })}
