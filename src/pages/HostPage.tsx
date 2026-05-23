@@ -74,18 +74,24 @@ export default function HostPage() {
 
     net.onMessage((msg: NetMessage, peerId: string) => {
       if (msg.type === 'PLAYER_JOIN') {
-        const clientId = msg.player.id
+        const joiningId = msg.player.id
+        const players = useGameStore.getState().state.players
+        const existingById = players.find(p => p.id === joiningId)
+        const existingByName = players.find(
+          p => p.name === msg.player.name && !p.isConnected
+        )
+        const existing = existingById ?? existingByName
+        const playerId = existing?.id ?? joiningId
 
         for (const [oldPeerId, cid] of peerToClient.current.entries()) {
-          if (cid === clientId && oldPeerId !== peerId) {
+          if ((cid === playerId || cid === joiningId) && oldPeerId !== peerId) {
             peerToClient.current.delete(oldPeerId)
           }
         }
-        peerToClient.current.set(peerId, clientId)
+        peerToClient.current.set(peerId, playerId)
 
-        const existing = useGameStore.getState().state.players.find(p => p.id === clientId)
         if (existing) {
-          setPlayerConnected(clientId, true)
+          setPlayerConnected(playerId, true)
           logEvent({
             role: 'host',
             roomCode: roomCode ?? '',
@@ -98,7 +104,7 @@ export default function HostPage() {
           return
         }
 
-        const nameTaken = useGameStore.getState().state.players.some(
+        const nameTaken = players.some(
           p => p.name === msg.player.name && p.isConnected
         )
         if (nameTaken) {
@@ -106,7 +112,7 @@ export default function HostPage() {
           return
         }
 
-        const player: Player = { ...msg.player, id: clientId, isConnected: true }
+        const player: Player = { ...msg.player, id: playerId, isConnected: true }
         addPlayer(player)
         logEvent({
           role: 'host',
