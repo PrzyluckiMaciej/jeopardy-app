@@ -376,9 +376,9 @@ export default function PlayerPage() {
   const ddPlayerInfo = state.dailyDouble ? state.players.find(p => p.id === state.dailyDouble!.playerId) : null
   const clueBlurred = settings.blurClueOnBuzz && uiPhase === 'buzzing' && state.buzzQueue.length > 0
   const buzzingOpen = uiPhase === 'buzzing'
-  const showBuzzDock =
-    !isDD && (uiPhase === 'question' || buzzingOpen) && !judgeResult && !buzzedOut
-  const showPlayerActionZone = judgeResult != null || (!isDD && showBuzzDock)
+  const canShowBuzzDock =
+    !isDD && (uiPhase === 'question' || buzzingOpen) && !buzzedOut
+  const showPlayerActionZone = judgeResult != null || canShowBuzzDock
   const showSidebarPanel =
     uiPhase === 'dailyDouble' ||
     (isDD && (uiPhase === 'dailyDoubleBet' || uiPhase === 'question')) ||
@@ -835,62 +835,72 @@ export default function PlayerPage() {
                         </div>
                       )}
                       <div className="player-action-zone__row">
-                        {showBuzzDock && (
-                          <div className="player-buzz-dock">
-                            <button
-                              type="button"
-                              className={[
-                                'player-buzz-btn font-display',
-                                !buzzingOpen
-                                  ? 'player-buzz-btn--waiting'
-                                  : hasBuzzed
+                        {(canShowBuzzDock || judgeResult) && (
+                          <div className="player-action-zone__slot">
+                            {canShowBuzzDock && (
+                              <div
+                                className={`player-buzz-dock${judgeResult ? ' player-buzz-dock--hidden' : ''}`}
+                                aria-hidden={judgeResult ? true : undefined}
+                              >
+                                <button
+                                  type="button"
+                                  className={[
+                                    'player-buzz-btn font-display',
+                                    !buzzingOpen
+                                      ? 'player-buzz-btn--waiting'
+                                      : hasBuzzed
+                                        ? isMyTurn
+                                          ? 'player-buzz-btn--my-turn'
+                                          : 'player-buzz-btn--queued'
+                                        : 'player-buzz-btn--ready buzz-btn',
+                                  ].join(' ')}
+                                  onClick={handleBuzz}
+                                  disabled={!buzzingOpen || hasBuzzed || !!judgeResult}
+                                  aria-disabled={!buzzingOpen || hasBuzzed || !!judgeResult}
+                                  tabIndex={judgeResult ? -1 : undefined}
+                                >
+                                  {hasBuzzed
                                     ? isMyTurn
-                                      ? 'player-buzz-btn--my-turn'
-                                      : 'player-buzz-btn--queued'
-                                    : 'player-buzz-btn--ready buzz-btn',
-                              ].join(' ')}
-                              onClick={handleBuzz}
-                              disabled={!buzzingOpen || hasBuzzed}
-                              aria-disabled={!buzzingOpen || hasBuzzed}
-                            >
-                              {hasBuzzed
-                                ? isMyTurn
-                                  ? (
-                                    <span className="player-buzz-btn__turn-label">
-                                      <span>Your</span>
-                                      <span>turn</span>
-                                    </span>
-                                  )
-                                  : `#${myQueuePosition} in queue`
-                                : 'BUZZ!'}
-                            </button>
-                            <div className="player-buzz-dock__hint font-condensed text-sm text-center">
-                              {!buzzingOpen
-                                ? 'Waiting for host to open buzzing…'
-                                : !hasBuzzed
-                                  ? state.buzzQueue.length > 0
-                                    ? `${state.buzzQueue.length} player${state.buzzQueue.length > 1 ? 's' : ''} buzzed`
-                                    : 'Be first to buzz!'
-                                  : null}
-                            </div>
-                          </div>
-                        )}
-                        {judgeResult && (
-                          <div
-                            key={judgeResult}
-                            className="player-judge-result overlay-sidebar-enter font-display text-2xl text-center rounded-xl"
-                            data-result={judgeResult}
-                          >
-                            {judgeResult === 'correct' ? (
-                              <span className="inline-flex items-center justify-center gap-2">
-                                <Check size={22} aria-hidden />
-                                Correct!
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center justify-center gap-2">
-                                <X size={22} aria-hidden />
-                                Wrong
-                              </span>
+                                      ? (
+                                        <span className="player-buzz-btn__turn-label">
+                                          <span>Your</span>
+                                          <span>turn</span>
+                                        </span>
+                                      )
+                                      : `#${myQueuePosition} in queue`
+                                    : 'BUZZ!'}
+                                </button>
+                                <div className="player-buzz-dock__hint font-condensed text-sm text-center">
+                                  {!buzzingOpen
+                                    ? 'Waiting for host to open buzzing…'
+                                    : !hasBuzzed
+                                      ? state.buzzQueue.length > 0
+                                        ? `${state.buzzQueue.length} player${state.buzzQueue.length > 1 ? 's' : ''} buzzed`
+                                        : 'Be first to buzz!'
+                                      : null}
+                                </div>
+                              </div>
+                            )}
+                            {judgeResult && (
+                              <div
+                                key={judgeResult}
+                                className="player-judge-result player-judge-result--overlay player-judge-result--enter font-display text-2xl text-center rounded-xl"
+                                data-result={judgeResult}
+                                role="status"
+                                aria-live="polite"
+                              >
+                                {judgeResult === 'correct' ? (
+                                  <span className="inline-flex items-center justify-center gap-2">
+                                    <Check size={22} aria-hidden />
+                                    Correct!
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center justify-center gap-2">
+                                    <X size={22} aria-hidden />
+                                    Wrong
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </div>
                         )}
