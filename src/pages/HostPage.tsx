@@ -7,6 +7,7 @@ import type { Board, Player, NetMessage, Question, GameSettings } from '../types
 import { createDefaultBoard, cellId } from '../lib/utils'
 import { getMedia, blobToDataUrl } from '../lib/db'
 import { logEvent } from '../lib/logger'
+import { evaluatePlayerJoin, isClientSessionActive } from '../lib/playerJoin'
 import BoardEditor from '../components/BoardEditor'
 import GameBoard from '../components/GameBoard'
 import QuestionOverlay from '../components/QuestionOverlay'
@@ -20,25 +21,6 @@ function pickRandom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
 }
 
-function findPeerForClient(
-  peerToClient: Map<string, string>,
-  clientId: string,
-): string | undefined {
-  for (const [peerId, cid] of peerToClient) {
-    if (cid === clientId) return peerId
-  }
-  return undefined
-}
-
-function isClientPeerLive(
-  peerToClient: Map<string, string>,
-  clientId: string,
-  livePeers: Set<string>,
-): boolean {
-  const peerId = findPeerForClient(peerToClient, clientId)
-  return peerId !== undefined && livePeers.has(peerId)
-}
-
 function pruneStalePlayers(
   peerToClient: Map<string, string>,
   setPlayerConnected: (id: string, connected: boolean) => void,
@@ -47,7 +29,7 @@ function pruneStalePlayers(
   const livePeers = new Set(net.getConnectedPeerIds())
   for (const player of useGameStore.getState().state.players) {
     if (!player.isConnected) continue
-    if (isClientPeerLive(peerToClient, player.id, livePeers)) continue
+    if (isClientSessionActive(peerToClient, player.id, livePeers)) continue
     setPlayerConnected(player.id, false)
     onStale(player.id)
     for (const [peerId, cid] of [...peerToClient.entries()]) {
@@ -115,36 +97,22 @@ export default function HostPage() {
 
     net.onMessage((msg: NetMessage, peerId: string) => {
       if (msg.type === 'PLAYER_JOIN') {
-        const joiningId = msg.player.id
-        const players = useGameStore.getState().state.players
-        const livePeers = new Set(net.getConnectedPeerIds())
-        const peerMap = peerToClient.current
+        const decision = evaluatePlayerJoin({
+          joiningId: msg.player.id,
+          joiningName: msg.player.name,
+          players: useGameStore.getState().state.players,
+          peerToClient: peerToClient.current,
+          livePeerIds: net.getConnectedPeerIds(),
+          joiningPeerId: peerId,
+        })
 
-        const liveOccupant = players.find(
-          p => p.name === msg.player.name && isClientPeerLive(peerMap, p.id, livePeers)
-        )
-        if (liveOccupant && liveOccupant.id !== joiningId) {
-          net.send({ type: 'JOIN_REJECTED', reason: 'NAME_TAKEN' }, peerId)
+        if (decision.action === 'reject') {
+          net.send({ type: 'JOIN_REJECTED', reason: decision.reason }, peerId)
           return
         }
-        if (liveOccupant?.id === joiningId) {
-          const currentPeer = findPeerForClient(peerMap, joiningId)
-          if (currentPeer && livePeers.has(currentPeer) && currentPeer !== peerId) {
-            net.send({ type: 'JOIN_REJECTED', reason: 'NAME_TAKEN' }, peerId)
-            return
-          }
-        }
 
-        const existingById = players.find(p => p.id === joiningId)
-        const existingByName = players.find(
-          p => p.name === msg.player.name && !p.isConnected
-        )
-        const ghostByName = players.find(
-          p => p.name === msg.player.name && p.isConnected
-            && !isClientPeerLive(peerMap, p.id, livePeers)
-        )
-        const existing = existingById ?? existingByName ?? ghostByName
-        const playerId = existing?.id ?? joiningId
+        const playerId = decision.playerId
+        const joiningId = msg.player.id
 
         for (const [oldPeerId, cid] of peerToClient.current.entries()) {
           if ((cid === playerId || cid === joiningId) && oldPeerId !== peerId) {
@@ -153,13 +121,13 @@ export default function HostPage() {
         }
         peerToClient.current.set(peerId, playerId)
 
-        if (existing) {
+        if (decision.action === 'reconnect') {
           setPlayerConnected(playerId, true)
           logEvent({
             role: 'host',
             roomCode: roomCode ?? '',
             actor: 'host',
-            event: `Player reconnected: ${existing.name}`,
+            event: `Player reconnected: ${msg.player.name}`,
           })
           setTimeout(() => {
             net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
