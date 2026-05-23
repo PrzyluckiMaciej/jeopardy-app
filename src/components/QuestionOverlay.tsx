@@ -293,7 +293,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
           </div>
 
           {!isDD && buzzQueue.length > 0 && (
-            <div className="panel flex flex-col gap-2">
+            <div key="buzz-queue" className="panel panel--buzz-queue overlay-sidebar-enter flex flex-col gap-2">
               <div className="font-condensed text-xs uppercase tracking-wider mb-1 text-gold opacity-70">
                 Buzz queue
               </div>

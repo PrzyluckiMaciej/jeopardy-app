@@ -556,6 +556,34 @@ select:focus-visible {
   animation: fadeSlideUp 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
+/* Question overlay sidebar panels & status lines */
+@keyframes overlaySidebarIn {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.overlay-sidebar-enter {
+  animation: overlaySidebarIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@keyframes overlayStatusIn {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.overlay-status-enter {
+  animation: overlayStatusIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
 /* Tab content crossfade on switch */
 @keyframes tabFadeIn {
   0%   { opacity: 0; transform: translateY(8px); }
@@ -1387,8 +1415,6 @@ select:focus-visible {
   flex-direction: column;
   gap: var(--space-md);
   min-height: 0;
-  padding-left: 1px;
-  border-left: 1px solid var(--border-subtle);
 }
 .question-overlay-sidebar .panel {
   background: var(--bg-surface);
@@ -1826,8 +1852,17 @@ select:focus-visible {
     text-align: center;
     width: 100%;
   }
+  .player-question-overlay .question-overlay-sidebar {
+    gap: var(--space-lg);
+    padding-top: var(--space-lg);
+  }
+  .player-question-overlay .question-overlay-sidebar .panel--buzz-queue {
+    margin-top: var(--space-sm);
+    margin-bottom: var(--space-lg);
+  }
   .question-overlay-layout--player.question-overlay-layout--has-buzz {
-    padding-bottom: 120px;
+    padding-bottom: 168px;
+    scroll-padding-bottom: 168px;
   }
   .player-question-overlay .question-overlay-layout {
     overflow-y: auto;
@@ -1864,5 +1899,13 @@ select:focus-visible {
 @media (min-width: 768px) {
   .host-topbar__logo {
     font-size: 1.5rem;
+  }
+
+  .question-overlay-layout {
+    gap: var(--space-xl);
+  }
+  .question-overlay-sidebar {
+    padding-left: var(--space-lg);
+    border-left: 1px solid var(--border-default);
   }
 }

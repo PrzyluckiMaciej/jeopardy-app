@@ -751,7 +751,11 @@ export default function PlayerPage() {
                 )}
 
                 {uiPhase === 'revealed' && (
-                  <div className="font-condensed text-sm text-center" style={{ color: '#4a5580' }}>
+                  <div
+                    key="answer-revealed"
+                    className="overlay-status-enter font-condensed text-sm text-center"
+                    style={{ color: '#4a5580' }}
+                  >
                     Answer revealed
                   </div>
                 )}
@@ -802,7 +806,7 @@ export default function PlayerPage() {
                     {judgeResult && (
                       <div
                         key={judgeResult}
-                        className="player-judge-result font-display text-2xl text-center rounded-xl w-full modal-enter"
+                        className="player-judge-result overlay-sidebar-enter font-display text-2xl text-center rounded-xl w-full"
                         data-result={judgeResult}
                       >
                         {judgeResult === 'correct' ? (
@@ -824,7 +828,7 @@ export default function PlayerPage() {
 
               {/* Buzz queue (hidden during DD) */}
               {!isDD && state.buzzQueue.length > 0 && (
-                <div className="panel flex flex-col gap-2">
+                <div key="buzz-queue" className="panel panel--buzz-queue overlay-sidebar-enter flex flex-col gap-2">
                   <div className="font-condensed text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--gold)', opacity: 0.7 }}>
                     Buzz queue
                   </div>
