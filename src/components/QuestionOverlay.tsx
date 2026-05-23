@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Check, X, ArrowLeft, CheckCircle, Bell, Eye } from 'lucide-react'
 import type { GameState, GameSettings } from '../types'
 import { cellId, formatScore } from '../lib/utils'
@@ -10,16 +10,6 @@ interface Props {
   state: GameState
   settings: GameSettings
   onClose: () => void
-}
-
-function scoreRank(sorted: { id: string; score: number }[], playerId: string): number {
-  const idx = sorted.findIndex((p) => p.id === playerId)
-  if (idx < 0) return 0
-  if (idx === 0) return 1
-  if (sorted[idx].score === sorted[idx - 1].score) {
-    return scoreRank(sorted, sorted[idx - 1].id)
-  }
-  return idx + 1
 }
 
 export default function QuestionOverlay({ state, settings }: Props) {
@@ -34,11 +24,6 @@ export default function QuestionOverlay({ state, settings }: Props) {
   const prevPhaseRef = useRef(phase)
   const [clueRevealKey, setClueRevealKey] = useState(0)
   const [answerRevealKey, setAnswerRevealKey] = useState(0)
-
-  const sortedPlayers = useMemo(
-    () => [...players].sort((a, b) => b.score - a.score),
-    [players],
-  )
 
   useEffect(() => {
     const prev = prevPhaseRef.current
@@ -357,31 +342,6 @@ export default function QuestionOverlay({ state, settings }: Props) {
               })}
             </div>
           )}
-
-          <div className="panel flex flex-col gap-2 overflow-auto flex-1">
-            <div className="font-condensed text-xs uppercase tracking-wider mb-1 text-gold opacity-70">Scores</div>
-            <div className="overlay-score-list">
-              {sortedPlayers.map((p) => {
-                const rank = scoreRank(sortedPlayers, p.id)
-                return (
-                  <div key={p.id} className="overlay-score-row">
-                    <span
-                      className={`overlay-score-rank${rank === 1 ? ' overlay-score-rank--first' : ''}`}
-                      aria-label={`Rank ${rank}`}
-                    >
-                      #{rank}
-                    </span>
-                    <span className="overlay-score-name" title={p.name}>{p.name}</span>
-                    <span
-                      className={`overlay-score-value ${p.score < 0 ? 'text-score-negative' : 'text-score-positive'}`}
-                    >
-                      {formatScore(p.score)}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
         </aside>
       </div>
     </div>
