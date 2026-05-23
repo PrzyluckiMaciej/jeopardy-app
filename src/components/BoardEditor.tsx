@@ -138,62 +138,33 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
   return (
     <div className="flex flex-col h-full">
       {/* Edit mode toolbar */}
-      <div
-        className="flex items-center gap-3 mb-5 px-4 py-3 rounded-lg flex-wrap flex-shrink-0"
-        style={{
-          background: 'rgba(59,130,246,0.07)',
-          border: '1px solid rgba(59,130,246,0.25)',
-        }}
-      >
-        {/* EDITING badge */}
-        <span
-          className="font-condensed font-bold text-xs px-2 py-0.5 rounded flex-shrink-0"
-          style={{
-            background: 'rgba(59,130,246,0.2)',
-            border: '1px solid rgba(59,130,246,0.45)',
-            color: '#60a5fa',
-            letterSpacing: '0.08em',
-          }}
-        >
-          EDITING
-        </span>
+      <div className="board-editor-toolbar">
+        <div className="board-editor-toolbar__left">
+          <span className="board-editor-toolbar__badge">Editing</span>
+          <button className="btn-outline text-sm" onClick={addCategory}>
+            + Category
+          </button>
+        </div>
 
-        {/* Board name input */}
-        <input
-          className="text-xl font-condensed"
-          style={{
-            background: 'transparent',
-            border: 'none',
-            borderBottom: '2px solid rgba(59,130,246,0.35)',
-            color: 'var(--gold-bright)',
-            fontSize: 20,
-            fontWeight: 700,
-            letterSpacing: 1,
-            borderRadius: 0,
-            paddingLeft: 0,
-            boxShadow: 'none',
-          }}
-          value={boardName}
-          onChange={(e) => {
-            setBoardName(e.target.value)
-            updateBoard({ name: e.target.value })
-          }}
-        />
+        <div className="board-editor-toolbar__center">
+          <input
+            className="board-editor-toolbar__name"
+            value={boardName}
+            onChange={(e) => {
+              setBoardName(e.target.value)
+              updateBoard({ name: e.target.value })
+            }}
+          />
+        </div>
 
-        {/* Add category — center */}
-        <button className="btn-outline text-sm" onClick={addCategory}>
-          + Category
-        </button>
-
-        <div className="flex-1" />
-
-        {/* Discard + Save actions */}
-        <button className="btn-ghost text-sm" onClick={discardChanges}>
-          Discard
-        </button>
-        <button className="btn-gold text-sm" onClick={onClose}>
-          Save &amp; Close
-        </button>
+        <div className="board-editor-toolbar__right">
+          <button className="btn-ghost text-sm" onClick={discardChanges}>
+            Discard
+          </button>
+          <button className="btn-gold text-sm" onClick={onClose}>
+            Save &amp; Close
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-5 flex-1 min-h-0 items-start">
