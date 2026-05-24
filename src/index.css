@@ -2126,6 +2126,42 @@ select:focus-visible {
     padding: var(--space-sm);
     padding-bottom: max(var(--space-sm), env(safe-area-inset-bottom, 0px));
   }
+  /* Daily Double: single-column on mobile — title + wager fit in viewport */
+  .player-question-overlay .question-overlay-layout--dd-compact {
+    overflow: hidden;
+  }
+  .player-question-overlay .question-overlay-layout--dd-compact .question-overlay-main {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    padding: var(--space-md) var(--space-sm);
+  }
+  .daily-double-phase--mobile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
+    width: 100%;
+    max-width: 20rem;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .daily-double-title--compact {
+    font-size: clamp(1.75rem, 6vw, 2.5rem);
+    line-height: 1.05;
+    margin: 0;
+  }
+  .daily-double-phase--mobile .dd-wager-form {
+    gap: var(--space-sm);
+    flex-shrink: 1;
+    min-height: 0;
+  }
+  .daily-double-phase--mobile .dd-wager-form .btn-gold {
+    padding-top: 0.625rem;
+    padding-bottom: 0.625rem;
+  }
   .player-question-overlay .question-overlay-layout--player.question-overlay-layout--has-buzz {
     padding-bottom: calc(72px + 1.25rem + var(--space-sm) * 4 + env(safe-area-inset-bottom, 0px));
     scroll-padding-bottom: calc(72px + 1.25rem + var(--space-sm) * 4 + env(safe-area-inset-bottom, 0px));

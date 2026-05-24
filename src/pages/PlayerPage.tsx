@@ -380,10 +380,14 @@ export default function PlayerPage() {
   const canShowBuzzDock =
     !isDD && (uiPhase === 'question' || buzzingOpen) && !buzzedOut
   const showPlayerActionZone = judgeResult != null || canShowBuzzDock
+  const showDdMobileCompact =
+    isMobileViewport && isDD && (uiPhase === 'dailyDouble' || uiPhase === 'dailyDoubleBet')
+  const showMobilePlayerDock = isMobileViewport && showPlayerActionZone
   const showSidebarPanel =
-    uiPhase === 'dailyDouble' ||
-    (isDD && (uiPhase === 'dailyDoubleBet' || uiPhase === 'question')) ||
-    (showPlayerActionZone && !isMobileViewport)
+    !showDdMobileCompact &&
+    (uiPhase === 'dailyDouble' ||
+      (isDD && (uiPhase === 'dailyDoubleBet' || uiPhase === 'question')) ||
+      (showPlayerActionZone && !isMobileViewport))
   const showBuzzQueuePanel = !isDD && state.buzzQueue.length > 0
   const showBuzzQueueInSidebar = showBuzzQueuePanel && !isMobileViewport
   const showBuzzQueueMobileToggle = showBuzzQueuePanel && isMobileViewport
@@ -446,7 +450,45 @@ export default function PlayerPage() {
   }
 
   const reservePlayerBuzzSpace =
-    !isDD && ['question', 'buzzing', 'revealed'].includes(uiPhase)
+    showMobilePlayerDock ||
+    (!isDD && ['question', 'buzzing', 'revealed'].includes(uiPhase))
+
+  const maxDdWager = (() => {
+    const maxPV = Math.max(...(state.board?.pointValues ?? [0]))
+    return myScore > maxPV ? myScore : maxPV
+  })()
+
+  const ddWagerForm = (
+    <div className="dd-wager-form w-full flex flex-col gap-3">
+      <div className="font-condensed font-bold text-sm text-center" style={{ color: 'var(--gold-bright)' }}>
+        Enter your wager
+      </div>
+      <div className="text-xs text-center" style={{ color: '#4a5580' }}>
+        Min: $1 &middot; Max: ${maxDdWager}
+      </div>
+      <input
+        type="number"
+        min={1}
+        className="w-full text-center font-display text-xl"
+        placeholder="Wager amount"
+        value={ddWagerInput}
+        onChange={(e) => { setDdWagerInput(e.target.value); setDdWagerError('') }}
+        onKeyDown={(e) => e.key === 'Enter' && handleSubmitWager()}
+        disabled={ddWagerSubmitted}
+        autoFocus
+      />
+      {ddWagerError && (
+        <div className="text-xs text-center" style={{ color: 'var(--red)' }}>{ddWagerError}</div>
+      )}
+      <button
+        className="btn-gold w-full py-3"
+        onClick={handleSubmitWager}
+        disabled={ddWagerSubmitted}
+      >
+        {ddWagerSubmitted ? 'Wager submitted' : 'Submit wager'}
+      </button>
+    </div>
+  )
 
   function handleSubmitWager() {
     const wager = parseInt(ddWagerInput, 10)
@@ -672,23 +714,41 @@ export default function PlayerPage() {
             </div>
           </header>
 
-          <div className={`question-overlay-layout question-overlay-layout--player${reservePlayerBuzzSpace ? ' question-overlay-layout--has-buzz' : ''}`}>
+          <div
+            className={`question-overlay-layout question-overlay-layout--player${reservePlayerBuzzSpace ? ' question-overlay-layout--has-buzz' : ''}${showDdMobileCompact ? ' question-overlay-layout--dd-compact' : ''}`}
+          >
             <div className={`question-overlay-main ${overlayExiting ? 'card-flip-exit' : 'card-flip'}`}>
-              {/* DD title splash */}
+              {/* DD title splash + wager (mobile: single column; desktop: title only in main) */}
               {uiPhase === 'dailyDouble' && (
-                <div className="daily-double-title">DAILY DOUBLE!</div>
+                <div className={`daily-double-phase${showDdMobileCompact ? ' daily-double-phase--mobile' : ''}`}>
+                  <div className={`daily-double-title${showDdMobileCompact ? ' daily-double-title--compact' : ''}`}>
+                    DAILY DOUBLE!
+                  </div>
+                  {showDdMobileCompact && (
+                    isDDPlayer ? (
+                      ddWagerForm
+                    ) : (
+                      <div className="font-condensed text-sm text-center" style={{ color: '#4a5580' }}>
+                        Waiting for {ddPlayerInfo?.name ?? 'player'} to wager…
+                      </div>
+                    )
+                  )}
+                </div>
               )}
 
               {/* DD wager submitted — waiting for host to reveal clue */}
               {uiPhase === 'dailyDoubleBet' && (
-                <div className="flex flex-col items-center gap-4">
-                  <div className="daily-double-title" style={{ fontSize: 'clamp(2rem, 5vw, 3.5rem)' }}>DAILY DOUBLE!</div>
+                <div className={`daily-double-phase${showDdMobileCompact ? ' daily-double-phase--mobile' : ''}`}>
+                  <div className={`daily-double-title${showDdMobileCompact ? ' daily-double-title--compact' : ''}`}>
+                    DAILY DOUBLE!
+                  </div>
                   {state.dailyDouble?.wager != null && (
-                    <div className="font-condensed text-2xl" style={{ color: 'var(--gold-bright)' }}>
-                      Wager: <span className="font-display">${state.dailyDouble.wager}</span>
+                    <div className="font-condensed text-center" style={{ color: 'var(--gold-bright)', fontSize: showDdMobileCompact ? '1.125rem' : '1.5rem' }}>
+                      {isDDPlayer ? 'Wager submitted' : `${ddPlayerInfo?.name} wagered`}:{' '}
+                      <span className="font-display">${state.dailyDouble.wager}</span>
                     </div>
                   )}
-                  <div className="font-condensed text-lg animate-pulse" style={{ color: '#4a5580' }}>
+                  <div className="font-condensed text-sm animate-pulse text-center" style={{ color: '#4a5580' }}>
                     Waiting for host to reveal the clue…
                   </div>
                 </div>
@@ -749,38 +809,7 @@ export default function PlayerPage() {
                 {/* DD: title phase — wager input for DD player, waiting message for others */}
                 {uiPhase === 'dailyDouble' && (
                   isDDPlayer ? (
-                    <div className="w-full flex flex-col gap-3">
-                      <div className="font-condensed font-bold text-sm text-center" style={{ color: 'var(--gold-bright)' }}>
-                        Enter your wager
-                      </div>
-                      <div className="text-xs text-center" style={{ color: '#4a5580' }}>
-                        Min: $1 &middot; Max: ${(() => {
-                          const maxPV = Math.max(...(state.board?.pointValues ?? [0]))
-                          return myScore > maxPV ? myScore : maxPV
-                        })()}
-                      </div>
-                      <input
-                        type="number"
-                        min={1}
-                        className="w-full text-center font-display text-xl"
-                        placeholder="Wager amount"
-                        value={ddWagerInput}
-                        onChange={(e) => { setDdWagerInput(e.target.value); setDdWagerError('') }}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSubmitWager()}
-                        disabled={ddWagerSubmitted}
-                        autoFocus
-                      />
-                      {ddWagerError && (
-                        <div className="text-xs text-center" style={{ color: 'var(--red)' }}>{ddWagerError}</div>
-                      )}
-                      <button
-                        className="btn-gold w-full py-3"
-                        onClick={handleSubmitWager}
-                        disabled={ddWagerSubmitted}
-                      >
-                        {ddWagerSubmitted ? 'Wager submitted' : 'Submit wager'}
-                      </button>
-                    </div>
+                    ddWagerForm
                   ) : (
                     <div className="font-condensed text-sm text-center" style={{ color: '#4a5580' }}>
                       Waiting for {ddPlayerInfo?.name ?? 'player'} to wager…
@@ -807,7 +836,7 @@ export default function PlayerPage() {
                 )}
 
                 {/* DD: question phase — waiting for host to judge */}
-                {isDD && uiPhase === 'question' && (
+                {isDD && uiPhase === 'question' && !judgeResult && (
                   <div className="w-full flex flex-col gap-2 items-center">
                     {state.dailyDouble?.wager != null && (
                       <div className="font-condensed text-sm" style={{ color: 'var(--gold-bright)' }}>
@@ -858,7 +887,7 @@ export default function PlayerPage() {
           </div>
 
           {/* Buzzer + judge feedback (mobile — fixed dock, outside sidebar flow) */}
-          {showPlayerActionZone && !isDD && isMobileViewport && (
+          {showMobilePlayerDock && (
             <PlayerActionZone {...playerActionZoneProps} />
           )}
         </div>
