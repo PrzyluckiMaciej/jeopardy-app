@@ -187,37 +187,19 @@ export default function SettingsPanel({
                 />
                 <div className="flex-1 min-w-0">
                   <div
-                    className="font-condensed font-bold flex items-center min-w-0"
-                    style={{ fontSize: '1.0625rem', gap: '0.5rem' }}
+                    className="font-condensed font-bold truncate min-w-0"
+                    style={{ fontSize: '1.0625rem' }}
                   >
-                    <span className="truncate min-w-0">{p.name}</span>
-                    {boardControlId === p.id && (
-                      <span
-                        className="inline-flex flex-shrink-0 items-center justify-center rounded"
-                        title="Board control"
-                        aria-label="Board control"
-                        style={{
-                          background: 'rgba(0,200,180,0.2)',
-                          color: '#40e0d0',
-                          border: '1px solid rgba(0,200,180,0.45)',
-                          padding: '2px 5px',
-                        }}
-                      >
-                        <Crown size={12} aria-hidden />
-                      </span>
-                    )}
+                    {p.name}
                   </div>
                   <div style={{ color: p.score < 0 ? '#e07070' : 'var(--gold)', fontSize: '0.9375rem', marginTop: 2 }}>
                     {formatScore(p.score)}
                   </div>
                 </div>
                 <button
-                  className="btn-icon-only rounded"
-                  style={{
-                    background: boardControlId === p.id ? 'rgba(0,200,180,0.2)' : 'rgba(0,200,180,0.08)',
-                    border: '1px solid rgba(0,200,180,0.35)',
-                    color: '#40e0d0',
-                  }}
+                  type="button"
+                  className={`btn-icon-only rounded settings-board-control-btn${boardControlId === p.id ? ' settings-board-control-btn--active' : ''}`}
+                  aria-pressed={boardControlId === p.id}
                   title={
                     boardControlId === p.id
                       ? 'Remove board control from this player'
