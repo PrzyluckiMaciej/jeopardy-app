@@ -740,7 +740,7 @@ export default function HostPage() {
 
         {tab === 'settings' && (
           <div
-            className="flex-1 overflow-auto tab-fade-in safe-area-x"
+            className="flex-1 overflow-auto tab-fade-in safe-area-x host-settings-scroll"
             style={{
               paddingTop: 'var(--space-sm)',
               paddingBottom: 'var(--space-lg)',

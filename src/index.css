@@ -1842,10 +1842,29 @@ select:focus-visible {
 }
 
 /* ── Settings layout ────────────────────────────────────────── */
+.host-settings-scroll {
+  scrollbar-gutter: stable;
+  overflow-x: hidden;
+}
 .settings-grid {
   display: grid;
   gap: var(--space-xl);
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+.settings-board-control-btn {
+  background: rgba(0, 200, 180, 0.08);
+  border: 1px solid rgba(0, 200, 180, 0.35);
+  color: #40e0d0;
+}
+.settings-board-control-btn--active {
+  background: rgba(0, 200, 180, 0.2);
+}
+.settings-board-control-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-blue);
 }
 .settings-toggle {
   display: flex;
