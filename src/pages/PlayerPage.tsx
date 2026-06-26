@@ -619,7 +619,7 @@ export default function PlayerPage() {
       >
         {/* Podium view */}
         {state.phase === 'podium' && (
-          <div className="flex-1 flex flex-col items-center justify-center p-4 overflow-auto">
+          <div className="flex-1 flex flex-col items-center justify-center p-4 overflow-auto w-full min-w-0">
             <Podium players={state.players} highlightId={myId} />
           </div>
         )}

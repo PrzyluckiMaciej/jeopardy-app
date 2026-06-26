@@ -29,13 +29,13 @@ export default function Podium({ players, highlightId }: Props) {
   }
 
   return (
-    <div className="flex flex-col items-center gap-8">
-      <div className="font-display text-4xl" style={{ color: 'var(--gold-bright)' }}>GAME OVER</div>
+    <div className="flex flex-col items-center gap-8 w-full max-w-lg">
+      <div className="font-display text-3xl sm:text-4xl" style={{ color: 'var(--gold-bright)' }}>GAME OVER</div>
 
-      <div className="flex items-end justify-center gap-4" style={{ minHeight: 320 }}>
+      <div className="flex items-end justify-center gap-2 sm:gap-4 w-full px-1 sm:px-0" style={{ minHeight: 280 }}>
         {PODIUM_ORDER.map((placeIdx) => {
           const player = top3[placeIdx]
-          if (!player) return <div key={placeIdx} className="w-32" />
+          if (!player) return <div key={placeIdx} className="flex-1 min-w-0" />
           const color = PODIUM_COLORS[placeIdx]
           const height = PODIUM_HEIGHTS[placeIdx]
           const delayClass = placeIdx === 0 ? 'podium-bar-1st' : placeIdx === 1 ? 'podium-bar-2nd' : 'podium-bar-3rd'
@@ -43,17 +43,17 @@ export default function Podium({ players, highlightId }: Props) {
           const isHighlighted = highlightId === player.id
 
           return (
-            <div key={placeIdx} className="flex flex-col items-center w-32">
-              <div className={`podium-name ${nameDelayClass} flex flex-col items-center mb-2`}>
+            <div key={placeIdx} className="flex flex-col items-center flex-1 min-w-0">
+              <div className={`podium-name ${nameDelayClass} flex flex-col items-center mb-2 w-full`}>
                 <div
-                  className="font-condensed font-bold text-lg truncate max-w-full text-center"
+                  className="font-condensed font-bold text-sm sm:text-lg truncate max-w-full text-center px-0.5"
                   style={{ color: isHighlighted ? 'var(--gold-bright)' : 'var(--white)' }}
                 >
                   {player.name}
                   {isHighlighted && <span className="text-xs ml-1" style={{ color: 'var(--gold)' }}>(you)</span>}
                 </div>
                 <div
-                  className="font-display text-xl"
+                  className="font-display text-base sm:text-xl"
                   style={{ color: player.score < 0 ? '#e07070' : 'var(--gold-bright)' }}
                 >
                   {formatScore(player.score)}
@@ -70,7 +70,7 @@ export default function Podium({ players, highlightId }: Props) {
                 }}
               >
                 <div
-                  className="font-display text-2xl"
+                  className="font-display text-lg sm:text-2xl"
                   style={{ color: 'var(--navy)', opacity: 0.7 }}
                 >
                   {color.rank}
