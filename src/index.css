@@ -1937,10 +1937,6 @@ select:focus-visible {
   .mobile-players-collapsible--open .mobile-players-collapsible__inner {
     overflow: visible;
   }
-  .mobile-players-collapsible--open .scoreboard--list {
-    max-height: 40vh;
-    overflow-y: auto;
-  }
 }
 
 /* ── Mobile breakpoint overrides (max-width: 767px = below md) ─ */
