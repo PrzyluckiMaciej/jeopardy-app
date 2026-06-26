@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { LogOut } from 'lucide-react'
+import { LogOut, Users, ChevronUp, ChevronDown } from 'lucide-react'
 import PlayerActionZone from '../components/PlayerActionZone'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useGameStore } from '../store/gameStore'
@@ -33,6 +33,7 @@ export default function PlayerPage() {
   const [scorePulsing, setScorePulsing] = useState(false)
   const [buzzQueuePopupOpen, setBuzzQueuePopupOpen] = useState(false)
   const [buzzQueuePopupActive, setBuzzQueuePopupActive] = useState(false)
+  const [mobilePlayersOpen, setMobilePlayersOpen] = useState(false)
   const [isMobileViewport, setIsMobileViewport] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches,
   )
@@ -662,15 +663,28 @@ export default function PlayerPage() {
             </div>
 
             <div className="flex-shrink-0 relative z-20 overflow-visible">
-              <Scoreboard
-                players={state.players}
-                buzzQueue={state.buzzQueue}
-                highlightId={myId}
-                boardControlId={state.boardControlId}
-                activeEmojis={activeEmojis}
-                myPlayerId={myId}
-                onEmojiSelect={handleEmojiSelect}
-              />
+              <button
+                className="mobile-players-toggle"
+                onClick={() => setMobilePlayersOpen(v => !v)}
+                aria-expanded={mobilePlayersOpen}
+              >
+                <Users size={14} aria-hidden />
+                <span>Players ({state.players.filter(p => p.isConnected).length})</span>
+                {mobilePlayersOpen ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
+              </button>
+              <div className={`mobile-players-collapsible${mobilePlayersOpen ? ' mobile-players-collapsible--open' : ''}`}>
+                <div className="mobile-players-collapsible__inner">
+                  <Scoreboard
+                    players={state.players}
+                    buzzQueue={state.buzzQueue}
+                    highlightId={myId}
+                    boardControlId={state.boardControlId}
+                    activeEmojis={activeEmojis}
+                    myPlayerId={myId}
+                    onEmojiSelect={handleEmojiSelect}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         )}
