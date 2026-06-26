@@ -1935,8 +1935,11 @@ select:focus-visible {
     min-height: 0;
   }
   .mobile-players-collapsible--open .mobile-players-collapsible__inner {
-    overflow-y: auto;
+    overflow: visible;
+  }
+  .mobile-players-collapsible--open .scoreboard--list {
     max-height: 40vh;
+    overflow-y: auto;
   }
 }
 
