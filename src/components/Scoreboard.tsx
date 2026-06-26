@@ -270,7 +270,7 @@ export default function Scoreboard({
           return (
             <div
               key={p.id}
-              className={`flex transition-all ${st.cardStateClass}`}
+              className={`flex ${st.cardStateClass}`}
               style={{
                 minWidth: 110,
                 maxWidth: 180,
@@ -280,6 +280,8 @@ export default function Scoreboard({
                 borderRadius: 10,
                 position: 'relative',
                 overflow: 'visible',
+                transition: 'border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease',
+                zIndex: reaction ? 10 : undefined,
               }}
             >
               {reaction && (

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Settings, Trash2, Pencil, Check, Copy, FolderOpen, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, RotateCcw, Shuffle, X } from 'lucide-react'
+import { Settings, Trash2, Pencil, Check, Copy, FolderOpen, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, RotateCcw, Shuffle, X, Users } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useGameStore, useBoardStore } from '../store/gameStore'
 import * as net from '../lib/network'
@@ -69,6 +69,7 @@ export default function HostPage() {
   const [editingGameId, setEditingGameId] = useState<string | null>(null)
   const [editingGameName, setEditingGameName] = useState('')
   const [activeEmojis, setActiveEmojis] = useState<Record<string, { emoji: string; seq: number }>>({})
+  const [mobilePlayersOpen, setMobilePlayersOpen] = useState(false)
 
   const peerToClient = useRef(new Map<string, string>())
   const nameSessions = useRef(new Map<string, NameSession>())
@@ -668,7 +669,7 @@ export default function HostPage() {
                   </div>
                 )}
 
-                <div className="flex-1 flex flex-col min-h-0 overflow-hidden gap-4 px-4 pb-4 pt-2">
+                <div className="board-and-players flex-1 flex flex-col min-h-0 overflow-hidden gap-4 px-4 pb-4 pt-2">
                   {/* Board — grows to fill space above scoreboard */}
                   <div className="board-scroll-wrap">
                     {editing && board ? (
@@ -698,38 +699,51 @@ export default function HostPage() {
                     )}
                   </div>
 
-                  {/* Scoreboard — pinned below board, always visible */}
+                  {/* Scoreboard — pinned below board, collapsible on mobile */}
                   {!editing && (
                     <div className="flex-shrink-0 relative z-20 overflow-visible">
-                      {state.players.some(p => p.isConnected) && (
-                        <div className="flex justify-end mb-2">
-                          <button
-                            className="font-condensed text-xs px-2 py-1 rounded btn-with-icon"
-                            style={{
-                              background: 'rgba(0,200,180,0.15)',
-                              color: '#40e0d0',
-                              border: '1px solid rgba(0,200,180,0.35)',
-                            }}
-                            title="Randomly select a player to have board control"
-                            onClick={() => {
-                              const connected = state.players.filter(p => p.isConnected)
-                              if (connected.length === 0) return
-                              const pick = pickRandom(connected)
-                              setBoardControl(pick.id)
-                              net.broadcast({ type: 'SET_BOARD_CONTROL', playerId: pick.id })
-                            }}
-                          >
-                            <Shuffle size={14} aria-hidden />
-                            <span>Randomize</span>
-                          </button>
+                      <button
+                        className="mobile-players-toggle"
+                        onClick={() => setMobilePlayersOpen(v => !v)}
+                        aria-expanded={mobilePlayersOpen}
+                      >
+                        <Users size={14} aria-hidden />
+                        <span>Players ({state.players.filter(p => p.isConnected).length})</span>
+                        {mobilePlayersOpen ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
+                      </button>
+                      <div className={`mobile-players-collapsible${mobilePlayersOpen ? ' mobile-players-collapsible--open' : ''}`}>
+                        <div className="mobile-players-collapsible__inner">
+                          {state.players.some(p => p.isConnected) && (
+                            <div className="flex justify-end mb-2">
+                              <button
+                                className="font-condensed text-xs px-2 py-1 rounded btn-with-icon"
+                                style={{
+                                  background: 'rgba(0,200,180,0.15)',
+                                  color: '#40e0d0',
+                                  border: '1px solid rgba(0,200,180,0.35)',
+                                }}
+                                title="Randomly select a player to have board control"
+                                onClick={() => {
+                                  const connected = state.players.filter(p => p.isConnected)
+                                  if (connected.length === 0) return
+                                  const pick = pickRandom(connected)
+                                  setBoardControl(pick.id)
+                                  net.broadcast({ type: 'SET_BOARD_CONTROL', playerId: pick.id })
+                                }}
+                              >
+                                <Shuffle size={14} aria-hidden />
+                                <span>Randomize</span>
+                              </button>
+                            </div>
+                          )}
+                          <Scoreboard
+                            players={state.players}
+                            buzzQueue={state.buzzQueue}
+                            boardControlId={state.boardControlId}
+                            activeEmojis={activeEmojis}
+                          />
                         </div>
-                      )}
-                      <Scoreboard
-                        players={state.players}
-                        buzzQueue={state.buzzQueue}
-                        boardControlId={state.boardControlId}
-                        activeEmojis={activeEmojis}
-                      />
+                      </div>
                     </div>
                   )}
                 </div>
