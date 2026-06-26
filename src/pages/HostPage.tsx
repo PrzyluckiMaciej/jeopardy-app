@@ -669,7 +669,7 @@ export default function HostPage() {
                   </div>
                 )}
 
-                <div className="flex-1 flex flex-col min-h-0 overflow-hidden gap-4 px-4 pb-4 pt-2">
+                <div className="board-and-players flex-1 flex flex-col min-h-0 overflow-hidden gap-4 px-4 pb-4 pt-2">
                   {/* Board — grows to fill space above scoreboard */}
                   <div className="board-scroll-wrap">
                     {editing && board ? (
