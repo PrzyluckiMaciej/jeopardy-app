@@ -581,7 +581,7 @@ export default function HostPage() {
 
             {/* Podium view */}
             {state.phase === 'podium' && (
-              <div className="flex-1 flex flex-col items-center justify-center gap-6 p-4 overflow-auto">
+              <div className="flex-1 flex flex-col items-center justify-center gap-6 p-4 overflow-auto w-full min-w-0">
                 <Podium players={state.players} />
                 <button className="btn-gold text-sm mt-4" onClick={handleEndGame}>
                   Back to lobby
