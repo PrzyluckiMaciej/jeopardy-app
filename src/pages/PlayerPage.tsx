@@ -770,10 +770,10 @@ export default function PlayerPage() {
 
               {/* Clue (shown in question/buzzing/revealed phases) */}
               {(uiPhase === 'question' || uiPhase === 'buzzing' || uiPhase === 'revealed') && (
-                <div key={`clue-${clueRevealKey}`} className="flex flex-col items-center w-full max-w-2xl">
+                <div key={`clue-${clueRevealKey}`} className="question-overlay-content flex flex-col items-center w-full max-w-2xl">
                   {displayMedia && (
                     <div
-                      className="mb-3 clue-reveal"
+                      className="question-overlay-media clue-reveal"
                       style={{
                         filter: clueBlurred ? 'blur(8px)' : 'none',
                         transition: 'filter 0.3s ease',
@@ -792,7 +792,7 @@ export default function PlayerPage() {
                   )}
 
                   <div
-                    className={`font-condensed font-bold text-3xl md:text-4xl leading-snug mb-3 max-w-2xl${displayMedia ? '' : ' clue-reveal'}`}
+                    className={`question-overlay-clue font-condensed font-bold text-3xl md:text-4xl leading-snug max-w-2xl${displayMedia ? '' : ' clue-reveal'}`}
                     style={{
                       color: 'var(--white)',
                       filter: clueBlurred ? 'blur(8px)' : 'none',
@@ -806,8 +806,7 @@ export default function PlayerPage() {
                   {uiPhase === 'revealed' && (
                     <div
                       key={`answer-${answerRevealKey}`}
-                      className="font-display text-2xl md:text-3xl px-6 py-3 rounded-lg mt-2 answer-reveal"
-                      style={{ background: 'rgba(212,160,23,0.15)', border: '2px solid var(--gold)', color: 'var(--gold-bright)' }}
+                      className="question-overlay-answer font-display text-2xl md:text-3xl answer-reveal"
                     >
                       {displayQ.answer || '—'}
                     </div>
