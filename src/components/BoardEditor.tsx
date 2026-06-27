@@ -502,7 +502,7 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
             </div>
 
             <div
-              className="flex items-center gap-3 px-3 py-2 rounded-lg"
+              className="board-editor-dd-toggle"
               style={{
                 background:
                   board.dailyDoubleQuestionId === activeQ.id
@@ -513,7 +513,6 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                     ? 'rgba(212,160,23,0.45)'
                     : 'var(--navy-light)'
                 }`,
-                cursor: 'pointer',
               }}
               onClick={() => {
                 const isDD = board.dailyDoubleQuestionId === activeQ.id
