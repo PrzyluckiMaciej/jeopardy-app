@@ -12,6 +12,7 @@ export interface Question {
   answer: string
   points: number
   mediaId?: string // reference to MediaAttachment in IndexedDB
+  mediaType?: 'image' | 'audio' | 'video'
 }
 
 export interface Category {
