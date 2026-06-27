@@ -936,6 +936,12 @@ select:focus-visible {
   }
 }
 
+/* ── Game board fill-mode typography ─────────────────────────── */
+.game-board--fill {
+  --board-category-font-size: clamp(0.75rem, 1.4vh, 0.875rem);
+  --board-cell-value-font-size: clamp(0.75rem, min(3.5vw, 4vh), 1.35rem);
+}
+
 /* ── Game board touch targets ───────────────────────────────── */
 .game-board--touch .board-cell {
   min-height: 48px;
@@ -973,6 +979,18 @@ select:focus-visible {
   flex-wrap: wrap;
   gap: var(--space-md);
   justify-content: center;
+}
+.scoreboard-card__name {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: var(--white);
+}
+.scoreboard-card__score {
+  font-family: 'Anton', sans-serif;
+  font-size: 1.6rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 @media (max-width: 767px) {
   .scoreboard--cards {
@@ -2362,6 +2380,20 @@ select:focus-visible {
 }
 
 @media (min-width: 768px) {
+  .game-board--fill {
+    --board-category-font-size: clamp(0.9375rem, 2.2vh, 1.375rem);
+    --board-cell-value-font-size: clamp(1.125rem, min(5vw, 6vh), 2.25rem);
+  }
+  .game-board--fill .dd-badge {
+    font-size: 12px;
+  }
+  .scoreboard--cards .scoreboard-card__name {
+    font-size: 1.0625rem;
+  }
+  .scoreboard--cards .scoreboard-card__score {
+    font-size: 2rem;
+  }
+
   .host-topbar__logo {
     font-size: 1.5rem;
   }

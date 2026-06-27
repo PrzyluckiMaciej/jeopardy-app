@@ -51,7 +51,7 @@ export default function GameBoard({
               background: 'var(--navy-mid)',
               border: '2px solid var(--navy-light)',
               letterSpacing: 1,
-              fontSize: fill ? 'clamp(0.75rem, 1.4vh, 0.875rem)' : 14,
+              fontSize: fill ? 'var(--board-category-font-size)' : 14,
               minHeight: fill ? undefined : 72,
             }}
           >
@@ -83,7 +83,7 @@ export default function GameBoard({
                   className={`board-cell__value font-display leading-none${fill ? '' : ' text-3xl'}`}
                   style={{
                     color: isAnswered ? '#4a5580' : 'var(--gold-bright)',
-                    fontSize: fill ? 'clamp(0.75rem, min(3.5vw, 4vh), 1.35rem)' : undefined,
+                    fontSize: fill ? 'var(--board-cell-value-font-size)' : undefined,
                   }}
                 >
                   ${pts}
