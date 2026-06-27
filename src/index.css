@@ -1710,9 +1710,45 @@ select:focus-visible {
   min-width: 5.5rem;
 }
 .question-media-controls__seek {
+  --seek-thumb-size: 0.875rem;
+  --seek-track-height: 0.25rem;
   flex: 1 1 8rem;
   min-width: 6rem;
-  accent-color: var(--gold);
+  position: relative;
+  height: var(--seek-thumb-size);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  touch-action: none;
+  outline: none;
+}
+.question-media-controls__seek:focus-visible .question-media-controls__seek-thumb {
+  box-shadow: 0 0 0 2px rgba(212, 160, 23, 0.45);
+}
+.question-media-controls__seek-track {
+  width: 100%;
+  height: var(--seek-track-height);
+  border-radius: 999px;
+  background: rgba(212, 160, 23, 0.2);
+  overflow: hidden;
+}
+.question-media-controls__seek-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--gold);
+  width: calc(var(--seek-thumb-size) / 2 + (100% - var(--seek-thumb-size)) * var(--seek-ratio, 0));
+}
+.question-media-controls__seek-thumb {
+  position: absolute;
+  top: 50%;
+  width: var(--seek-thumb-size);
+  height: var(--seek-thumb-size);
+  border-radius: 50%;
+  background: var(--gold-bright);
+  border: 2px solid var(--gold);
+  box-shadow: 0 0 0 1px rgba(6, 11, 40, 0.4);
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 .question-media-controls__speed select {
   font-family: 'Barlow Condensed', sans-serif;
