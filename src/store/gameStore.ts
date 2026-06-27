@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { Board, Game, GameState, GameSettings, Player, Question } from '../types'
+import type { Board, Game, GameState, GameSettings, MediaPlaybackState, Player, Question } from '../types'
 
 // ---- Board editor store (persisted) ----
 interface BoardStore {
@@ -134,6 +134,7 @@ interface GameStore {
   setBoardControl: (id: string | null) => void
   openCard: (categoryId: string, question: Question, mediaDataUrl?: string) => void
   closeCard: () => void
+  setMediaPlayback: (playback: MediaPlaybackState | null) => void
   startBuzzing: () => void
   addBuzz: (playerId: string) => void
   clearBuzzQueue: () => void
@@ -160,6 +161,7 @@ const defaultState: GameState = {
   activeQuestion: null,
   buzzQueue: [],
   activeMedia: null,
+  mediaPlayback: null,
   boardControlId: null,
   dailyDouble: null,
   activeGameId: null,
@@ -250,6 +252,7 @@ export const useGameStore = create<GameStore>()(
               activeMedia: mediaDataUrl && mediaType
                 ? { type: mediaType, dataUrl: mediaDataUrl }
                 : null,
+              mediaPlayback: null,
             },
           }
         }),
@@ -262,9 +265,13 @@ export const useGameStore = create<GameStore>()(
             activeQuestion: null,
             buzzQueue: [],
             activeMedia: null,
+            mediaPlayback: null,
             dailyDouble: null,
           },
         })),
+
+      setMediaPlayback: (playback) =>
+        set((s) => ({ state: { ...s.state, mediaPlayback: playback } })),
 
       startBuzzing: () =>
         set((s) => ({ state: { ...s.state, phase: 'buzzing', buzzQueue: [] } })),
@@ -310,6 +317,7 @@ export const useGameStore = create<GameStore>()(
             activeQuestion: null,
             buzzQueue: [],
             activeMedia: null,
+            mediaPlayback: null,
             dailyDouble: null,
           },
         })),
@@ -349,6 +357,7 @@ export const useGameStore = create<GameStore>()(
             activeQuestion: null,
             buzzQueue: [],
             activeMedia: null,
+            mediaPlayback: null,
             boardControlId: null,
             dailyDouble: null,
           },
@@ -367,6 +376,7 @@ export const useGameStore = create<GameStore>()(
             activeQuestion: null,
             buzzQueue: [],
             activeMedia: null,
+            mediaPlayback: null,
             boardControlId: null,
             dailyDouble: null,
             boardTransition: null,
@@ -388,6 +398,7 @@ export const useGameStore = create<GameStore>()(
             activeQuestion: null,
             buzzQueue: [],
             activeMedia: null,
+            mediaPlayback: null,
             dailyDouble: null,
             boardTransition: null,
           },

@@ -5,6 +5,7 @@ import { cellId, formatScore } from '../lib/utils'
 import * as net from '../lib/network'
 import { useGameStore } from '../store/gameStore'
 import { logEvent } from '../lib/logger'
+import QuestionMediaPlayer from './QuestionMediaPlayer'
 
 interface Props {
   state: GameState
@@ -13,7 +14,7 @@ interface Props {
 }
 
 export default function QuestionOverlay({ state, settings }: Props) {
-  const { activeQuestion, phase, buzzQueue, players, activeMedia, dailyDouble } = state
+  const { activeQuestion, phase, buzzQueue, players, activeMedia, mediaPlayback, dailyDouble } = state
   const store = useGameStore()
   const roomCode = useGameStore(s => s.roomCode) ?? ''
 
@@ -179,17 +180,13 @@ export default function QuestionOverlay({ state, settings }: Props) {
           {showClue && (
             <div key={`clue-${clueRevealKey}`} className="question-overlay-content flex flex-col items-center w-full max-w-2xl">
               {activeMedia && (
-                <div className="question-overlay-media clue-reveal">
-                  {activeMedia.type === 'image' && (
-                    <img src={activeMedia.dataUrl} alt="" />
-                  )}
-                  {activeMedia.type === 'audio' && (
-                    <audio controls src={activeMedia.dataUrl} autoPlay className="mx-auto" />
-                  )}
-                  {activeMedia.type === 'video' && (
-                    <video controls src={activeMedia.dataUrl} autoPlay />
-                  )}
-                </div>
+                <QuestionMediaPlayer
+                  media={activeMedia}
+                  role="host"
+                  playback={mediaPlayback}
+                  mountKey={clueRevealKey}
+                  className="question-overlay-media clue-reveal"
+                />
               )}
 
               <div

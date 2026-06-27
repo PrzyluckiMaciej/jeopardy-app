@@ -10,6 +10,7 @@ import { logEvent } from '../lib/logger'
 import GameBoard from '../components/GameBoard'
 import Scoreboard from '../components/Scoreboard'
 import Podium from '../components/Podium'
+import QuestionMediaPlayer from '../components/QuestionMediaPlayer'
 
 export default function PlayerPage() {
   const navigate = useNavigate()
@@ -112,10 +113,11 @@ export default function PlayerPage() {
           activeMedia: msg.mediaDataUrl && mediaType
             ? { type: mediaType, dataUrl: msg.mediaDataUrl }
             : null,
+          mediaPlayback: null,
         })
       }
       if (msg.type === 'CLOSE_CARD') {
-        patchState({ phase: 'board', activeQuestion: null, buzzQueue: [], activeMedia: null, dailyDouble: null })
+        patchState({ phase: 'board', activeQuestion: null, buzzQueue: [], activeMedia: null, mediaPlayback: null, dailyDouble: null })
         setHasBuzzed(false)
         wasInBuzzQueueRef.current = false
         setJudgeResult(null)
@@ -144,7 +146,11 @@ export default function PlayerPage() {
           activeMedia: msg.mediaDataUrl && mediaType
             ? { type: mediaType, dataUrl: msg.mediaDataUrl }
             : null,
+          mediaPlayback: null,
         })
+      }
+      if (msg.type === 'MEDIA_PLAYBACK') {
+        patchState({ mediaPlayback: msg.playback })
       }
       if (msg.type === 'DAILY_DOUBLE_ACCEPT_BET') {
         patchState({
@@ -191,6 +197,7 @@ export default function PlayerPage() {
           activeQuestion: null,
           buzzQueue: [],
           activeMedia: null,
+          mediaPlayback: null,
           dailyDouble: null,
         })
         setHasBuzzed(false)
@@ -777,23 +784,17 @@ export default function PlayerPage() {
               {(uiPhase === 'question' || uiPhase === 'buzzing' || uiPhase === 'revealed') && (
                 <div key={`clue-${clueRevealKey}`} className="question-overlay-content flex flex-col items-center w-full max-w-2xl">
                   {displayMedia && (
-                    <div
+                    <QuestionMediaPlayer
+                      media={displayMedia}
+                      role="player"
+                      playback={state.mediaPlayback}
+                      mountKey={clueRevealKey}
                       className="question-overlay-media clue-reveal"
                       style={{
                         filter: clueBlurred ? 'blur(8px)' : 'none',
                         transition: 'filter 0.3s ease',
                       }}
-                    >
-                      {displayMedia.type === 'image' && (
-                        <img src={displayMedia.dataUrl} alt="Question media" />
-                      )}
-                      {displayMedia.type === 'audio' && (
-                        <audio controls src={displayMedia.dataUrl} autoPlay className="mx-auto" />
-                      )}
-                      {displayMedia.type === 'video' && (
-                        <video controls src={displayMedia.dataUrl} autoPlay />
-                      )}
-                    </div>
+                    />
                   )}
 
                   <div
