@@ -201,7 +201,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
                   role="host"
                   playback={mediaPlayback}
                   mountKey={clueRevealKey}
-                  mediaActive={!overlayExiting}
+                  mediaActive={mediaRevealed && !overlayExiting}
                   className={`question-overlay-media${mediaRevealed ? '' : ' question-overlay-media--pending'}`}
                 />
               )}
