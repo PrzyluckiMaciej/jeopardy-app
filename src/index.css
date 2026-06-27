@@ -849,6 +849,56 @@ select:focus-visible {
   border-bottom-color: rgba(96, 165, 250, 0.75);
 }
 
+/* Board editor — question edit panel overlays the grid */
+.board-editor-body {
+  position: relative;
+}
+.board-editor-question-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 20rem;
+  z-index: 2;
+  max-height: 100%;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  box-shadow: -12px 0 32px rgba(0, 0, 0, 0.45);
+}
+@keyframes boardEditorPanelIn {
+  0% {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.board-editor-question-panel--enter {
+  animation: boardEditorPanelIn 0.24s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@keyframes boardEditorPanelOut {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+.board-editor-question-panel--exit {
+  animation: boardEditorPanelOut 0.24s cubic-bezier(0.4, 0, 1, 1) forwards;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .board-editor-question-panel--enter,
+  .board-editor-question-panel--exit {
+    animation: none;
+  }
+}
+
 /* ── Board horizontal scroll with edge fade hint ────────────── */
 .board-scroll-wrap {
   position: relative;
