@@ -8,6 +8,7 @@ import type { NetMessage, Player } from '../types'
 import { initialMediaPlaybackForType } from '../types'
 import { generateId, formatScore } from '../lib/utils'
 import { logEvent } from '../lib/logger'
+import { setCachedMedia, getOrCreateObjectUrl, clearCache } from '../lib/mediaCache'
 import GameBoard from '../components/GameBoard'
 import Scoreboard from '../components/Scoreboard'
 import Podium from '../components/Podium'
@@ -40,6 +41,8 @@ export default function PlayerPage() {
   const [isMobileViewport, setIsMobileViewport] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches,
   )
+  const [mediaLoading, setMediaLoading] = useState(false)
+  const pendingMediaRequest = useRef<string | null>(null)
   const hostPeerId = useRef<string | null>(null)
   const emojiTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const prevPhaseRef = useRef(state.phase)
@@ -83,6 +86,26 @@ export default function PlayerPage() {
       }
     })
 
+    net.onMedia((data, peerId, metadata) => {
+      const blob = new Blob([data], { type: metadata.mimeType })
+      setCachedMedia(metadata.mediaId, blob)
+      net.send({ type: 'MEDIA_ACK', mediaId: metadata.mediaId }, peerId)
+      if (pendingMediaRequest.current === metadata.mediaId) {
+        pendingMediaRequest.current = null
+        const objectUrl = getOrCreateObjectUrl(metadata.mediaId)
+        if (objectUrl) {
+          const currentState = useGameStore.getState().state
+          const question = currentState.activeQuestion?.question
+          if (question?.mediaId === metadata.mediaId && question.mediaType) {
+            patchState({
+              activeMedia: { type: question.mediaType, dataUrl: objectUrl },
+            })
+          }
+          setMediaLoading(false)
+        }
+      }
+    })
+
     net.onMessage((msg: NetMessage, peerId: string) => {
       if (msg.type === 'SYNC_STATE') {
         if (!hostPeerId.current) hostPeerId.current = peerId
@@ -106,19 +129,31 @@ export default function PlayerPage() {
         setHasBuzzed(false)
         wasInBuzzQueueRef.current = false
         setJudgeResult(null)
-        let mediaType: 'image' | 'audio' | 'video' | undefined
-        if (msg.mediaDataUrl) {
-          if (msg.mediaDataUrl.startsWith('data:image')) mediaType = 'image'
-          else if (msg.mediaDataUrl.startsWith('data:audio')) mediaType = 'audio'
-          else if (msg.mediaDataUrl.startsWith('data:video')) mediaType = 'video'
+        const mediaId = msg.question.mediaId
+        const mediaType = msg.question.mediaType
+        let activeMedia: { type: 'image' | 'audio' | 'video'; dataUrl: string } | null = null
+
+        if (mediaId && mediaType) {
+          const objectUrl = getOrCreateObjectUrl(mediaId)
+          if (objectUrl) {
+            activeMedia = { type: mediaType, dataUrl: objectUrl }
+            setMediaLoading(false)
+          } else {
+            setMediaLoading(true)
+            pendingMediaRequest.current = mediaId
+            if (hostPeerId.current) {
+              net.send({ type: 'MEDIA_REQUEST', mediaId }, hostPeerId.current)
+            }
+          }
+        } else {
+          setMediaLoading(false)
         }
+
         patchState({
           phase: 'question',
           activeQuestion: { categoryId: msg.categoryId, question: msg.question },
           buzzQueue: [],
-          activeMedia: msg.mediaDataUrl && mediaType
-            ? { type: mediaType, dataUrl: msg.mediaDataUrl }
-            : null,
+          activeMedia,
           clueRevealed: msg.clueRevealed ?? false,
           mediaRevealed: msg.mediaRevealed ?? false,
           mediaPlayback: msg.mediaRevealed
@@ -134,6 +169,8 @@ export default function PlayerPage() {
         setDdWagerInput('')
         setDdWagerError('')
         setDdWagerSubmitted(false)
+        setMediaLoading(false)
+        pendingMediaRequest.current = null
       }
       if (msg.type === 'DAILY_DOUBLE_REVEAL') {
         setHasBuzzed(false)
@@ -142,20 +179,32 @@ export default function PlayerPage() {
         setDdWagerInput('')
         setDdWagerError('')
         setDdWagerSubmitted(false)
-        let mediaType: 'image' | 'audio' | 'video' | undefined
-        if (msg.mediaDataUrl) {
-          if (msg.mediaDataUrl.startsWith('data:image')) mediaType = 'image'
-          else if (msg.mediaDataUrl.startsWith('data:audio')) mediaType = 'audio'
-          else if (msg.mediaDataUrl.startsWith('data:video')) mediaType = 'video'
+        const mediaId = msg.question.mediaId
+        const mediaType = msg.question.mediaType
+        let activeMedia: { type: 'image' | 'audio' | 'video'; dataUrl: string } | null = null
+
+        if (mediaId && mediaType) {
+          const objectUrl = getOrCreateObjectUrl(mediaId)
+          if (objectUrl) {
+            activeMedia = { type: mediaType, dataUrl: objectUrl }
+            setMediaLoading(false)
+          } else {
+            setMediaLoading(true)
+            pendingMediaRequest.current = mediaId
+            if (hostPeerId.current) {
+              net.send({ type: 'MEDIA_REQUEST', mediaId }, hostPeerId.current)
+            }
+          }
+        } else {
+          setMediaLoading(false)
         }
+
         patchState({
           phase: 'dailyDouble',
           activeQuestion: { categoryId: msg.categoryId, question: msg.question },
           buzzQueue: [],
           dailyDouble: { playerId: msg.playerId, wager: null },
-          activeMedia: msg.mediaDataUrl && mediaType
-            ? { type: mediaType, dataUrl: msg.mediaDataUrl }
-            : null,
+          activeMedia,
           clueRevealed: false,
           mediaRevealed: false,
           mediaPlayback: null,
@@ -241,6 +290,8 @@ export default function PlayerPage() {
         setDdWagerInput('')
         setDdWagerError('')
         setDdWagerSubmitted(false)
+        setMediaLoading(false)
+        pendingMediaRequest.current = null
       }
       if (msg.type === 'PLAYER_LEAVE') {
         setPlayerConnected(msg.playerId, false)
@@ -276,6 +327,7 @@ export default function PlayerPage() {
 
     return () => {
       net.leaveRoom()
+      clearCache()
       logEvent({ role: 'player', roomCode, actor: playerName, event: 'Left room' })
     }
   }, [roomCode]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -846,11 +898,24 @@ export default function PlayerPage() {
                       playback={state.mediaPlayback}
                       mountKey={mediaRevealKey}
                       mediaActive={displayMediaRevealed}
+                      loading={mediaLoading}
                       className="question-overlay-media clue-reveal"
                       style={{
                         filter: clueBlurred ? 'blur(8px)' : 'none',
                         transition: 'filter 0.3s ease',
                       }}
+                    />
+                  )}
+
+                  {!displayMedia && mediaLoading && displayMediaRevealed && (
+                    <QuestionMediaPlayer
+                      media={{ type: 'audio', dataUrl: '' }}
+                      role="player"
+                      playback={null}
+                      mountKey={mediaRevealKey}
+                      mediaActive={false}
+                      loading={true}
+                      className="question-overlay-media clue-reveal"
                     />
                   )}
 

@@ -13,6 +13,7 @@ interface Props {
   playback: MediaPlaybackState | null
   mountKey: number
   mediaActive?: boolean
+  loading?: boolean
   className?: string
   style?: React.CSSProperties
 }
@@ -105,6 +106,7 @@ export default function QuestionMediaPlayer({
   playback,
   mountKey,
   mediaActive = true,
+  loading = false,
   className,
   style,
 }: Props) {
@@ -321,6 +323,20 @@ export default function QuestionMediaPlayer({
     el.playbackRate = rate
     setPlaybackRate(rate)
     publishPlayback(el)
+  }
+
+  if (loading) {
+    return (
+      <div
+        className={`question-media-player question-media-player--loading${className ? ` ${className}` : ''}`}
+        style={style}
+      >
+        <div className="question-media-player__loader">
+          <div className="question-media-player__spinner" />
+          <span className="question-media-player__loader-text font-condensed">Loading media…</span>
+        </div>
+      </div>
+    )
   }
 
   if (media.type === 'image') {
