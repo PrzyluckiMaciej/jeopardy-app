@@ -3,6 +3,7 @@ import type { Player } from '../types'
 
 export interface PlayerActionZoneProps {
   canShowBuzzDock: boolean
+  revealedPhase?: boolean
   judgeResult: 'correct' | 'wrong' | null
   buzzingOpen: boolean
   hasBuzzed: boolean
@@ -22,6 +23,7 @@ export interface PlayerActionZoneProps {
 
 export default function PlayerActionZone({
   canShowBuzzDock,
+  revealedPhase = false,
   judgeResult,
   buzzingOpen,
   hasBuzzed,
@@ -38,16 +40,20 @@ export default function PlayerActionZone({
   players,
   myId,
 }: PlayerActionZoneProps) {
-  const showSlot = canShowBuzzDock || judgeResult != null
+  const showSlot = canShowBuzzDock || judgeResult != null || revealedPhase
   if (!showSlot) return null
 
-  const buzzHint = !buzzingOpen
-    ? 'Waiting for host to open buzzing…'
-    : !hasBuzzed
-      ? buzzQueueLength > 0
-        ? `${buzzQueueLength} player${buzzQueueLength > 1 ? 's' : ''} buzzed`
-        : 'Be first to buzz!'
-      : null
+  const showBuzzButton = canShowBuzzDock && !(revealedPhase && !judgeResult)
+
+  const buzzHint = revealedPhase && !judgeResult
+    ? '\u00a0'
+    : !buzzingOpen
+      ? 'Waiting for host to open buzzing…'
+      : !hasBuzzed
+        ? buzzQueueLength > 0
+          ? `${buzzQueueLength} player${buzzQueueLength > 1 ? 's' : ''} buzzed`
+          : 'Be first to buzz!'
+        : null
 
   return (
     <div className="player-action-zone" data-mobile-dock>
@@ -86,7 +92,7 @@ export default function PlayerActionZone({
         <div className="player-action-zone__row">
           <div className="player-action-zone__slot">
             <div className="player-action-zone__stack">
-              {canShowBuzzDock ? (
+              {showBuzzButton ? (
                 <button
                   type="button"
                   className={[
