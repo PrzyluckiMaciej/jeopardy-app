@@ -3,7 +3,7 @@ import { Settings, Trash2, Pencil, Check, Copy, CopyPlus, FolderOpen, LogOut, Ch
 import { useNavigate } from 'react-router-dom'
 import { useGameStore, useBoardStore } from '../store/gameStore'
 import * as net from '../lib/network'
-import type { Board, Player, NetMessage, Question, GameSettings } from '../types'
+import type { Board, Player, NetMessage, Question, GameSettings, PlayerSyncStatus } from '../types'
 import { createDefaultBoard, cellId } from '../lib/utils'
 import { duplicateBoard } from '../lib/duplicateBoard'
 import { getMedia, blobToDataUrl } from '../lib/db'
@@ -77,9 +77,117 @@ export default function HostPage() {
   const emojiTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const copyFeedbackTimers = useRef<ReturnType<typeof setTimeout>[]>([])
 
+  const mediaBlobCache = useRef(new Map<string, Blob>())
+  const mediaSyncMap = useRef(new Map<string, Set<string>>())
+  const currentManifestIds = useRef<string[]>([])
+  const [mediaSyncStatus, setMediaSyncStatus] = useState<Map<string, PlayerSyncStatus>>(new Map())
+
+  function collectBoardMediaIds(board: Board): string[] {
+    const ids: string[] = []
+    for (const cat of board.categories) {
+      for (const q of cat.questions) {
+        if (q.mediaId) ids.push(q.mediaId)
+      }
+    }
+    return ids
+  }
+
+  async function loadMediaBlobs(mediaIds: string[]) {
+    for (const id of mediaIds) {
+      if (mediaBlobCache.current.has(id)) continue
+      const rec = await getMedia(id)
+      if (rec) mediaBlobCache.current.set(id, rec.blob)
+    }
+  }
+
+  async function sendManifestAndMedia(targetPeerId: string | null) {
+    const mediaIds = currentManifestIds.current
+    if (mediaIds.length === 0) return
+
+    await loadMediaBlobs(mediaIds)
+
+    const items = mediaIds.map((mediaId) => {
+      const blob = mediaBlobCache.current.get(mediaId)
+      return {
+        mediaId,
+        mimeType: blob?.type ?? 'application/octet-stream',
+        size: blob?.size ?? 0,
+      }
+    })
+
+    if (targetPeerId) {
+      net.send({ type: 'MEDIA_MANIFEST', items }, targetPeerId)
+    } else {
+      net.broadcast({ type: 'MEDIA_MANIFEST', items })
+    }
+
+    for (const mediaId of mediaIds) {
+      const blob = mediaBlobCache.current.get(mediaId)
+      if (!blob) continue
+      net.sendMedia(blob, targetPeerId, { mediaId, mimeType: blob.type })
+    }
+  }
+
+  function clearMediaSync() {
+    currentManifestIds.current = []
+    mediaSyncMap.current.clear()
+    setMediaSyncStatus(new Map())
+  }
+
+  function initSyncForAllPlayers() {
+    const players = useGameStore.getState().state.players
+    for (const p of players) {
+      if (p.isConnected && !mediaSyncMap.current.has(p.id)) {
+        mediaSyncMap.current.set(p.id, new Set())
+      }
+    }
+    updateSyncStatusState()
+  }
+
+  async function startPreTransfer(board: Board) {
+    const mediaIds = collectBoardMediaIds(board)
+    currentManifestIds.current = mediaIds
+    if (mediaIds.length === 0) {
+      clearMediaSync()
+      return
+    }
+
+    initSyncForAllPlayers()
+
+    await loadMediaBlobs(mediaIds)
+    await sendManifestAndMedia(null)
+  }
+
+  function handleMediaAck(playerId: string, mediaId: string) {
+    const synced = mediaSyncMap.current.get(playerId)
+    if (synced) {
+      synced.add(mediaId)
+    } else {
+      mediaSyncMap.current.set(playerId, new Set([mediaId]))
+    }
+    updateSyncStatusState()
+  }
+
+  function updateSyncStatusState() {
+    const total = currentManifestIds.current.length
+    const next = new Map<string, PlayerSyncStatus>()
+    for (const [playerId, synced] of mediaSyncMap.current) {
+      next.set(playerId, { total, synced: synced.size })
+    }
+    setMediaSyncStatus(next)
+  }
+
   useEffect(() => () => {
     copyFeedbackTimers.current.forEach(clearTimeout)
   }, [])
+
+  useEffect(() => {
+    if (!state.board) return
+    const mediaIds = collectBoardMediaIds(state.board)
+    if (mediaIds.length > 0 && currentManifestIds.current.join(',') !== mediaIds.join(',')) {
+      void startPreTransfer(state.board)
+    }
+  }, [state.board]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!roomCode) { navigate('/'); return }
@@ -162,14 +270,23 @@ export default function HostPage() {
             actor: 'host',
             event: `Player reconnected: ${msg.player.name}`,
           })
+          mediaSyncMap.current.set(playerId, new Set())
+          updateSyncStatusState()
           setTimeout(() => {
             net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
           }, 100)
+          setTimeout(() => {
+            if (currentManifestIds.current.length > 0) {
+              sendManifestAndMedia(peerId)
+            }
+          }, 500)
           return
         }
 
         const player: Player = { ...msg.player, id: playerId, isConnected: true }
         addPlayer(player)
+        mediaSyncMap.current.set(playerId, new Set())
+        updateSyncStatusState()
         logEvent({
           role: 'host',
           roomCode: roomCode ?? '',
@@ -179,6 +296,11 @@ export default function HostPage() {
         setTimeout(() => {
           net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
         }, 100)
+        setTimeout(() => {
+          if (currentManifestIds.current.length > 0) {
+            sendManifestAndMedia(peerId)
+          }
+        }, 500)
       }
       if (msg.type === 'BUZZ') {
         const clientId = peerToClient.current.get(peerId)
@@ -214,6 +336,23 @@ export default function HostPage() {
           })
         }, 3500)
       }
+      if (msg.type === 'MEDIA_ACK') {
+        const clientId = peerToClient.current.get(peerId)
+        if (clientId) handleMediaAck(clientId, msg.mediaId)
+      }
+      if (msg.type === 'MEDIA_REQUEST') {
+        const blob = mediaBlobCache.current.get(msg.mediaId)
+        if (blob) {
+          net.sendMedia(blob, peerId, { mediaId: msg.mediaId, mimeType: blob.type })
+        } else {
+          getMedia(msg.mediaId).then((rec) => {
+            if (rec) {
+              mediaBlobCache.current.set(msg.mediaId, rec.blob)
+              net.sendMedia(rec.blob, peerId, { mediaId: msg.mediaId, mimeType: rec.mimeType })
+            }
+          })
+        }
+      }
     })
 
     return () => net.leaveRoom()
@@ -231,6 +370,7 @@ export default function HostPage() {
     net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
     closeBoardPicker()
     setEditing(false)
+    startPreTransfer(b)
   }
 
   function handleUnselectBoard() {
@@ -251,11 +391,13 @@ export default function HostPage() {
     })
     net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
     closeBoardPicker()
+    clearMediaSync()
   }
 
   function handleSelectGame(gameId: string, boardIds: string[]) {
     selectGame(gameId, boardIds)
     setActiveBoard(null)
+    clearMediaSync()
     net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
     closeBoardPicker()
     setEditing(false)
@@ -273,6 +415,7 @@ export default function HostPage() {
     setBoardTransition(b.name)
     patchState({ board: b, answeredCells: [], phase: 'board' })
     net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+    startPreTransfer(b)
 
     setTimeout(() => {
       const connectedPlayers = useGameStore.getState().state.players.filter(p => p.isConnected)
@@ -301,6 +444,7 @@ export default function HostPage() {
     setBoardTransition(b.name)
     patchState({ board: b, answeredCells: [], phase: 'board', activeQuestion: null, buzzQueue: [], activeMedia: null, mediaPlayback: null, dailyDouble: null })
     net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+    startPreTransfer(b)
 
     setTimeout(() => {
       const connectedPlayers = useGameStore.getState().state.players.filter(p => p.isConnected)
@@ -317,6 +461,7 @@ export default function HostPage() {
       if (activeGameId) {
         patchState({ phase: 'gameStart', board: null, answeredCells: [], boardTransition: null })
         setActiveBoard(null)
+        clearMediaSync()
         net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
       }
       return
@@ -332,6 +477,7 @@ export default function HostPage() {
     setBoardTransition(b.name)
     patchState({ board: b, answeredCells: [], phase: 'board', activeQuestion: null, buzzQueue: [], activeMedia: null, mediaPlayback: null, dailyDouble: null })
     net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+    startPreTransfer(b)
 
     setTimeout(() => {
       const connectedPlayers = useGameStore.getState().state.players.filter(p => p.isConnected)
@@ -349,6 +495,7 @@ export default function HostPage() {
       activeQuestion: null, buzzQueue: [], activeMedia: null, mediaPlayback: null, dailyDouble: null,
     })
     setActiveBoard(null)
+    clearMediaSync()
     net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
   }
 
@@ -358,6 +505,7 @@ export default function HostPage() {
       setActiveBoard(null)
       setEditing(false)
       patchState({ board: null, answeredCells: [], phase: 'lobby' })
+      clearMediaSync()
       net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
     }
   }
@@ -410,12 +558,12 @@ export default function HostPage() {
       }
       openCard(categoryId, question, mediaDataUrl, { clue: false, media: false })
       startDailyDouble(ddPlayerId)
-      net.broadcast({ type: 'DAILY_DOUBLE_REVEAL', playerId: ddPlayerId, categoryId, question, mediaDataUrl })
+      net.broadcast({ type: 'DAILY_DOUBLE_REVEAL', playerId: ddPlayerId, categoryId, question })
     } else {
       const clueRevealed = settings.autoRevealClue
       const mediaRevealed = settings.autoRevealMedia
       openCard(categoryId, question, mediaDataUrl, { clue: clueRevealed, media: mediaRevealed })
-      net.broadcast({ type: 'OPEN_CARD', categoryId, question, mediaDataUrl, clueRevealed, mediaRevealed })
+      net.broadcast({ type: 'OPEN_CARD', categoryId, question, clueRevealed, mediaRevealed })
       if (settings.autoBuzzQueue && clueRevealed) {
         store.startBuzzing()
         net.broadcast({ type: 'START_BUZZING' })
@@ -718,6 +866,7 @@ export default function HostPage() {
                         setEditing(false)
                         const current = useGameStore.getState().state
                         net.broadcast({ type: 'SYNC_STATE', state: current })
+                        if (board) startPreTransfer(board)
                       }} />
                     ) : board ? (
                       <GameBoard
@@ -809,6 +958,7 @@ export default function HostPage() {
               onAssignBoardControl={handleAssignBoardControl}
               onUpdatePlayer={handleUpdatePlayer}
               onRemovePlayer={handleRemovePlayer}
+              mediaSyncStatus={mediaSyncStatus}
             />
           </div>
         )}

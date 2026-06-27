@@ -112,7 +112,9 @@ export type NetMessage =
   | { type: 'REMOVE_PLAYER'; playerId: string }
   | { type: 'SET_BOARD_CONTROL'; playerId: string | null }
   | { type: 'UPDATE_SETTINGS'; settings: GameSettings }
-  | { type: 'MEDIA_CHUNK'; mediaId: string; chunk: string; index: number; total: number; mimeType: string }
+  | { type: 'MEDIA_MANIFEST'; items: Array<{ mediaId: string; mimeType: string; size: number }> }
+  | { type: 'MEDIA_ACK'; mediaId: string }
+  | { type: 'MEDIA_REQUEST'; mediaId: string }
   | { type: 'MEDIA_PLAYBACK'; playback: MediaPlaybackState }
   | { type: 'JOIN_REJECTED'; reason: 'NAME_TAKEN' }
   | { type: 'DAILY_DOUBLE_REVEAL'; playerId: string; categoryId: string; question: Question; mediaDataUrl?: string }
@@ -128,4 +130,9 @@ export interface GameSettings {
   blurClueOnBuzz: boolean
   autoRevealClue: boolean
   autoRevealMedia: boolean
+}
+
+export interface PlayerSyncStatus {
+  total: number
+  synced: number
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Pencil, Trash2, Crown, Check, X } from 'lucide-react'
-import type { GameSettings, Player } from '../types'
+import { Pencil, Trash2, Crown, Check, X, RefreshCw } from 'lucide-react'
+import type { GameSettings, Player, PlayerSyncStatus } from '../types'
 import { formatScore } from '../lib/utils'
 
 interface Props {
@@ -11,6 +11,7 @@ interface Props {
   onAssignBoardControl: (playerId: string | null) => void
   onUpdatePlayer: (p: Player) => void
   onRemovePlayer: (id: string) => void
+  mediaSyncStatus?: Map<string, PlayerSyncStatus>
 }
 
 const sectionTitleStyle = {
@@ -28,6 +29,7 @@ export default function SettingsPanel({
   onAssignBoardControl,
   onUpdatePlayer,
   onRemovePlayer,
+  mediaSyncStatus,
 }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
@@ -204,8 +206,36 @@ export default function SettingsPanel({
                   >
                     {p.name}
                   </div>
-                  <div style={{ color: p.score < 0 ? '#e07070' : 'var(--gold)', fontSize: '0.9375rem', marginTop: 2 }}>
-                    {formatScore(p.score)}
+                  <div className="flex items-center gap-2" style={{ marginTop: 2 }}>
+                    <span style={{ color: p.score < 0 ? '#e07070' : 'var(--gold)', fontSize: '0.9375rem' }}>
+                      {formatScore(p.score)}
+                    </span>
+                    {(() => {
+                      const sync = mediaSyncStatus?.get(p.id)
+                      if (!sync || sync.total === 0) return null
+                      if (sync.synced >= sync.total) {
+                        return (
+                          <span
+                            className="inline-flex items-center gap-1"
+                            style={{ color: 'var(--green)', fontSize: '0.75rem' }}
+                            title="All media synced"
+                          >
+                            <Check size={12} aria-hidden />
+                            <span className="font-condensed">synced</span>
+                          </span>
+                        )
+                      }
+                      return (
+                        <span
+                          className="inline-flex items-center gap-1"
+                          style={{ color: '#6b7db3', fontSize: '0.75rem' }}
+                          title={`${sync.synced} of ${sync.total} media files synced`}
+                        >
+                          <RefreshCw size={11} className="animate-spin" style={{ animationDuration: '2s' }} aria-hidden />
+                          <span className="font-condensed">{sync.synced}/{sync.total}</span>
+                        </span>
+                      )
+                    })()}
                   </div>
                 </div>
                 <button
