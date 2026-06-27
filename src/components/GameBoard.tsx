@@ -88,9 +88,6 @@ export default function GameBoard({
                 >
                   ${pts}
                 </span>
-                {q.mediaId && !isAnswered && (
-                  <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: 'var(--gold)', opacity: 0.6 }} />
-                )}
                 {dailyDoubleQuestionId === q.id && !isAnswered && (
                   <div className="dd-badge">DD</div>
                 )}
