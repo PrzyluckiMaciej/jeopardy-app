@@ -380,15 +380,19 @@ export default function PlayerPage() {
   const buzzingOpen = uiPhase === 'buzzing'
   const canShowBuzzDock =
     !isDD && (uiPhase === 'question' || buzzingOpen) && !buzzedOut
-  const showPlayerActionZone = judgeResult != null || canShowBuzzDock
+  const keepSidebarDuringQuestion =
+    !isDD && ['question', 'buzzing', 'revealed'].includes(uiPhase)
+  const showPlayerActionZone =
+    judgeResult != null || canShowBuzzDock || keepSidebarDuringQuestion
   const showDdMobileCompact =
     isMobileViewport && isDD && (uiPhase === 'dailyDouble' || uiPhase === 'dailyDoubleBet')
   const showMobilePlayerDock = isMobileViewport && showPlayerActionZone
   const showSidebarPanel =
     !showDdMobileCompact &&
+    !isMobileViewport &&
     (uiPhase === 'dailyDouble' ||
       (isDD && (uiPhase === 'dailyDoubleBet' || uiPhase === 'question')) ||
-      (showPlayerActionZone && !isMobileViewport))
+      keepSidebarDuringQuestion)
   const showBuzzQueuePanel = !isDD && state.buzzQueue.length > 0
   const showBuzzQueueInSidebar = showBuzzQueuePanel && !isMobileViewport
   const showBuzzQueueMobileToggle = showBuzzQueuePanel && isMobileViewport
@@ -433,6 +437,7 @@ export default function PlayerPage() {
 
   const playerActionZoneProps = {
     canShowBuzzDock,
+    revealedPhase: uiPhase === 'revealed',
     judgeResult,
     buzzingOpen,
     hasBuzzed,
