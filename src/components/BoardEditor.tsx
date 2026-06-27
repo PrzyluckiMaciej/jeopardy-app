@@ -17,6 +17,7 @@ interface EditingCell {
 
 export default function BoardEditor({ board, onChange, onClose }: Props) {
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null)
+  const [panelExiting, setPanelExiting] = useState(false)
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
   const [boardName, setBoardName] = useState(board.name)
   const [mediaPreview, setMediaPreview] = useState<string | null>(null)
@@ -75,7 +76,31 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
 
   function removeCategory(catId: string) {
     updateBoard({ categories: board.categories.filter((c) => c.id !== catId) })
-    if (editingCell?.categoryId === catId) setEditingCell(null)
+    if (editingCell?.categoryId === catId) closePanel()
+  }
+
+  function finishPanelClose() {
+    setPanelExiting(false)
+    setEditingCell(null)
+    setMediaPreview(null)
+  }
+
+  function closePanel() {
+    if (!editingCell || panelExiting) return
+    setPanelExiting(true)
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      finishPanelClose()
+    }
+  }
+
+  function handlePanelAnimationEnd(e: React.AnimationEvent<HTMLDivElement>) {
+    if (
+      panelExiting &&
+      e.target === e.currentTarget &&
+      e.animationName === 'boardEditorPanelOut'
+    ) {
+      finishPanelClose()
+    }
   }
 
   function startEditingRowPts(pts: number) {
@@ -98,6 +123,7 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
   }
 
   async function openCell(catId: string, q: Question) {
+    setPanelExiting(false)
     setEditingCell({ categoryId: catId, questionId: q.id })
     setMediaPreview(null)
     if (q.mediaId) {
@@ -172,9 +198,9 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
         </div>
       </div>
 
-      <div className="flex gap-5 flex-1 min-h-0 items-start">
+      <div className="board-editor-body flex-1 min-h-0">
         {/* Grid */}
-        <div className="overflow-auto min-w-0 flex-1">
+        <div className="overflow-auto min-w-0 h-full">
           <div
             className="grid gap-2 min-w-max"
             style={{ gridTemplateColumns: `72px repeat(${board.categories.length}, minmax(140px, 1fr))` }}
@@ -352,9 +378,16 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
           </div>
         </div>
 
-        {/* Question editor panel */}
+        {/* Question editor panel — overlays the board; board width stays fixed */}
         {editingCell && activeQ && activeCategory && (
-          <div className="panel w-80 flex-shrink-0 flex flex-col gap-4 overflow-auto">
+          <div
+            className={`panel board-editor-question-panel flex flex-col gap-4 overflow-auto${
+              panelExiting
+                ? ' board-editor-question-panel--exit'
+                : ' board-editor-question-panel--enter'
+            }`}
+            onAnimationEnd={handlePanelAnimationEnd}
+          >
             <div className="flex items-center justify-between">
               <span
                 className="font-condensed font-bold uppercase text-sm"
@@ -364,7 +397,7 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
               </span>
               <button
                 className="btn-ghost text-xs py-1 px-2"
-                onClick={() => setEditingCell(null)}
+                onClick={closePanel}
               >
                 ✕
               </button>
