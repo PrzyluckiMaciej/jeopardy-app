@@ -898,6 +898,14 @@ select:focus-visible {
     animation: none;
   }
 }
+.board-editor-dd-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+}
 
 /* ── Board horizontal scroll with edge fade hint ────────────── */
 .board-scroll-wrap {
