@@ -14,7 +14,7 @@ interface Props {
 }
 
 export default function QuestionOverlay({ state, settings }: Props) {
-  const { activeQuestion, phase, buzzQueue, players, activeMedia, mediaPlayback, dailyDouble } = state
+  const { activeQuestion, phase, buzzQueue, players, activeMedia, mediaPlayback, dailyDouble, clueRevealed, mediaRevealed } = state
   const store = useGameStore()
   const roomCode = useGameStore(s => s.roomCode) ?? ''
 
@@ -87,10 +87,26 @@ export default function QuestionOverlay({ state, settings }: Props) {
 
   function handleRevealDailyDoubleClue() {
     pendingDdAction.current = () => {
-      store.revealDailyDoubleClue()
-      net.broadcast({ type: 'DAILY_DOUBLE_REVEAL_CLUE' })
+      const revealMedia = settings.autoRevealMedia
+      store.revealDailyDoubleClue(revealMedia)
+      const { mediaRevealed } = useGameStore.getState().state
+      net.broadcast({ type: 'DAILY_DOUBLE_REVEAL_CLUE', mediaRevealed })
     }
     setDdExiting(true)
+  }
+
+  function handleRevealClue() {
+    store.revealClue()
+    net.broadcast({ type: 'REVEAL_CLUE' })
+    if (settings.autoBuzzQueue && !isDD) {
+      store.startBuzzing()
+      net.broadcast({ type: 'START_BUZZING' })
+    }
+  }
+
+  function handleRevealMedia() {
+    store.revealMedia()
+    net.broadcast({ type: 'REVEAL_MEDIA' })
   }
 
   function handleReveal() {
@@ -185,13 +201,15 @@ export default function QuestionOverlay({ state, settings }: Props) {
                   role="host"
                   playback={mediaPlayback}
                   mountKey={clueRevealKey}
-                  mediaActive={showClue && !overlayExiting}
-                  className="question-overlay-media clue-reveal"
+                  mediaActive={!overlayExiting}
+                  className={`question-overlay-media${mediaRevealed ? '' : ' question-overlay-media--pending'}`}
                 />
               )}
 
               <div
-                className={`question-overlay-clue font-condensed font-bold text-3xl md:text-4xl leading-snug max-w-2xl${activeMedia ? '' : ' clue-reveal'}`}
+                className={`question-overlay-clue font-condensed font-bold text-3xl md:text-4xl leading-snug max-w-2xl${
+                  clueRevealed ? '' : ' question-overlay-clue--pending'
+                }`}
               >
                 {question.question}
               </div>
@@ -225,6 +243,12 @@ export default function QuestionOverlay({ state, settings }: Props) {
                 <div className="font-condensed text-sm text-gold-bright">
                   {ddPlayer?.name} wagered <span className="font-display text-lg">${dailyDouble.wager}</span>
                 </div>
+                {activeMedia && !mediaRevealed && (
+                  <button type="button" className="btn-outline w-full btn-with-icon justify-center" onClick={handleRevealMedia}>
+                    <Eye size={16} aria-hidden />
+                    <span>Reveal media</span>
+                  </button>
+                )}
                 <button type="button" className="btn-gold w-full py-3" onClick={handleRevealDailyDoubleClue}>
                   Reveal clue
                 </button>
@@ -259,7 +283,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
               </div>
             )}
 
-            {!isDD && phase === 'question' && !settings.autoBuzzQueue && (
+            {!isDD && phase === 'question' && !settings.autoBuzzQueue && clueRevealed && (
               <button
                 type="button"
                 className="btn-gold w-full py-3 btn-with-icon justify-center"
@@ -275,6 +299,30 @@ export default function QuestionOverlay({ state, settings }: Props) {
               <div className="text-sm font-condensed text-subtle">
                 {buzzQueue.length > 0 ? 'Judging…' : 'Waiting for buzzes…'}
               </div>
+            )}
+
+            {showClue && !clueRevealed && (
+              <button
+                type="button"
+                className="btn-outline w-full btn-with-icon justify-center"
+                onClick={handleRevealClue}
+                title="Show the clue to players"
+              >
+                <Eye size={16} aria-hidden />
+                <span>Reveal clue</span>
+              </button>
+            )}
+
+            {showClue && activeMedia && !mediaRevealed && (
+              <button
+                type="button"
+                className="btn-outline w-full btn-with-icon justify-center"
+                onClick={handleRevealMedia}
+                title="Show the media to players"
+              >
+                <Eye size={16} aria-hidden />
+                <span>Reveal media</span>
+              </button>
             )}
 
             {phase !== 'revealed' && phase !== 'dailyDouble' && phase !== 'dailyDoubleBet' && (

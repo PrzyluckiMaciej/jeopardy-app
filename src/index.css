@@ -1578,6 +1578,14 @@ select:focus-visible {
   color: var(--white);
   margin-bottom: var(--space-lg);
 }
+.question-overlay-clue--pending {
+  opacity: 0.45;
+  color: #8899cc;
+}
+.question-overlay-media--pending {
+  opacity: 0.45;
+  filter: grayscale(0.3);
+}
 .question-overlay-media {
   margin-bottom: var(--space-xl);
   width: 100%;

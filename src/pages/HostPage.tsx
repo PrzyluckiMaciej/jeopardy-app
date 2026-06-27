@@ -408,13 +408,15 @@ export default function HostPage() {
         setShowDdNoControlAlert(true)
         return
       }
-      openCard(categoryId, question, mediaDataUrl)
+      openCard(categoryId, question, mediaDataUrl, { clue: false, media: false })
       startDailyDouble(ddPlayerId)
       net.broadcast({ type: 'DAILY_DOUBLE_REVEAL', playerId: ddPlayerId, categoryId, question, mediaDataUrl })
     } else {
-      openCard(categoryId, question, mediaDataUrl)
-      net.broadcast({ type: 'OPEN_CARD', categoryId, question, mediaDataUrl })
-      if (settings.autoBuzzQueue) {
+      const clueRevealed = settings.autoRevealClue
+      const mediaRevealed = settings.autoRevealMedia
+      openCard(categoryId, question, mediaDataUrl, { clue: clueRevealed, media: mediaRevealed })
+      net.broadcast({ type: 'OPEN_CARD', categoryId, question, mediaDataUrl, clueRevealed, mediaRevealed })
+      if (settings.autoBuzzQueue && clueRevealed) {
         store.startBuzzing()
         net.broadcast({ type: 'START_BUZZING' })
       }
