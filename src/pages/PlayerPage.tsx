@@ -794,6 +794,7 @@ export default function PlayerPage() {
                       role="player"
                       playback={state.mediaPlayback}
                       mountKey={clueRevealKey}
+                      mediaActive={!!state.activeMedia}
                       className="question-overlay-media clue-reveal"
                       style={{
                         filter: clueBlurred ? 'blur(8px)' : 'none',

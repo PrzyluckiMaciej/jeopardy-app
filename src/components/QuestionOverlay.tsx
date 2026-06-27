@@ -185,6 +185,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
                   role="host"
                   playback={mediaPlayback}
                   mountKey={clueRevealKey}
+                  mediaActive={showClue && !overlayExiting}
                   className="question-overlay-media clue-reveal"
                 />
               )}

@@ -12,6 +12,7 @@ interface Props {
   role: 'host' | 'player'
   playback: MediaPlaybackState | null
   mountKey: number
+  mediaActive?: boolean
   className?: string
   style?: React.CSSProperties
 }
@@ -34,6 +35,11 @@ function readStoredVolume(): number {
   }
 }
 
+function stopMediaElement(el: HTMLMediaElement) {
+  el.pause()
+  el.currentTime = 0
+}
+
 function applyPlaybackToElement(
   el: HTMLMediaElement,
   playback: MediaPlaybackState,
@@ -45,7 +51,7 @@ function applyPlaybackToElement(
     el.currentTime = playback.currentTime
   }
   if (playback.paused) {
-    if (!el.paused) el.pause()
+    el.pause()
   } else if (el.paused) {
     el.play().catch(() => {})
   }
@@ -58,18 +64,30 @@ function applyPlaybackWhenReady(
   el: HTMLMediaElement,
   playback: MediaPlaybackState,
   applyingRef: React.MutableRefObject<boolean>,
+  getLatestPlayback: () => MediaPlaybackState | null,
+  signal: AbortSignal,
 ) {
   const apply = () => {
-    applyPlaybackToElement(el, playback, applyingRef)
-    if (!playback.paused && el.paused) {
-      el.addEventListener('canplay', () => applyPlaybackToElement(el, playback, applyingRef), { once: true })
+    if (signal.aborted) return
+    const latest = getLatestPlayback() ?? playback
+    applyPlaybackToElement(el, latest, applyingRef)
+    if (!latest.paused && el.paused) {
+      el.addEventListener(
+        'canplay',
+        () => {
+          if (signal.aborted) return
+          const current = getLatestPlayback()
+          if (current) applyPlaybackToElement(el, current, applyingRef)
+        },
+        { once: true, signal },
+      )
     }
   }
 
   if (el.readyState >= HTMLMediaElement.HAVE_METADATA) {
     apply()
   } else {
-    el.addEventListener('loadedmetadata', apply, { once: true })
+    el.addEventListener('loadedmetadata', apply, { once: true, signal })
   }
 }
 
@@ -86,20 +104,13 @@ export default function QuestionMediaPlayer({
   role,
   playback,
   mountKey,
+  mediaActive = true,
   className,
   style,
 }: Props) {
   const mediaRef = useRef<HTMLMediaElement | null>(null)
   const applyingRef = useRef(false)
-  const pendingPlaybackRef = useRef<MediaPlaybackState | null>(playback)
   const lastPlaybackRef = useRef<MediaPlaybackState | null>(playback)
-
-  const setMediaRef = useCallback((el: HTMLVideoElement | HTMLAudioElement | null) => {
-    mediaRef.current = el
-    if (el && role === 'player' && pendingPlaybackRef.current) {
-      applyPlaybackWhenReady(el, pendingPlaybackRef.current, applyingRef)
-    }
-  }, [role])
   const setMediaPlayback = useGameStore((s) => s.setMediaPlayback)
 
   const [duration, setDuration] = useState(0)
@@ -109,6 +120,8 @@ export default function QuestionMediaPlayer({
   const [volume, setVolume] = useState(readStoredVolume)
 
   const isHost = role === 'host'
+
+  const getLatestPlayback = useCallback(() => lastPlaybackRef.current, [])
 
   const publishPlayback = useCallback(
     (el: HTMLMediaElement) => {
@@ -123,9 +136,12 @@ export default function QuestionMediaPlayer({
     el.volume = v
   }, [])
 
+  const setMediaRef = useCallback((el: HTMLVideoElement | HTMLAudioElement | null) => {
+    mediaRef.current = el
+  }, [])
+
   useEffect(() => {
     lastPlaybackRef.current = playback
-    pendingPlaybackRef.current = playback
   }, [playback])
 
   useEffect(() => {
@@ -135,38 +151,54 @@ export default function QuestionMediaPlayer({
   }, [volume, media.type, mountKey, applyVolume])
 
   useEffect(() => {
+    const el = mediaRef.current
+    if (!el || media.type === 'image') return
+    if (!mediaActive || !playback) {
+      stopMediaElement(el)
+      return
+    }
+    if (isHost) return
+
+    const controller = new AbortController()
+    applyPlaybackWhenReady(el, playback, applyingRef, getLatestPlayback, controller.signal)
+    return () => controller.abort()
+  }, [playback, isHost, media.type, mountKey, mediaActive, getLatestPlayback])
+
+  useEffect(() => {
     if (media.type === 'image') return
     const el = mediaRef.current
     if (!el) return
 
-    if (isHost) {
-      const startPlayback = () => {
-        applyingRef.current = true
-        el.playbackRate = 1
-        el.currentTime = 0
-        el.play()
-          .catch(() => {})
-          .finally(() => {
-            applyingRef.current = false
-            publishPlayback(el)
-          })
-      }
-
-      if (el.readyState >= 1) {
-        startPlayback()
-      } else {
-        el.addEventListener('loadedmetadata', startPlayback, { once: true })
-        return () => el.removeEventListener('loadedmetadata', startPlayback)
-      }
+    if (!mediaActive) {
+      stopMediaElement(el)
+      if (isHost) publishPlayback(el)
+      return
     }
-  }, [mountKey, media.dataUrl, media.type, isHost, publishPlayback])
 
-  useEffect(() => {
-    if (isHost || media.type === 'image' || !playback) return
-    const el = mediaRef.current
-    if (!el) return
-    applyPlaybackWhenReady(el, playback, applyingRef)
-  }, [playback, isHost, media.type, mountKey])
+    if (!isHost) return
+
+    const controller = new AbortController()
+    const startPlayback = () => {
+      if (controller.signal.aborted) return
+      applyingRef.current = true
+      el.playbackRate = 1
+      el.currentTime = 0
+      el.play()
+        .catch(() => {})
+        .finally(() => {
+          applyingRef.current = false
+          if (!controller.signal.aborted) publishPlayback(el)
+        })
+    }
+
+    if (el.readyState >= HTMLMediaElement.HAVE_METADATA) {
+      startPlayback()
+    } else {
+      el.addEventListener('loadedmetadata', startPlayback, { once: true, signal: controller.signal })
+    }
+
+    return () => controller.abort()
+  }, [mountKey, media.dataUrl, media.type, isHost, mediaActive, publishPlayback])
 
   useEffect(() => {
     if (media.type === 'image') return
@@ -186,13 +218,20 @@ export default function QuestionMediaPlayer({
       setDuration(el.duration)
       if (isHost) {
         setCurrentTime(el.currentTime)
-      } else if (pendingPlaybackRef.current) {
-        applyPlaybackWhenReady(el, pendingPlaybackRef.current, applyingRef)
+      } else if (mediaActive && lastPlaybackRef.current) {
+        const controller = new AbortController()
+        applyPlaybackWhenReady(
+          el,
+          lastPlaybackRef.current,
+          applyingRef,
+          getLatestPlayback,
+          controller.signal,
+        )
       }
     }
 
     const onHostPlaybackChange = () => {
-      if (!isHost || applyingRef.current) return
+      if (!isHost || applyingRef.current || !mediaActive) return
       setIsPaused(el.paused)
       setCurrentTime(el.currentTime)
       setPlaybackRate(el.playbackRate)
@@ -200,9 +239,12 @@ export default function QuestionMediaPlayer({
     }
 
     const onPlayerTamper = () => {
-      if (isHost || applyingRef.current) return
+      if (isHost || applyingRef.current || !mediaActive) return
       const synced = lastPlaybackRef.current
-      if (synced) applyPlaybackWhenReady(el, synced, applyingRef)
+      if (synced) {
+        const controller = new AbortController()
+        applyPlaybackWhenReady(el, synced, applyingRef, getLatestPlayback, controller.signal)
+      }
     }
 
     el.addEventListener('timeupdate', onTimeUpdate)
@@ -233,7 +275,14 @@ export default function QuestionMediaPlayer({
         el.removeEventListener('ratechange', onPlayerTamper)
       }
     }
-  }, [isHost, media.type, media.dataUrl, mountKey, publishPlayback])
+  }, [isHost, media.type, media.dataUrl, mountKey, mediaActive, publishPlayback, getLatestPlayback])
+
+  useEffect(() => {
+    return () => {
+      const el = mediaRef.current
+      if (el && media.type !== 'image') stopMediaElement(el)
+    }
+  }, [media.type])
 
   function handleVolumeChange(v: number) {
     setVolume(v)
@@ -248,24 +297,27 @@ export default function QuestionMediaPlayer({
 
   function handleTogglePlay() {
     const el = mediaRef.current
-    if (!el || !isHost) return
+    if (!el || !isHost || !mediaActive) return
     if (el.paused) {
-      el.play().catch(() => {})
+      el.play()
+        .then(() => publishPlayback(el))
+        .catch(() => publishPlayback(el))
     } else {
       el.pause()
+      publishPlayback(el)
     }
   }
 
   function handleSeek(value: number) {
     const el = mediaRef.current
-    if (!el || !isHost) return
+    if (!el || !isHost || !mediaActive) return
     el.currentTime = value
     setCurrentTime(value)
   }
 
   function handleSpeedChange(rate: number) {
     const el = mediaRef.current
-    if (!el || !isHost) return
+    if (!el || !isHost || !mediaActive) return
     el.playbackRate = rate
     setPlaybackRate(rate)
     publishPlayback(el)
@@ -282,7 +334,6 @@ export default function QuestionMediaPlayer({
   const mediaProps = {
     ref: setMediaRef,
     src: media.dataUrl,
-    autoPlay: !isHost,
     playsInline: true,
     tabIndex: -1,
     preload: 'auto' as const,
