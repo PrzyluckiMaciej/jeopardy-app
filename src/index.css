@@ -1555,12 +1555,31 @@ select:focus-visible {
 }
 .question-overlay-clue {
   color: var(--white);
+  margin-bottom: var(--space-lg);
+}
+.question-overlay-media {
+  margin-bottom: var(--space-xl);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.question-overlay-media img,
+.question-overlay-media video {
+  display: block;
 }
 .question-overlay-answer {
   background: rgba(212, 160, 23, 0.15);
   border: 2px solid var(--gold);
   color: var(--gold-bright);
   border-radius: var(--radius-lg);
+  padding: var(--space-md) var(--space-xl);
+  margin-top: var(--space-lg);
+  position: relative;
+  z-index: 1;
+}
+.question-overlay-content:has(.question-overlay-media) .question-overlay-answer {
+  margin-top: var(--space-xl);
 }
 .question-overlay-answer--pending {
   opacity: 0.45;

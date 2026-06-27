@@ -177,9 +177,9 @@ export default function QuestionOverlay({ state, settings }: Props) {
           )}
 
           {showClue && (
-            <div key={`clue-${clueRevealKey}`} className="flex flex-col items-center w-full max-w-2xl">
+            <div key={`clue-${clueRevealKey}`} className="question-overlay-content flex flex-col items-center w-full max-w-2xl">
               {activeMedia && (
-                <div className="mb-6 clue-reveal">
+                <div className="question-overlay-media clue-reveal">
                   {activeMedia.type === 'image' && (
                     <img src={activeMedia.dataUrl} className="max-h-48 rounded-lg object-contain mx-auto" alt="" />
                   )}
@@ -193,14 +193,14 @@ export default function QuestionOverlay({ state, settings }: Props) {
               )}
 
               <div
-                className={`question-overlay-clue font-condensed font-bold text-3xl md:text-4xl leading-snug mb-6 max-w-2xl${activeMedia ? '' : ' clue-reveal'}`}
+                className={`question-overlay-clue font-condensed font-bold text-3xl md:text-4xl leading-snug max-w-2xl${activeMedia ? '' : ' clue-reveal'}`}
               >
-                {question.question || <span className="text-muted">No question text</span>}
+                {question.question}
               </div>
 
               <div
                 key={phase === 'revealed' ? `answer-${answerRevealKey}` : 'answer-pending'}
-                className={`question-overlay-answer font-display text-2xl md:text-3xl px-6 py-3 mt-2${
+                className={`question-overlay-answer font-display text-2xl md:text-3xl${
                   phase === 'revealed' ? ' answer-reveal' : ' question-overlay-answer--pending'
                 }`}
               >
