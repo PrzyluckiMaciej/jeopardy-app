@@ -5,6 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useGameStore } from '../store/gameStore'
 import * as net from '../lib/network'
 import type { NetMessage, Player } from '../types'
+import { initialMediaPlaybackForType } from '../types'
 import { generateId, formatScore } from '../lib/utils'
 import { logEvent } from '../lib/logger'
 import GameBoard from '../components/GameBoard'
@@ -113,7 +114,7 @@ export default function PlayerPage() {
           activeMedia: msg.mediaDataUrl && mediaType
             ? { type: mediaType, dataUrl: msg.mediaDataUrl }
             : null,
-          mediaPlayback: null,
+          mediaPlayback: initialMediaPlaybackForType(mediaType),
         })
       }
       if (msg.type === 'CLOSE_CARD') {
@@ -146,7 +147,7 @@ export default function PlayerPage() {
           activeMedia: msg.mediaDataUrl && mediaType
             ? { type: mediaType, dataUrl: msg.mediaDataUrl }
             : null,
-          mediaPlayback: null,
+          mediaPlayback: initialMediaPlaybackForType(mediaType),
         })
       }
       if (msg.type === 'MEDIA_PLAYBACK') {
@@ -161,7 +162,11 @@ export default function PlayerPage() {
         })
       }
       if (msg.type === 'DAILY_DOUBLE_REVEAL_CLUE') {
-        patchState({ phase: 'question' })
+        const activeMedia = useGameStore.getState().state.activeMedia
+        patchState({
+          phase: 'question',
+          mediaPlayback: initialMediaPlaybackForType(activeMedia?.type),
+        })
       }
       if (msg.type === 'START_BUZZING') {
         patchState({ phase: 'buzzing', buzzQueue: [] })

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type { Board, Game, GameState, GameSettings, MediaPlaybackState, Player, Question } from '../types'
+import { initialMediaPlaybackForType } from '../types'
 
 // ---- Board editor store (persisted) ----
 interface BoardStore {
@@ -252,7 +253,7 @@ export const useGameStore = create<GameStore>()(
               activeMedia: mediaDataUrl && mediaType
                 ? { type: mediaType, dataUrl: mediaDataUrl }
                 : null,
-              mediaPlayback: null,
+              mediaPlayback: initialMediaPlaybackForType(mediaType),
             },
           }
         }),
@@ -344,7 +345,11 @@ export const useGameStore = create<GameStore>()(
 
       revealDailyDoubleClue: () =>
         set((s) => ({
-          state: { ...s.state, phase: 'question' },
+          state: {
+            ...s.state,
+            phase: 'question',
+            mediaPlayback: initialMediaPlaybackForType(s.state.activeMedia?.type),
+          },
         })),
 
       resetBoard: () =>

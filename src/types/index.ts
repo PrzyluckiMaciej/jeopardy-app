@@ -52,6 +52,18 @@ export interface MediaPlaybackState {
   playbackRate: number
 }
 
+export const INITIAL_MEDIA_PLAYBACK: MediaPlaybackState = {
+  paused: false,
+  currentTime: 0,
+  playbackRate: 1,
+}
+
+export function initialMediaPlaybackForType(
+  type?: 'image' | 'audio' | 'video',
+): MediaPlaybackState | null {
+  return type === 'audio' || type === 'video' ? INITIAL_MEDIA_PLAYBACK : null
+}
+
 export type GamePhase =
   | 'lobby'            // waiting for players
   | 'gameStart'        // game selected, waiting for host to press start

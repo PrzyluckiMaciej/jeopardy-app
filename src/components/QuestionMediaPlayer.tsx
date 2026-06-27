@@ -54,6 +54,25 @@ function applyPlaybackToElement(
   })
 }
 
+function applyPlaybackWhenReady(
+  el: HTMLMediaElement,
+  playback: MediaPlaybackState,
+  applyingRef: React.MutableRefObject<boolean>,
+) {
+  const apply = () => {
+    applyPlaybackToElement(el, playback, applyingRef)
+    if (!playback.paused && el.paused) {
+      el.addEventListener('canplay', () => applyPlaybackToElement(el, playback, applyingRef), { once: true })
+    }
+  }
+
+  if (el.readyState >= HTMLMediaElement.HAVE_METADATA) {
+    apply()
+  } else {
+    el.addEventListener('loadedmetadata', apply, { once: true })
+  }
+}
+
 function playbackFromElement(el: HTMLMediaElement): MediaPlaybackState {
   return {
     paused: el.paused,
@@ -71,12 +90,16 @@ export default function QuestionMediaPlayer({
   style,
 }: Props) {
   const mediaRef = useRef<HTMLMediaElement | null>(null)
+  const applyingRef = useRef(false)
+  const pendingPlaybackRef = useRef<MediaPlaybackState | null>(playback)
+  const lastPlaybackRef = useRef<MediaPlaybackState | null>(playback)
 
   const setMediaRef = useCallback((el: HTMLVideoElement | HTMLAudioElement | null) => {
     mediaRef.current = el
-  }, [])
-  const applyingRef = useRef(false)
-  const lastPlaybackRef = useRef<MediaPlaybackState | null>(playback)
+    if (el && role === 'player' && pendingPlaybackRef.current) {
+      applyPlaybackWhenReady(el, pendingPlaybackRef.current, applyingRef)
+    }
+  }, [role])
   const setMediaPlayback = useGameStore((s) => s.setMediaPlayback)
 
   const [duration, setDuration] = useState(0)
@@ -102,6 +125,7 @@ export default function QuestionMediaPlayer({
 
   useEffect(() => {
     lastPlaybackRef.current = playback
+    pendingPlaybackRef.current = playback
   }, [playback])
 
   useEffect(() => {
@@ -141,7 +165,7 @@ export default function QuestionMediaPlayer({
     if (isHost || media.type === 'image' || !playback) return
     const el = mediaRef.current
     if (!el) return
-    applyPlaybackToElement(el, playback, applyingRef)
+    applyPlaybackWhenReady(el, playback, applyingRef)
   }, [playback, isHost, media.type, mountKey])
 
   useEffect(() => {
@@ -160,7 +184,11 @@ export default function QuestionMediaPlayer({
 
     const onLoadedMetadata = () => {
       setDuration(el.duration)
-      if (isHost) setCurrentTime(el.currentTime)
+      if (isHost) {
+        setCurrentTime(el.currentTime)
+      } else if (pendingPlaybackRef.current) {
+        applyPlaybackWhenReady(el, pendingPlaybackRef.current, applyingRef)
+      }
     }
 
     const onHostPlaybackChange = () => {
@@ -174,7 +202,7 @@ export default function QuestionMediaPlayer({
     const onPlayerTamper = () => {
       if (isHost || applyingRef.current) return
       const synced = lastPlaybackRef.current
-      if (synced) applyPlaybackToElement(el, synced, applyingRef)
+      if (synced) applyPlaybackWhenReady(el, synced, applyingRef)
     }
 
     el.addEventListener('timeupdate', onTimeUpdate)
@@ -254,6 +282,7 @@ export default function QuestionMediaPlayer({
   const mediaProps = {
     ref: setMediaRef,
     src: media.dataUrl,
+    autoPlay: !isHost,
     playsInline: true,
     tabIndex: -1,
     preload: 'auto' as const,
