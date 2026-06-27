@@ -233,6 +233,25 @@ export default function HostPage() {
     setEditing(false)
   }
 
+  function handleUnselectBoard() {
+    const { activeGameId } = useGameStore.getState().state
+    setActiveBoard(null)
+    setEditing(false)
+    patchState({
+      board: null,
+      answeredCells: [],
+      phase: activeGameId ? 'gameStart' : 'lobby',
+      activeQuestion: null,
+      buzzQueue: [],
+      activeMedia: null,
+      boardControlId: null,
+      dailyDouble: null,
+      boardTransition: null,
+    })
+    net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+    closeBoardPicker()
+  }
+
   function handleSelectGame(gameId: string, boardIds: string[]) {
     selectGame(gameId, boardIds)
     setActiveBoard(null)
@@ -615,14 +634,24 @@ export default function HostPage() {
                         <span>Select</span>
                       </button>
                       {board && (
-                        <button
-                          className="btn-ghost text-sm btn-with-icon"
-                          onClick={() => setEditing(true)}
-                          title="Edit the current board"
-                        >
-                          <Pencil size={16} aria-hidden />
-                          <span>Edit</span>
-                        </button>
+                        <>
+                          <button
+                            className="btn-ghost text-sm btn-with-icon"
+                            onClick={() => setEditing(true)}
+                            title="Edit the current board"
+                          >
+                            <Pencil size={16} aria-hidden />
+                            <span>Edit</span>
+                          </button>
+                          <button
+                            className="btn-ghost text-sm btn-with-icon"
+                            onClick={handleUnselectBoard}
+                            title="Unload the current board"
+                          >
+                            <X size={16} aria-hidden />
+                            <span>Unload</span>
+                          </button>
+                        </>
                       )}
                     </div>
 
