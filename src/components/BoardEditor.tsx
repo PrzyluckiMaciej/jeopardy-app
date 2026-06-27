@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
-import { Trash2, Upload } from 'lucide-react'
+import { Trash2, Upload, FileText, Image, Music, Video, Paperclip, HelpCircle } from 'lucide-react'
 import type { Board, Category, Question } from '../types'
 import { generateId } from '../lib/utils'
 import { saveMedia, deleteMedia, getMedia, blobToDataUrl } from '../lib/db'
@@ -122,7 +122,12 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
       mimeType: file.type,
       blob: file,
     })
-    updateQuestion(editingCell.categoryId, editingCell.questionId, { mediaId })
+    const mediaType: 'image' | 'audio' | 'video' = file.type.startsWith('image/')
+      ? 'image'
+      : file.type.startsWith('audio/')
+        ? 'audio'
+        : 'video'
+    updateQuestion(editingCell.categoryId, editingCell.questionId, { mediaId, mediaType })
     const url = await blobToDataUrl(file)
     setMediaPreview(url)
   }
@@ -282,7 +287,10 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                 const q = cat.questions.find((q) => q.points === pts)
                 if (!q) return <div key={`${cat.id}-${pts}`} />
                 const isActive = editingCell?.questionId === q.id
-                const hasContent = q.question.trim() || q.answer.trim()
+                const hasClue = !!q.question.trim()
+                const hasAnswer = !!q.answer.trim()
+                const isEmpty = !hasClue && !hasAnswer && !q.mediaId
+                const iconStyle = { color: 'var(--gold)', opacity: 0.8 } as const
                 return (
                   <button
                     key={q.id}
@@ -296,26 +304,44 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                     }}
                     onClick={() => openCell(cat.id, q)}
                   >
-                    <div className="font-display text-2xl" style={{ color: 'var(--gold-bright)' }}>
+                    {/* Point value — always top-center */}
+                    <div
+                      className="font-display text-2xl"
+                      style={{ color: 'var(--gold-bright)', position: 'absolute', top: 8, left: 0, right: 0, textAlign: 'center' }}
+                    >
                       ${pts}
                     </div>
-                    {!hasContent && (
-                      <div className="text-xs mt-1" style={{ color: '#4a5580' }}>
+
+                    {/* Bottom-left: clue icon + media icon */}
+                    {(hasClue || q.mediaId) && (
+                      <div style={{ position: 'absolute', bottom: 5, left: 5, display: 'flex', gap: 3, alignItems: 'center' }}>
+                        {hasClue && <HelpCircle size={16} style={iconStyle} />}
+                        {q.mediaId && (
+                          q.mediaType === 'image' ? <Image size={16} style={iconStyle} />
+                          : q.mediaType === 'audio' ? <Music size={16} style={iconStyle} />
+                          : q.mediaType === 'video' ? <Video size={16} style={iconStyle} />
+                          : <Paperclip size={16} style={iconStyle} />
+                        )}
+                      </div>
+                    )}
+
+                    {/* Bottom-right: answer icon */}
+                    {hasAnswer && (
+                      <div style={{ position: 'absolute', bottom: 5, right: 5 }}>
+                        <FileText size={16} style={iconStyle} />
+                      </div>
+                    )}
+
+                    {/* Bottom-center: empty label */}
+                    {isEmpty && (
+                      <div
+                        className="text-xs"
+                        style={{ position: 'absolute', bottom: 5, left: 0, right: 0, textAlign: 'center', color: '#4a5580' }}
+                      >
                         empty
                       </div>
                     )}
-                    {hasContent && (
-                      <div
-                        className="w-2 h-2 rounded-full mx-auto mt-1"
-                        style={{ background: 'var(--gold)', opacity: 0.6 }}
-                      />
-                    )}
-                    {q.mediaId && (
-                      <div
-                        className="w-1.5 h-1.5 rounded-full mx-auto mt-1"
-                        style={{ background: 'var(--gold)', opacity: 0.8 }}
-                      />
-                    )}
+
                     {board.dailyDoubleQuestionId === q.id && (
                       <div className="dd-badge">DD</div>
                     )}
