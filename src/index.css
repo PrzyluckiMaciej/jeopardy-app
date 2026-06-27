@@ -1186,6 +1186,9 @@ select:focus-visible {
 .board-picker-board-row:hover .board-picker-board-row__actions {
   opacity: 1;
 }
+.board-picker-board-row__actions .board-picker-icon-btn {
+  opacity: 1;
+}
 .board-picker-icon-btn:hover {
   background: rgba(255, 255, 255, 0.08);
   color: var(--white);
