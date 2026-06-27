@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { Settings, Trash2, Pencil, Check, Copy, FolderOpen, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, RotateCcw, Shuffle, X, Users } from 'lucide-react'
+import { Settings, Trash2, Pencil, Check, Copy, CopyPlus, FolderOpen, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, RotateCcw, Shuffle, X, Users } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useGameStore, useBoardStore } from '../store/gameStore'
 import * as net from '../lib/network'
 import type { Board, Player, NetMessage, Question, GameSettings } from '../types'
 import { createDefaultBoard, cellId } from '../lib/utils'
+import { duplicateBoard } from '../lib/duplicateBoard'
 import { getMedia, blobToDataUrl } from '../lib/db'
 import { logEvent } from '../lib/logger'
 import {
@@ -338,6 +339,14 @@ export default function HostPage() {
       setEditing(false)
       patchState({ board: null, answeredCells: [], phase: 'lobby' })
       net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+    }
+  }
+
+  async function handleDuplicateBoard(board: Board) {
+    const copy = await duplicateBoard(board)
+    boardStore.saveBoard(copy)
+    if (pickerGame) {
+      boardStore.addBoardToGame(pickerGame, copy.id)
     }
   }
 
@@ -952,6 +961,14 @@ export default function HostPage() {
                             –
                           </button>
                         )}
+                        <button
+                          type="button"
+                          className="board-picker-icon-btn"
+                          title="Duplicate board"
+                          onClick={(e) => { e.stopPropagation(); void handleDuplicateBoard(b) }}
+                        >
+                          <CopyPlus size={11} />
+                        </button>
                         <button
                           type="button"
                           className="board-picker-delete-btn"
