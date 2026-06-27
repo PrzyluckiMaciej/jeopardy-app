@@ -100,6 +100,78 @@ function playbackFromElement(el: HTMLMediaElement): MediaPlaybackState {
   }
 }
 
+const SEEK_THUMB_SIZE = '0.875rem'
+
+interface MediaSeekBarProps {
+  value: number
+  max: number
+  onChange: (value: number) => void
+}
+
+function MediaSeekBar({ value, max, onChange }: MediaSeekBarProps) {
+  const trackRef = useRef<HTMLDivElement>(null)
+  const ratio = max > 0 ? Math.min(1, Math.max(0, value / max)) : 0
+
+  function seekFromClientX(clientX: number) {
+    const track = trackRef.current
+    if (!track || max <= 0) return
+    const rect = track.getBoundingClientRect()
+    const nextRatio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width))
+    onChange(nextRatio * max)
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (max <= 0) return
+    const step = Math.max(0.1, max / 100)
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+      e.preventDefault()
+      onChange(Math.max(0, value - step))
+    } else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+      e.preventDefault()
+      onChange(Math.min(max, value + step))
+    } else if (e.key === 'Home') {
+      e.preventDefault()
+      onChange(0)
+    } else if (e.key === 'End') {
+      e.preventDefault()
+      onChange(max)
+    }
+  }
+
+  return (
+    <div
+      ref={trackRef}
+      className="question-media-controls__seek"
+      role="slider"
+      tabIndex={0}
+      aria-valuemin={0}
+      aria-valuemax={max}
+      aria-valuenow={value}
+      aria-label="Seek"
+      style={{ ['--seek-ratio' as string]: ratio }}
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId)
+        seekFromClientX(e.clientX)
+      }}
+      onPointerMove={(e) => {
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+          seekFromClientX(e.clientX)
+        }
+      }}
+      onKeyDown={handleKeyDown}
+    >
+      <div className="question-media-controls__seek-track" aria-hidden>
+        <div className="question-media-controls__seek-fill" />
+      </div>
+      <div
+        className="question-media-controls__seek-thumb"
+        style={{ left: `calc((100% - ${SEEK_THUMB_SIZE}) * ${ratio})` }}
+        aria-hidden
+      />
+    </div>
+  )
+}
+
 export default function QuestionMediaPlayer({
   media,
   role,
@@ -384,15 +456,10 @@ export default function QuestionMediaPlayer({
             {formatTime(currentTime)} / {formatTime(duration)}
           </span>
 
-          <input
-            type="range"
-            className="question-media-controls__seek"
-            min={0}
-            max={duration || 0}
-            step={0.1}
+          <MediaSeekBar
             value={Math.min(currentTime, duration || 0)}
-            onChange={(e) => handleSeek(parseFloat(e.target.value))}
-            aria-label="Seek"
+            max={duration || 0}
+            onChange={handleSeek}
           />
 
           <label className="question-media-controls__speed">
