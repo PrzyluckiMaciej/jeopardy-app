@@ -104,27 +104,38 @@ export default function HostPage() {
     const mediaIds = currentManifestIds.current
     if (mediaIds.length === 0) return
 
-    const items = await Promise.all(
-      mediaIds.map(async (mediaId) => {
-        const blob = mediaBlobCache.current.get(mediaId)
-        const rec = blob ? undefined : await getMedia(mediaId)
-        const finalBlob = blob ?? rec?.blob
-        if (rec?.blob && !blob) mediaBlobCache.current.set(mediaId, rec.blob)
-        return {
-          mediaId,
-          mimeType: finalBlob?.type ?? 'application/octet-stream',
-          size: finalBlob?.size ?? 0,
-        }
-      }),
-    )
+    await loadMediaBlobs(mediaIds)
 
-    net.send({ type: 'MEDIA_MANIFEST', items }, targetPeerId ?? undefined)
+    const items = mediaIds.map((mediaId) => {
+      const blob = mediaBlobCache.current.get(mediaId)
+      return {
+        mediaId,
+        mimeType: blob?.type ?? 'application/octet-stream',
+        size: blob?.size ?? 0,
+      }
+    })
+
+    if (targetPeerId) {
+      net.send({ type: 'MEDIA_MANIFEST', items }, targetPeerId)
+    } else {
+      net.broadcast({ type: 'MEDIA_MANIFEST', items })
+    }
 
     for (const mediaId of mediaIds) {
       const blob = mediaBlobCache.current.get(mediaId)
       if (!blob) continue
       net.sendMedia(blob, targetPeerId, { mediaId, mimeType: blob.type })
     }
+  }
+
+  function initSyncForAllPlayers() {
+    const players = useGameStore.getState().state.players
+    for (const p of players) {
+      if (p.isConnected && !mediaSyncMap.current.has(p.id)) {
+        mediaSyncMap.current.set(p.id, new Set())
+      }
+    }
+    updateSyncStatusState()
   }
 
   async function startPreTransfer(board: Board) {
@@ -135,15 +146,10 @@ export default function HostPage() {
       setMediaSyncStatus(new Map())
       return
     }
-    await loadMediaBlobs(mediaIds)
 
-    const players = useGameStore.getState().state.players
-    for (const p of players) {
-      if (p.isConnected && !mediaSyncMap.current.has(p.id)) {
-        mediaSyncMap.current.set(p.id, new Set())
-      }
-    }
-    updateSyncStatusState()
+    initSyncForAllPlayers()
+
+    await loadMediaBlobs(mediaIds)
     await sendManifestAndMedia(null)
   }
 
@@ -171,6 +177,19 @@ export default function HostPage() {
   }, [])
 
   useEffect(() => {
+    if (!state.board) {
+      currentManifestIds.current = []
+      mediaSyncMap.current.clear()
+      setMediaSyncStatus(new Map())
+      return
+    }
+    const mediaIds = collectBoardMediaIds(state.board)
+    if (mediaIds.length > 0 && currentManifestIds.current.join(',') !== mediaIds.join(',')) {
+      startPreTransfer(state.board)
+    }
+  }, [state.board]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     if (!roomCode) { navigate('/'); return }
 
     net.createRoom(roomCode)
@@ -182,9 +201,6 @@ export default function HostPage() {
     net.onPeerJoin((peerId) => {
       const current = useGameStore.getState()
       net.send({ type: 'SYNC_STATE', state: current.state }, peerId)
-      if (currentManifestIds.current.length > 0) {
-        setTimeout(() => sendManifestAndMedia(peerId), 200)
-      }
     })
 
     net.onPeerLeave((peerId) => {
@@ -258,10 +274,12 @@ export default function HostPage() {
           updateSyncStatusState()
           setTimeout(() => {
             net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+          }, 100)
+          setTimeout(() => {
             if (currentManifestIds.current.length > 0) {
               sendManifestAndMedia(peerId)
             }
-          }, 100)
+          }, 500)
           return
         }
 
@@ -277,10 +295,12 @@ export default function HostPage() {
         })
         setTimeout(() => {
           net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+        }, 100)
+        setTimeout(() => {
           if (currentManifestIds.current.length > 0) {
             sendManifestAndMedia(peerId)
           }
-        }, 100)
+        }, 500)
       }
       if (msg.type === 'BUZZ') {
         const clientId = peerToClient.current.get(peerId)
@@ -841,6 +861,7 @@ export default function HostPage() {
                         setEditing(false)
                         const current = useGameStore.getState().state
                         net.broadcast({ type: 'SYNC_STATE', state: current })
+                        if (board) startPreTransfer(board)
                       }} />
                     ) : board ? (
                       <GameBoard
