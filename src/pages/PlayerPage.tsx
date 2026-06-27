@@ -31,6 +31,7 @@ export default function PlayerPage() {
   const [activeEmojis, setActiveEmojis] = useState<Record<string, { emoji: string; seq: number }>>({})
   const [, bumpAnimRender] = useState(0)
   const [clueRevealKey, setClueRevealKey] = useState(0)
+  const [mediaRevealKey, setMediaRevealKey] = useState(0)
   const [answerRevealKey, setAnswerRevealKey] = useState(0)
   const [scorePulsing, setScorePulsing] = useState(false)
   const [buzzQueuePopupOpen, setBuzzQueuePopupOpen] = useState(false)
@@ -48,6 +49,10 @@ export default function PlayerPage() {
   const lastOverlayPhase = useRef(state.phase)
   const lastIsDD = useRef(false)
   const lastActiveMedia = useRef(state.activeMedia)
+  const lastClueRevealed = useRef(state.clueRevealed)
+  const lastMediaRevealed = useRef(state.mediaRevealed)
+  const prevClueRevealedRef = useRef(state.clueRevealed)
+  const prevMediaRevealedRef = useRef(state.mediaRevealed)
   const boardSplashLabelRef = useRef<string | null>(null)
   const boardSplashExitingRef = useRef(false)
   const overlayOpenRef = useRef(false)
@@ -114,11 +119,15 @@ export default function PlayerPage() {
           activeMedia: msg.mediaDataUrl && mediaType
             ? { type: mediaType, dataUrl: msg.mediaDataUrl }
             : null,
-          mediaPlayback: initialMediaPlaybackForType(mediaType),
+          clueRevealed: msg.clueRevealed ?? false,
+          mediaRevealed: msg.mediaRevealed ?? false,
+          mediaPlayback: msg.mediaRevealed
+            ? initialMediaPlaybackForType(mediaType)
+            : null,
         })
       }
       if (msg.type === 'CLOSE_CARD') {
-        patchState({ phase: 'board', activeQuestion: null, buzzQueue: [], activeMedia: null, mediaPlayback: null, dailyDouble: null })
+        patchState({ phase: 'board', activeQuestion: null, buzzQueue: [], activeMedia: null, mediaPlayback: null, dailyDouble: null, clueRevealed: false, mediaRevealed: false })
         setHasBuzzed(false)
         wasInBuzzQueueRef.current = false
         setJudgeResult(null)
@@ -147,7 +156,9 @@ export default function PlayerPage() {
           activeMedia: msg.mediaDataUrl && mediaType
             ? { type: mediaType, dataUrl: msg.mediaDataUrl }
             : null,
-          mediaPlayback: initialMediaPlaybackForType(mediaType),
+          clueRevealed: false,
+          mediaRevealed: false,
+          mediaPlayback: null,
         })
       }
       if (msg.type === 'MEDIA_PLAYBACK') {
@@ -162,9 +173,26 @@ export default function PlayerPage() {
         })
       }
       if (msg.type === 'DAILY_DOUBLE_REVEAL_CLUE') {
-        const activeMedia = useGameStore.getState().state.activeMedia
+        const current = useGameStore.getState().state
+        const activeMedia = current.activeMedia
+        const wasMediaRevealed = current.mediaRevealed
+        const mediaRevealed = msg.mediaRevealed ?? wasMediaRevealed
         patchState({
           phase: 'question',
+          clueRevealed: true,
+          mediaRevealed,
+          mediaPlayback: mediaRevealed && !wasMediaRevealed
+            ? initialMediaPlaybackForType(activeMedia?.type)
+            : current.mediaPlayback,
+        })
+      }
+      if (msg.type === 'REVEAL_CLUE') {
+        patchState({ clueRevealed: true })
+      }
+      if (msg.type === 'REVEAL_MEDIA') {
+        const activeMedia = useGameStore.getState().state.activeMedia
+        patchState({
+          mediaRevealed: true,
           mediaPlayback: initialMediaPlaybackForType(activeMedia?.type),
         })
       }
@@ -204,6 +232,8 @@ export default function PlayerPage() {
           activeMedia: null,
           mediaPlayback: null,
           dailyDouble: null,
+          clueRevealed: false,
+          mediaRevealed: false,
         })
         setHasBuzzed(false)
         wasInBuzzQueueRef.current = false
@@ -270,17 +300,28 @@ export default function PlayerPage() {
     return () => clearTimeout(t)
   }, [state.boardTransition])
 
-  // Clue / answer reveal keys on phase transitions
+  // Clue / answer reveal keys on state transitions
   useEffect(() => {
     const prev = prevPhaseRef.current
-    if (state.phase === 'question' && prev !== 'question' && prev !== 'buzzing' && prev !== 'revealed') {
-      setClueRevealKey((k) => k + 1)
-    }
     if (state.phase === 'revealed' && prev !== 'revealed') {
       setAnswerRevealKey((k) => k + 1)
     }
     prevPhaseRef.current = state.phase
   }, [state.phase])
+
+  useEffect(() => {
+    if (state.clueRevealed && !prevClueRevealedRef.current) {
+      setClueRevealKey((k) => k + 1)
+    }
+    prevClueRevealedRef.current = state.clueRevealed
+  }, [state.clueRevealed])
+
+  useEffect(() => {
+    if (state.mediaRevealed && !prevMediaRevealedRef.current) {
+      setMediaRevealKey((k) => k + 1)
+    }
+    prevMediaRevealedRef.current = state.mediaRevealed
+  }, [state.mediaRevealed])
 
   // Pulse header score when it changes
   useEffect(() => {
@@ -370,6 +411,8 @@ export default function PlayerPage() {
     lastOverlayPhase.current = state.phase
     lastIsDD.current = state.dailyDouble !== null
     lastActiveMedia.current = state.activeMedia
+    lastClueRevealed.current = state.clueRevealed
+    lastMediaRevealed.current = state.mediaRevealed
   } else if (overlayOpenRef.current && !overlayExitingRef.current) {
     overlayExitingRef.current = true
   }
@@ -386,12 +429,14 @@ export default function PlayerPage() {
   const uiPhase = overlayExiting ? lastOverlayPhase.current : state.phase
   const isDD = overlayExiting ? lastIsDD.current : state.dailyDouble !== null
   const displayMedia = overlayExiting ? lastActiveMedia.current : state.activeMedia
+  const displayClueRevealed = overlayExiting ? lastClueRevealed.current : state.clueRevealed
+  const displayMediaRevealed = overlayExiting ? lastMediaRevealed.current : state.mediaRevealed
   const isDDPlayer = state.dailyDouble?.playerId === myId
   const ddPlayerInfo = state.dailyDouble ? state.players.find(p => p.id === state.dailyDouble!.playerId) : null
   const clueBlurred = settings.blurClueOnBuzz && uiPhase === 'buzzing' && state.buzzQueue.length > 0
   const buzzingOpen = uiPhase === 'buzzing'
   const canShowBuzzDock =
-    !isDD && (uiPhase === 'question' || buzzingOpen) && !buzzedOut
+    !isDD && state.clueRevealed && (uiPhase === 'question' || buzzingOpen) && !buzzedOut
   const keepSidebarDuringQuestion =
     !isDD && ['question', 'buzzing', 'revealed'].includes(uiPhase)
   const showPlayerActionZone =
@@ -787,14 +832,20 @@ export default function PlayerPage() {
 
               {/* Clue (shown in question/buzzing/revealed phases) */}
               {(uiPhase === 'question' || uiPhase === 'buzzing' || uiPhase === 'revealed') && (
-                <div key={`clue-${clueRevealKey}`} className="question-overlay-content flex flex-col items-center w-full max-w-2xl">
-                  {displayMedia && (
+                <div className="question-overlay-content flex flex-col items-center w-full max-w-2xl">
+                  {!displayClueRevealed && !displayMediaRevealed && (
+                    <div className="font-condensed text-sm animate-pulse text-center" style={{ color: '#4a5580' }}>
+                      Waiting for host to reveal the clue…
+                    </div>
+                  )}
+
+                  {displayMedia && displayMediaRevealed && (
                     <QuestionMediaPlayer
                       media={displayMedia}
                       role="player"
                       playback={state.mediaPlayback}
-                      mountKey={clueRevealKey}
-                      mediaActive={!!state.activeMedia}
+                      mountKey={mediaRevealKey}
+                      mediaActive={displayMediaRevealed}
                       className="question-overlay-media clue-reveal"
                       style={{
                         filter: clueBlurred ? 'blur(8px)' : 'none',
@@ -803,17 +854,22 @@ export default function PlayerPage() {
                     />
                   )}
 
-                  <div
-                    className={`question-overlay-clue font-condensed font-bold text-3xl md:text-4xl leading-snug max-w-2xl${displayMedia ? '' : ' clue-reveal'}`}
-                    style={{
-                      color: 'var(--white)',
-                      filter: clueBlurred ? 'blur(8px)' : 'none',
-                      transition: 'filter 0.3s ease',
-                      userSelect: clueBlurred ? 'none' : undefined,
-                    }}
-                  >
-                    {displayQ.question}
-                  </div>
+                  {displayClueRevealed && (
+                    <div
+                      key={`clue-${clueRevealKey}`}
+                      className={`question-overlay-clue font-condensed font-bold text-3xl md:text-4xl leading-snug max-w-2xl${
+                        displayMediaRevealed ? '' : ' clue-reveal'
+                      }`}
+                      style={{
+                        color: 'var(--white)',
+                        filter: clueBlurred ? 'blur(8px)' : 'none',
+                        transition: 'filter 0.3s ease',
+                        userSelect: clueBlurred ? 'none' : undefined,
+                      }}
+                    >
+                      {displayQ.question}
+                    </div>
+                  )}
 
                   {uiPhase === 'revealed' && (
                     <div

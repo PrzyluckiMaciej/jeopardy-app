@@ -90,6 +90,8 @@ export interface GameState {
   gameBoardIds: string[]
   currentBoardIndex: number
   boardTransition: string | null // board name shown during transition animation
+  clueRevealed: boolean
+  mediaRevealed: boolean
 }
 
 // ---- Network messages ----
@@ -97,12 +99,14 @@ export type NetMessage =
   | { type: 'SYNC_STATE'; state: GameState }
   | { type: 'PLAYER_JOIN'; player: Player }
   | { type: 'PLAYER_LEAVE'; playerId: string }
-  | { type: 'OPEN_CARD'; categoryId: string; question: Question; mediaDataUrl?: string }
+  | { type: 'OPEN_CARD'; categoryId: string; question: Question; mediaDataUrl?: string; clueRevealed?: boolean; mediaRevealed?: boolean }
   | { type: 'CLOSE_CARD' }
   | { type: 'START_BUZZING' }
   | { type: 'BUZZ'; playerId: string; playerName: string }
   | { type: 'JUDGE'; playerId: string; correct: boolean; pointDelta: number; boardControlId?: string }
   | { type: 'REVEAL_ANSWER' }
+  | { type: 'REVEAL_CLUE' }
+  | { type: 'REVEAL_MEDIA' }
   | { type: 'MARK_ANSWERED'; cellId: string }
   | { type: 'UPDATE_PLAYER'; player: Player }
   | { type: 'REMOVE_PLAYER'; playerId: string }
@@ -114,7 +118,7 @@ export type NetMessage =
   | { type: 'DAILY_DOUBLE_REVEAL'; playerId: string; categoryId: string; question: Question; mediaDataUrl?: string }
   | { type: 'DAILY_DOUBLE_BET'; wager: number; playerId: string }
   | { type: 'DAILY_DOUBLE_ACCEPT_BET'; wager: number }
-  | { type: 'DAILY_DOUBLE_REVEAL_CLUE' }
+  | { type: 'DAILY_DOUBLE_REVEAL_CLUE'; mediaRevealed?: boolean }
   | { type: 'EMOJI_REACT'; playerId: string; emoji: string }
 
 export interface GameSettings {
@@ -122,4 +126,6 @@ export interface GameSettings {
   allowNegativeScore: boolean
   autoBuzzQueue: boolean
   blurClueOnBuzz: boolean
+  autoRevealClue: boolean
+  autoRevealMedia: boolean
 }

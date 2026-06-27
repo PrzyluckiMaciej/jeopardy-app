@@ -88,6 +88,18 @@ export default function SettingsPanel({
               onChange={() => toggle('blurClueOnBuzz')}
               disabled={!settings.autoBuzzQueue}
             />
+            <Toggle
+              label="Auto-reveal clue"
+              description="Show the clue text to players as soon as a question opens"
+              value={settings.autoRevealClue}
+              onChange={() => toggle('autoRevealClue')}
+            />
+            <Toggle
+              label="Auto-reveal media"
+              description="Show attached media to players as soon as a question opens"
+              value={settings.autoRevealMedia}
+              onChange={() => toggle('autoRevealMedia')}
+            />
           </div>
         </div>
 

@@ -133,7 +133,7 @@ interface GameStore {
   updatePlayer: (player: Player) => void
   setPlayerConnected: (id: string, connected: boolean) => void
   setBoardControl: (id: string | null) => void
-  openCard: (categoryId: string, question: Question, mediaDataUrl?: string) => void
+  openCard: (categoryId: string, question: Question, mediaDataUrl?: string, reveal?: { clue?: boolean; media?: boolean }) => void
   closeCard: () => void
   setMediaPlayback: (playback: MediaPlaybackState | null) => void
   startBuzzing: () => void
@@ -141,10 +141,12 @@ interface GameStore {
   clearBuzzQueue: () => void
   judgeAnswer: (playerId: string, correct: boolean, pointDelta: number) => void
   revealAnswer: () => void
+  revealClue: () => void
+  revealMedia: () => void
   markAnswered: (cellId: string) => void
   startDailyDouble: (playerId: string) => void
   setDailyDoubleBet: (wager: number) => void
-  revealDailyDoubleClue: () => void
+  revealDailyDoubleClue: (autoRevealMedia?: boolean) => void
   resetBoard: () => void
   reset: () => void
   leaveRoom: () => void
@@ -169,6 +171,8 @@ const defaultState: GameState = {
   gameBoardIds: [],
   currentBoardIndex: 0,
   boardTransition: null,
+  clueRevealed: false,
+  mediaRevealed: false,
 }
 
 const defaultSettings: GameSettings = {
@@ -176,6 +180,8 @@ const defaultSettings: GameSettings = {
   allowNegativeScore: false,
   autoBuzzQueue: false,
   blurClueOnBuzz: false,
+  autoRevealClue: false,
+  autoRevealMedia: false,
 }
 
 export const useGameStore = create<GameStore>()(
@@ -236,7 +242,7 @@ export const useGameStore = create<GameStore>()(
       setBoardControl: (id) =>
         set((s) => ({ state: { ...s.state, boardControlId: id } })),
 
-      openCard: (categoryId, question, mediaDataUrl) =>
+      openCard: (categoryId, question, mediaDataUrl, reveal) =>
         set((s) => {
           let mediaType: 'image' | 'audio' | 'video' | undefined
           if (mediaDataUrl) {
@@ -244,6 +250,8 @@ export const useGameStore = create<GameStore>()(
             else if (mediaDataUrl.startsWith('data:audio')) mediaType = 'audio'
             else if (mediaDataUrl.startsWith('data:video')) mediaType = 'video'
           }
+          const clueRevealed = reveal?.clue ?? false
+          const mediaRevealed = reveal?.media ?? false
           return {
             state: {
               ...s.state,
@@ -253,7 +261,11 @@ export const useGameStore = create<GameStore>()(
               activeMedia: mediaDataUrl && mediaType
                 ? { type: mediaType, dataUrl: mediaDataUrl }
                 : null,
-              mediaPlayback: initialMediaPlaybackForType(mediaType),
+              clueRevealed,
+              mediaRevealed,
+              mediaPlayback: mediaRevealed
+                ? initialMediaPlaybackForType(mediaType)
+                : null,
             },
           }
         }),
@@ -268,6 +280,8 @@ export const useGameStore = create<GameStore>()(
             activeMedia: null,
             mediaPlayback: null,
             dailyDouble: null,
+            clueRevealed: false,
+            mediaRevealed: false,
           },
         })),
 
@@ -309,6 +323,18 @@ export const useGameStore = create<GameStore>()(
       revealAnswer: () =>
         set((s) => ({ state: { ...s.state, phase: 'revealed' } })),
 
+      revealClue: () =>
+        set((s) => ({ state: { ...s.state, clueRevealed: true } })),
+
+      revealMedia: () =>
+        set((s) => ({
+          state: {
+            ...s.state,
+            mediaRevealed: true,
+            mediaPlayback: initialMediaPlaybackForType(s.state.activeMedia?.type),
+          },
+        })),
+
       markAnswered: (cellId) =>
         set((s) => ({
           state: {
@@ -320,6 +346,8 @@ export const useGameStore = create<GameStore>()(
             activeMedia: null,
             mediaPlayback: null,
             dailyDouble: null,
+            clueRevealed: false,
+            mediaRevealed: false,
           },
         })),
 
@@ -343,14 +371,21 @@ export const useGameStore = create<GameStore>()(
           },
         })),
 
-      revealDailyDoubleClue: () =>
-        set((s) => ({
-          state: {
-            ...s.state,
-            phase: 'question',
-            mediaPlayback: initialMediaPlaybackForType(s.state.activeMedia?.type),
-          },
-        })),
+      revealDailyDoubleClue: (autoRevealMedia = false) =>
+        set((s) => {
+          const mediaRevealed = s.state.mediaRevealed || autoRevealMedia
+          return {
+            state: {
+              ...s.state,
+              phase: 'question',
+              clueRevealed: true,
+              mediaRevealed,
+              mediaPlayback: mediaRevealed && !s.state.mediaRevealed
+                ? initialMediaPlaybackForType(s.state.activeMedia?.type)
+                : s.state.mediaPlayback,
+            },
+          }
+        }),
 
       resetBoard: () =>
         set((s) => ({
@@ -365,6 +400,8 @@ export const useGameStore = create<GameStore>()(
             mediaPlayback: null,
             boardControlId: null,
             dailyDouble: null,
+            clueRevealed: false,
+            mediaRevealed: false,
           },
         })),
 
@@ -385,6 +422,8 @@ export const useGameStore = create<GameStore>()(
             boardControlId: null,
             dailyDouble: null,
             boardTransition: null,
+            clueRevealed: false,
+            mediaRevealed: false,
             players: s.state.players.map((p) => ({ ...p, score: 0 })),
           },
         })),
@@ -406,6 +445,8 @@ export const useGameStore = create<GameStore>()(
             mediaPlayback: null,
             dailyDouble: null,
             boardTransition: null,
+            clueRevealed: false,
+            mediaRevealed: false,
           },
         })),
 
