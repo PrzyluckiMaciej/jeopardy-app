@@ -1562,6 +1562,12 @@ select:focus-visible {
   color: var(--gold-bright);
   border-radius: var(--radius-lg);
 }
+.question-overlay-answer--pending {
+  opacity: 0.45;
+  background: rgba(212, 160, 23, 0.06);
+  border-color: rgba(212, 160, 23, 0.25);
+  color: #8899cc;
+}
 .question-overlay-header {
   display: flex;
   align-items: center;

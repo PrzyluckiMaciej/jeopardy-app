@@ -198,14 +198,14 @@ export default function QuestionOverlay({ state, settings }: Props) {
                 {question.question || <span className="text-muted">No question text</span>}
               </div>
 
-              {phase === 'revealed' && (
-                <div
-                  key={`answer-${answerRevealKey}`}
-                  className="question-overlay-answer font-display text-2xl md:text-3xl px-6 py-3 mt-2 answer-reveal"
-                >
-                  {question.answer || '—'}
-                </div>
-              )}
+              <div
+                key={phase === 'revealed' ? `answer-${answerRevealKey}` : 'answer-pending'}
+                className={`question-overlay-answer font-display text-2xl md:text-3xl px-6 py-3 mt-2${
+                  phase === 'revealed' ? ' answer-reveal' : ' question-overlay-answer--pending'
+                }`}
+              >
+                {question.answer || '—'}
+              </div>
             </div>
           )}
         </div>
