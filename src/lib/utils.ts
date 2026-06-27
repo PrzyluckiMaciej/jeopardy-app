@@ -7,6 +7,18 @@ export function generateRoomCode(): string {
   return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
 }
 
+import type { Player } from '../types'
+
+export function orderPlayersForDisplay(
+  players: Player[],
+  myPlayerId?: string,
+): Player[] {
+  if (!myPlayerId) return players
+  const meIndex = players.findIndex((p) => p.id === myPlayerId)
+  if (meIndex <= 0) return players
+  return [players[meIndex], ...players.slice(0, meIndex), ...players.slice(meIndex + 1)]
+}
+
 export function formatScore(score: number): string {
   if (score < 0) return `-$${Math.abs(score).toLocaleString()}`
   return `$${score.toLocaleString()}`

@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Smile, Crown } from 'lucide-react'
-import { formatScore } from '../lib/utils'
+import { formatScore, orderPlayersForDisplay } from '../lib/utils'
 import type { Player } from '../types'
 
 const EMOJIS = ['😂', '😎', '😠', '🤡', '😮', '🤨', '😴', '😍', '👍', '👎']
@@ -166,7 +166,7 @@ export default function Scoreboard({
     }
     return null
   }
-  const sorted = [...players].sort((a, b) => b.score - a.score)
+  const displayPlayers = orderPlayersForDisplay(players, myPlayerId)
 
   const prevScores = useRef<Record<string, number>>({})
   const [pulsingIds, setPulsingIds] = useState<Set<string>>(new Set())
@@ -263,7 +263,7 @@ export default function Scoreboard({
     <div className="scoreboard">
       {/* Desktop / tablet: horizontal cards */}
       <div className="scoreboard--cards">
-        {sorted.map((p) => {
+        {displayPlayers.map((p) => {
           const st = playerState(p, buzzQueue, highlightId, boardControlId, myPlayerId)
           const reaction = activeEmojis[p.id]
 
@@ -377,7 +377,7 @@ export default function Scoreboard({
 
       {/* Mobile: compact list */}
       <div className="scoreboard--list">
-        {sorted.map((p) => {
+        {displayPlayers.map((p) => {
           const st = playerState(p, buzzQueue, highlightId, boardControlId, myPlayerId)
           const reaction = activeEmojis[p.id]
 

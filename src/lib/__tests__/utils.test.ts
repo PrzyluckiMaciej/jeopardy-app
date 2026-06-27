@@ -1,4 +1,33 @@
-import { formatScore, cellId, generateRoomCode, generateId, createDefaultBoard } from '../utils'
+import { formatScore, cellId, generateRoomCode, generateId, createDefaultBoard, orderPlayersForDisplay } from '../utils'
+import type { Player } from '../../types'
+
+function player(id: string, name: string): Player {
+  return { id, name, score: 0, isConnected: true }
+}
+
+describe('orderPlayersForDisplay', () => {
+  const alice = player('a', 'Alice')
+  const bob = player('b', 'Bob')
+  const carol = player('c', 'Carol')
+  const players = [alice, bob, carol]
+
+  it('preserves join order when myPlayerId is omitted', () => {
+    expect(orderPlayersForDisplay(players)).toEqual(players)
+  })
+
+  it('moves the current player to the front while preserving relative order of others', () => {
+    expect(orderPlayersForDisplay(players, 'b')).toEqual([bob, alice, carol])
+    expect(orderPlayersForDisplay(players, 'c')).toEqual([carol, alice, bob])
+  })
+
+  it('returns the array unchanged when self is already first', () => {
+    expect(orderPlayersForDisplay(players, 'a')).toEqual(players)
+  })
+
+  it('returns the array unchanged when myPlayerId is not found', () => {
+    expect(orderPlayersForDisplay(players, 'missing')).toEqual(players)
+  })
+})
 
 describe('formatScore', () => {
   it('formats positive scores with dollar sign', () => {
