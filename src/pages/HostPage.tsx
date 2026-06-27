@@ -128,6 +128,12 @@ export default function HostPage() {
     }
   }
 
+  function clearMediaSync() {
+    currentManifestIds.current = []
+    mediaSyncMap.current.clear()
+    setMediaSyncStatus(new Map())
+  }
+
   function initSyncForAllPlayers() {
     const players = useGameStore.getState().state.players
     for (const p of players) {
@@ -142,8 +148,7 @@ export default function HostPage() {
     const mediaIds = collectBoardMediaIds(board)
     currentManifestIds.current = mediaIds
     if (mediaIds.length === 0) {
-      mediaSyncMap.current.clear()
-      setMediaSyncStatus(new Map())
+      clearMediaSync()
       return
     }
 
@@ -177,15 +182,10 @@ export default function HostPage() {
   }, [])
 
   useEffect(() => {
-    if (!state.board) {
-      currentManifestIds.current = []
-      mediaSyncMap.current.clear()
-      setMediaSyncStatus(new Map())
-      return
-    }
+    if (!state.board) return
     const mediaIds = collectBoardMediaIds(state.board)
     if (mediaIds.length > 0 && currentManifestIds.current.join(',') !== mediaIds.join(',')) {
-      startPreTransfer(state.board)
+      void startPreTransfer(state.board)
     }
   }, [state.board]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -391,11 +391,13 @@ export default function HostPage() {
     })
     net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
     closeBoardPicker()
+    clearMediaSync()
   }
 
   function handleSelectGame(gameId: string, boardIds: string[]) {
     selectGame(gameId, boardIds)
     setActiveBoard(null)
+    clearMediaSync()
     net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
     closeBoardPicker()
     setEditing(false)
@@ -459,6 +461,7 @@ export default function HostPage() {
       if (activeGameId) {
         patchState({ phase: 'gameStart', board: null, answeredCells: [], boardTransition: null })
         setActiveBoard(null)
+        clearMediaSync()
         net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
       }
       return
@@ -492,6 +495,7 @@ export default function HostPage() {
       activeQuestion: null, buzzQueue: [], activeMedia: null, mediaPlayback: null, dailyDouble: null,
     })
     setActiveBoard(null)
+    clearMediaSync()
     net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
   }
 
@@ -501,6 +505,7 @@ export default function HostPage() {
       setActiveBoard(null)
       setEditing(false)
       patchState({ board: null, answeredCells: [], phase: 'lobby' })
+      clearMediaSync()
       net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
     }
   }
