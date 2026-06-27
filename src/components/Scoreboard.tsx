@@ -302,7 +302,7 @@ export default function Scoreboard({
               />
 
               <div
-                className="relative flex flex-col items-center text-center gap-1.5 w-full min-w-0"
+                className="relative flex flex-col flex-1 items-center text-center gap-1.5 w-full min-w-0"
                 style={{ padding: '12px 16px 14px' }}
               >
                 <span
@@ -319,8 +319,34 @@ export default function Scoreboard({
                   }}
                 />
 
+                <div
+                  className="scoreboard-card__name text-center w-full truncate px-1"
+                  title={p.name}
+                >
+                  {p.name}
+                </div>
+
+                <div
+                  className={`scoreboard-card__score leading-none text-center${pulsingIds.has(p.id) ? ' score-pulse' : ''}`}
+                  style={{
+                    color: p.score < 0 ? '#e07070' : 'var(--gold-bright)',
+                  }}
+                  onAnimationEnd={() => clearPulse(p.id)}
+                >
+                  {formatScore(p.score)}
+                </div>
+
+                <div className="flex flex-wrap gap-1 justify-center mt-0.5" style={{ minHeight: 20 }}>
+                  <StatusBadges
+                    hasControl={st.hasControl}
+                    isBuzzed={st.isBuzzed}
+                    isFirst={st.isFirst}
+                    buzzPos={st.buzzPos}
+                  />
+                </div>
+
                 {st.isMe && onEmojiSelect && (
-                  <div className="relative flex justify-center w-full">
+                  <div className="relative flex justify-center w-full mt-auto">
                     <button
                       ref={emojiBtnCardsRef}
                       type="button"
@@ -339,36 +365,6 @@ export default function Scoreboard({
                     </button>
                   </div>
                 )}
-
-                <div
-                  className="font-condensed font-bold text-sm text-center w-full truncate px-1"
-                  style={{ color: 'var(--white)' }}
-                  title={p.name}
-                >
-                  {p.name}
-                </div>
-
-                <div
-                  className={`font-display leading-none text-center${pulsingIds.has(p.id) ? ' score-pulse' : ''}`}
-                  style={{
-                    fontSize: '1.6rem',
-                    color: p.score < 0 ? '#e07070' : 'var(--gold-bright)',
-                    fontVariantNumeric: 'tabular-nums',
-                    letterSpacing: '-0.01em',
-                  }}
-                  onAnimationEnd={() => clearPulse(p.id)}
-                >
-                  {formatScore(p.score)}
-                </div>
-
-                <div className="flex flex-wrap gap-1 justify-center mt-0.5" style={{ minHeight: 20 }}>
-                  <StatusBadges
-                    hasControl={st.hasControl}
-                    isBuzzed={st.isBuzzed}
-                    isFirst={st.isFirst}
-                    buzzPos={st.buzzPos}
-                  />
-                </div>
               </div>
             </div>
           )
