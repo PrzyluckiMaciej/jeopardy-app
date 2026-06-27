@@ -785,13 +785,13 @@ export default function PlayerPage() {
                       }}
                     >
                       {displayMedia.type === 'image' && (
-                        <img src={displayMedia.dataUrl} className="max-h-48 rounded-lg object-contain mx-auto" alt="Question media" />
+                        <img src={displayMedia.dataUrl} alt="Question media" />
                       )}
                       {displayMedia.type === 'audio' && (
                         <audio controls src={displayMedia.dataUrl} autoPlay className="mx-auto" />
                       )}
                       {displayMedia.type === 'video' && (
-                        <video controls src={displayMedia.dataUrl} autoPlay className="max-h-48 rounded-lg mx-auto" />
+                        <video controls src={displayMedia.dataUrl} autoPlay />
                       )}
                     </div>
                   )}

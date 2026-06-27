@@ -181,13 +181,13 @@ export default function QuestionOverlay({ state, settings }: Props) {
               {activeMedia && (
                 <div className="question-overlay-media clue-reveal">
                   {activeMedia.type === 'image' && (
-                    <img src={activeMedia.dataUrl} className="max-h-48 rounded-lg object-contain mx-auto" alt="" />
+                    <img src={activeMedia.dataUrl} alt="" />
                   )}
                   {activeMedia.type === 'audio' && (
                     <audio controls src={activeMedia.dataUrl} autoPlay className="mx-auto" />
                   )}
                   {activeMedia.type === 'video' && (
-                    <video controls src={activeMedia.dataUrl} autoPlay className="max-h-48 rounded-lg mx-auto" />
+                    <video controls src={activeMedia.dataUrl} autoPlay />
                   )}
                 </div>
               )}
