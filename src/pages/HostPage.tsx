@@ -244,6 +244,7 @@ export default function HostPage() {
       activeQuestion: null,
       buzzQueue: [],
       activeMedia: null,
+      mediaPlayback: null,
       boardControlId: null,
       dailyDouble: null,
       boardTransition: null,
@@ -298,7 +299,7 @@ export default function HostPage() {
     setBoardTransitionExiting(false)
     patchState({ currentBoardIndex: nextIndex })
     setBoardTransition(b.name)
-    patchState({ board: b, answeredCells: [], phase: 'board', activeQuestion: null, buzzQueue: [], activeMedia: null, dailyDouble: null })
+    patchState({ board: b, answeredCells: [], phase: 'board', activeQuestion: null, buzzQueue: [], activeMedia: null, mediaPlayback: null, dailyDouble: null })
     net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
 
     setTimeout(() => {
@@ -329,7 +330,7 @@ export default function HostPage() {
     setBoardTransitionExiting(false)
     patchState({ currentBoardIndex: prevIndex })
     setBoardTransition(b.name)
-    patchState({ board: b, answeredCells: [], phase: 'board', activeQuestion: null, buzzQueue: [], activeMedia: null, dailyDouble: null })
+    patchState({ board: b, answeredCells: [], phase: 'board', activeQuestion: null, buzzQueue: [], activeMedia: null, mediaPlayback: null, dailyDouble: null })
     net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
 
     setTimeout(() => {
@@ -345,7 +346,7 @@ export default function HostPage() {
     patchState({
       phase: 'lobby', board: null, answeredCells: [], activeGameId: null,
       gameBoardIds: [], currentBoardIndex: 0, boardTransition: null,
-      activeQuestion: null, buzzQueue: [], activeMedia: null, dailyDouble: null,
+      activeQuestion: null, buzzQueue: [], activeMedia: null, mediaPlayback: null, dailyDouble: null,
     })
     setActiveBoard(null)
     net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
