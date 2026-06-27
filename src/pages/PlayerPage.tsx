@@ -369,7 +369,7 @@ export default function PlayerPage() {
     overlayExitingRef.current = false
     lastOverlayPhase.current = state.phase
     lastIsDD.current = state.dailyDouble !== null
-    if (state.activeMedia) lastActiveMedia.current = state.activeMedia
+    lastActiveMedia.current = state.activeMedia
   } else if (overlayOpenRef.current && !overlayExitingRef.current) {
     overlayExitingRef.current = true
   }
