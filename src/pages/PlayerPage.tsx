@@ -964,7 +964,7 @@ export default function PlayerPage() {
                   {displayClueRevealed && (
                     <div
                       key={`clue-${clueRevealKey}`}
-                      className={`question-overlay-clue font-condensed font-bold text-3xl md:text-4xl leading-snug max-w-2xl${
+                      className={`question-overlay-clue font-condensed font-bold max-w-2xl${
                         displayMediaRevealed ? '' : ' clue-reveal'
                       }`}
                       style={{
@@ -981,7 +981,7 @@ export default function PlayerPage() {
                   {uiPhase === 'revealed' && (
                     <div
                       key={`answer-${answerRevealKey}`}
-                      className="question-overlay-answer font-display text-2xl md:text-3xl answer-reveal"
+                      className="question-overlay-answer font-display answer-reveal"
                     >
                       {displayQ.answer || '—'}
                     </div>
