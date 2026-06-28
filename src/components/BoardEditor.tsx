@@ -39,7 +39,7 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
       const map: Record<string, MediaType> = {}
       const patches = new Map<string, MediaType>()
 
-      for (const cat of board.categories) {
+      for (const cat of boardRef.current.categories) {
         for (const q of cat.questions) {
           if (!q.mediaId) continue
           if (q.mediaType) {

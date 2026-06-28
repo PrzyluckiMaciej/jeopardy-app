@@ -6,6 +6,12 @@ import { useGameStore } from '../store/gameStore'
 
 const VOLUME_STORAGE_KEY = 'jeopardy-media-volume'
 const SPEED_OPTIONS = [0.5, 1, 1.25, 1.5, 2] as const
+const CONTROLS_HIDE_DELAY_MS = 3000
+const CONTROLS_LEAVE_DELAY_MS = 300
+
+function canHover(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches
+}
 
 interface Props {
   media: { type: 'image' | 'audio' | 'video'; dataUrl: string }
@@ -173,6 +179,152 @@ function MediaSeekBar({ value, max, onChange, ariaLabel = 'Seek' }: MediaSeekBar
   )
 }
 
+interface HostControlsProps {
+  isPaused: boolean
+  currentTime: number
+  duration: number
+  playbackRate: number
+  volume: number
+  muted: boolean
+  onTogglePlay: () => void
+  onSeek: (value: number) => void
+  onSpeedChange: (rate: number) => void
+  onVolumeChange: (value: number) => void
+  onToggleMute: () => void
+  variant: 'bar' | 'overlay'
+  onControlInteract?: () => void
+}
+
+function HostControls({
+  isPaused,
+  currentTime,
+  duration,
+  playbackRate,
+  volume,
+  muted,
+  onTogglePlay,
+  onSeek,
+  onSpeedChange,
+  onVolumeChange,
+  onToggleMute,
+  variant,
+  onControlInteract,
+}: HostControlsProps) {
+  const isOverlay = variant === 'overlay'
+  const seekBar = (
+    <MediaSeekBar
+      value={Math.min(currentTime, duration || 0)}
+      max={duration || 0}
+      onChange={onSeek}
+    />
+  )
+
+  if (isOverlay) {
+    return (
+      <>
+        <div
+          className="question-media-player__overlay-seek"
+          onPointerDown={onControlInteract}
+        >
+          {seekBar}
+        </div>
+        <div className="question-media-player__overlay-toolbar">
+          <button
+            type="button"
+            className="question-media-player__overlay-btn"
+            onClick={() => {
+              onControlInteract?.()
+              onTogglePlay()
+            }}
+            aria-label={isPaused ? 'Play' : 'Pause'}
+          >
+            {isPaused ? <Play size={20} aria-hidden /> : <Pause size={20} aria-hidden />}
+          </button>
+
+          <span className="question-media-player__overlay-time">
+            {formatTime(currentTime)} / {formatTime(duration)}
+          </span>
+
+          <VolumeControls
+            className="question-media-player__overlay-volume"
+            volume={volume}
+            muted={muted}
+            onVolumeChange={(v) => {
+              onControlInteract?.()
+              onVolumeChange(v)
+            }}
+            onToggleMute={() => {
+              onControlInteract?.()
+              onToggleMute()
+            }}
+            iconSize={20}
+          />
+
+          <label className="question-media-player__overlay-speed">
+            <span className="sr-only">Playback speed</span>
+            <select
+              value={playbackRate}
+              onChange={(e) => {
+                onControlInteract?.()
+                onSpeedChange(parseFloat(e.target.value))
+              }}
+              aria-label="Playback speed"
+            >
+              {SPEED_OPTIONS.map((rate) => (
+                <option key={rate} value={rate}>
+                  {rate}x
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </>
+    )
+  }
+
+  return (
+    <div className="question-media-controls">
+      <button
+        type="button"
+        className="question-media-controls__btn"
+        onClick={onTogglePlay}
+        aria-label={isPaused ? 'Play' : 'Pause'}
+      >
+        {isPaused ? <Play size={18} aria-hidden /> : <Pause size={18} aria-hidden />}
+      </button>
+
+      <span className="question-media-controls__time">
+        {formatTime(currentTime)} / {formatTime(duration)}
+      </span>
+
+      {seekBar}
+
+      <label className="question-media-controls__speed">
+        <span className="sr-only">Playback speed</span>
+        <select
+          value={playbackRate}
+          onChange={(e) => onSpeedChange(parseFloat(e.target.value))}
+          aria-label="Playback speed"
+        >
+          {SPEED_OPTIONS.map((rate) => (
+            <option key={rate} value={rate}>
+              {rate}x
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <VolumeControls
+        className="question-media-controls__volume"
+        volume={volume}
+        muted={muted}
+        onVolumeChange={onVolumeChange}
+        onToggleMute={onToggleMute}
+      />
+    </div>
+  )
+}
+
 interface VolumeControlsProps {
   volume: number
   muted: boolean
@@ -238,10 +390,74 @@ export default function QuestionMediaPlayer({
   const [volume, setVolume] = useState(readStoredVolume)
   const [muted, setMuted] = useState(false)
   const volumeBeforeMuteRef = useRef(volume)
+  const [controlsVisible, setControlsVisible] = useState(false)
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const leaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const hoverCapableRef = useRef(canHover())
 
   const isHost = role === 'host'
+  const isVideo = media.type === 'video'
 
-  const getLatestPlayback = useCallback(() => lastPlaybackRef.current, [])
+  const clearHideTimeout = useCallback(() => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current)
+      hideTimeoutRef.current = null
+    }
+  }, [])
+
+  const clearLeaveTimeout = useCallback(() => {
+    if (leaveTimeoutRef.current) {
+      clearTimeout(leaveTimeoutRef.current)
+      leaveTimeoutRef.current = null
+    }
+  }, [])
+
+  const scheduleHide = useCallback(() => {
+    clearHideTimeout()
+    hideTimeoutRef.current = setTimeout(() => {
+      setControlsVisible(false)
+    }, CONTROLS_HIDE_DELAY_MS)
+  }, [clearHideTimeout])
+
+  const handleControlInteract = useCallback(() => {
+    setControlsVisible(true)
+    if (!hoverCapableRef.current) {
+      scheduleHide()
+    } else {
+      clearHideTimeout()
+    }
+  }, [scheduleHide, clearHideTimeout])
+
+  const handleStageMouseEnter = useCallback(() => {
+    if (!hoverCapableRef.current) return
+    clearLeaveTimeout()
+    clearHideTimeout()
+    setControlsVisible(true)
+  }, [clearLeaveTimeout, clearHideTimeout])
+
+  const handleStageMouseLeave = useCallback(() => {
+    if (!hoverCapableRef.current) return
+    clearLeaveTimeout()
+    leaveTimeoutRef.current = setTimeout(() => {
+      setControlsVisible(false)
+      clearHideTimeout()
+    }, CONTROLS_LEAVE_DELAY_MS)
+  }, [clearLeaveTimeout, clearHideTimeout])
+
+  const handleStagePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (hoverCapableRef.current) return
+      const target = e.target as HTMLElement
+      if (target.closest('.question-media-player__overlay')) return
+      setControlsVisible((visible) => {
+        const next = !visible
+        if (next) scheduleHide()
+        else clearHideTimeout()
+        return next
+      })
+    },
+    [scheduleHide, clearHideTimeout],
+  )
 
   const publishPlayback = useCallback(
     (el: HTMLMediaElement) => {
@@ -251,6 +467,45 @@ export default function QuestionMediaPlayer({
     },
     [setMediaPlayback],
   )
+
+  const handleTogglePlay = useCallback(() => {
+    const el = mediaRef.current
+    if (!el || !isHost || !mediaActive) return
+    if (el.paused) {
+      el.play()
+        .then(() => publishPlayback(el))
+        .catch(() => publishPlayback(el))
+    } else {
+      el.pause()
+      publishPlayback(el)
+    }
+  }, [isHost, mediaActive, publishPlayback])
+
+  const handleStageClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!isHost || !mediaActive) return
+      const target = e.target as HTMLElement
+      if (
+        target.closest(
+          '.question-media-player__overlay-toolbar, .question-media-player__overlay-seek, button, select, label',
+        )
+      ) {
+        return
+      }
+      handleTogglePlay()
+      handleControlInteract()
+    },
+    [isHost, mediaActive, handleTogglePlay, handleControlInteract],
+  )
+
+  useEffect(() => {
+    return () => {
+      clearHideTimeout()
+      clearLeaveTimeout()
+    }
+  }, [clearHideTimeout, clearLeaveTimeout])
+
+  const getLatestPlayback = useCallback(() => lastPlaybackRef.current, [])
 
   const applyVolume = useCallback((el: HTMLMediaElement, v: number) => {
     el.volume = v
@@ -438,19 +693,6 @@ export default function QuestionMediaPlayer({
     }
   }
 
-  function handleTogglePlay() {
-    const el = mediaRef.current
-    if (!el || !isHost || !mediaActive) return
-    if (el.paused) {
-      el.play()
-        .then(() => publishPlayback(el))
-        .catch(() => publishPlayback(el))
-    } else {
-      el.pause()
-      publishPlayback(el)
-    }
-  }
-
   function handleSeek(value: number) {
     const el = mediaRef.current
     if (!el || !isHost || !mediaActive) return
@@ -497,72 +739,92 @@ export default function QuestionMediaPlayer({
     onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
   }
 
+  const playerVolumeControls = (
+    <VolumeControls
+      className={isVideo ? 'question-media-player__overlay-volume' : 'question-media-volume'}
+      volume={volume}
+      muted={muted}
+      onVolumeChange={(v) => {
+        if (isVideo) handleControlInteract()
+        handleVolumeChange(v)
+      }}
+      onToggleMute={() => {
+        if (isVideo) handleControlInteract()
+        handleToggleMute()
+      }}
+      iconSize={isVideo ? 20 : 18}
+    />
+  )
+
   return (
     <div
-      className={`question-media-player${isHost ? '' : ' question-media-player--player'}${className ? ` ${className}` : ''}`}
+      className={`question-media-player${isHost ? '' : ' question-media-player--player'}${isVideo ? ' question-media-player--video' : ''}${className ? ` ${className}` : ''}`}
       style={style}
     >
-      <div className="question-media-player__element">
-        {media.type === 'video' ? (
-          <video {...mediaProps} className="question-media-player__video" />
-        ) : (
-          <audio {...mediaProps} className="question-media-player__audio" />
-        )}
-      </div>
-
-      {isHost ? (
-        <div className="question-media-controls">
-          <button
-            type="button"
-            className="question-media-controls__btn"
-            onClick={handleTogglePlay}
-            aria-label={isPaused ? 'Play' : 'Pause'}
+      {isVideo ? (
+        <div
+          className={`question-media-player__stage${controlsVisible ? ' question-media-player--controls-visible' : ''}`}
+          onMouseEnter={handleStageMouseEnter}
+          onMouseLeave={handleStageMouseLeave}
+          onPointerDown={handleStagePointerDown}
+          onClick={handleStageClick}
+        >
+          <video
+            {...mediaProps}
+            className={`question-media-player__video${isHost ? '' : ' question-media-player__video--no-pointer'}`}
+          />
+          <div
+            className={`question-media-player__overlay${isHost ? '' : ' question-media-player__overlay--player'}`}
+            aria-hidden={!controlsVisible}
           >
-            {isPaused ? <Play size={18} aria-hidden /> : <Pause size={18} aria-hidden />}
-          </button>
-
-          <span className="question-media-controls__time">
-            {formatTime(currentTime)} / {formatTime(duration)}
-          </span>
-
-          <MediaSeekBar
-            value={Math.min(currentTime, duration || 0)}
-            max={duration || 0}
-            onChange={handleSeek}
-          />
-
-          <label className="question-media-controls__speed">
-            <span className="sr-only">Playback speed</span>
-            <select
-              value={playbackRate}
-              onChange={(e) => handleSpeedChange(parseFloat(e.target.value))}
-              aria-label="Playback speed"
-            >
-              {SPEED_OPTIONS.map((rate) => (
-                <option key={rate} value={rate}>
-                  {rate}x
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <VolumeControls
-            className="question-media-controls__volume"
-            volume={volume}
-            muted={muted}
-            onVolumeChange={handleVolumeChange}
-            onToggleMute={handleToggleMute}
-          />
+            {isHost ? (
+              <HostControls
+                variant="overlay"
+                isPaused={isPaused}
+                currentTime={currentTime}
+                duration={duration}
+                playbackRate={playbackRate}
+                volume={volume}
+                muted={muted}
+                onTogglePlay={handleTogglePlay}
+                onSeek={handleSeek}
+                onSpeedChange={handleSpeedChange}
+                onVolumeChange={handleVolumeChange}
+                onToggleMute={handleToggleMute}
+                onControlInteract={handleControlInteract}
+              />
+            ) : (
+              <div className="question-media-player__overlay-toolbar question-media-player__overlay-toolbar--player">
+                {playerVolumeControls}
+              </div>
+            )}
+          </div>
         </div>
       ) : (
-        <VolumeControls
-          className="question-media-volume"
-          volume={volume}
-          muted={muted}
-          onVolumeChange={handleVolumeChange}
-          onToggleMute={handleToggleMute}
-          iconSize={18}
-        />
+        <>
+          <div className="question-media-player__element">
+            <audio {...mediaProps} className="question-media-player__audio" />
+          </div>
+
+          {isHost ? (
+            <HostControls
+              variant="bar"
+              isPaused={isPaused}
+              currentTime={currentTime}
+              duration={duration}
+              playbackRate={playbackRate}
+              volume={volume}
+              muted={muted}
+              onTogglePlay={handleTogglePlay}
+              onSeek={handleSeek}
+              onSpeedChange={handleSpeedChange}
+              onVolumeChange={handleVolumeChange}
+              onToggleMute={handleToggleMute}
+            />
+          ) : (
+            playerVolumeControls
+          )}
+        </>
       )}
     </div>
   )
