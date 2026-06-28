@@ -89,21 +89,24 @@ export default function QuestionOverlayText({
 
       {mediaSlot}
 
-      <div
-        key={answerKey}
-        aria-hidden={!showAnswerContent}
-        className={`question-overlay-answer font-condensed font-bold${
-          showAnswerContent && !answerRevealed ? ' question-overlay-answer--pending' : ''
-        }${!showAnswerContent ? ' question-overlay-answer--concealed' : ''}${
-          answerClassName ? ` ${answerClassName}` : ''
-        }`}
-        style={{
-          ...textStyle,
-          ...(!showAnswerContent && answerMinHeight > 0 ? { minHeight: answerMinHeight } : undefined),
-        }}
-      >
-        {showAnswerContent ? answer || '—' : null}
-      </div>
+      {showAnswerContent ? (
+        <div
+          key={answerKey}
+          className={`question-overlay-answer font-condensed font-bold${
+            !answerRevealed ? ' question-overlay-answer--pending' : ''
+          }${answerClassName ? ` ${answerClassName}` : ''}`}
+          style={textStyle}
+        >
+          {answer || '—'}
+        </div>
+      ) : (
+        <div
+          key={answerKey}
+          className="question-overlay-answer-spacer"
+          aria-hidden
+          style={answerMinHeight > 0 ? { minHeight: answerMinHeight } : undefined}
+        />
+      )}
     </div>
   )
 }

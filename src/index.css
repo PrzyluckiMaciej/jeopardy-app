@@ -1575,17 +1575,16 @@ select:focus-visible {
   pointer-events: none;
   text-align: center;
 }
-.question-overlay-clue--concealed,
-.question-overlay-answer--concealed {
+.question-overlay-clue--concealed {
   pointer-events: none;
   user-select: none;
 }
-.question-overlay-answer--concealed {
-  background: transparent;
-  border-color: transparent;
-  color: transparent;
-  padding: 0;
-  margin-top: 0;
+.question-overlay-answer-spacer {
+  flex-shrink: 0;
+  width: 100%;
+  align-self: center;
+  visibility: hidden;
+  pointer-events: none;
 }
 .question-overlay-media--reserved {
   visibility: hidden;
