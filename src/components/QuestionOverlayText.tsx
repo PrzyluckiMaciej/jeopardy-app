@@ -1,10 +1,11 @@
-import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useRef, type CSSProperties, type ReactNode } from 'react'
 import { useOverlayTextFontSize } from '../hooks/useOverlayTextFontSize'
 
 interface Props {
   clue: string
   answer: string
   media?: ReactNode
+  hasMediaSlot?: boolean
   contentKey?: string | number
   clueKey?: string | number
   answerKey?: string | number
@@ -13,13 +14,15 @@ interface Props {
   clueStyle?: CSSProperties
   clueRevealed?: boolean
   answerRevealed?: boolean
-  beforeContent?: ReactNode
+  showClueContent?: boolean
+  showAnswerContent?: boolean
 }
 
 export default function QuestionOverlayText({
   clue,
   answer,
   media,
+  hasMediaSlot = false,
   contentKey,
   clueKey,
   answerKey,
@@ -28,34 +31,18 @@ export default function QuestionOverlayText({
   clueStyle,
   clueRevealed = true,
   answerRevealed = true,
-  beforeContent,
+  showClueContent = true,
+  showAnswerContent = true,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const clueRef = useRef<HTMLDivElement>(null)
-  const beforeRef = useRef<HTMLDivElement>(null)
-  const [reservedHeight, setReservedHeight] = useState(0)
 
-  useLayoutEffect(() => {
-    const el = beforeRef.current
-    if (!el) {
-      setReservedHeight(0)
-      return
-    }
-
-    const measure = () => setReservedHeight(el.offsetHeight)
-    measure()
-
-    const ro = new ResizeObserver(measure)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [beforeContent])
-
-  const fontSizePx = useOverlayTextFontSize({
+  const { fontSizePx, clueMinHeight, answerMinHeight } = useOverlayTextFontSize({
     clue,
     answer,
     containerRef,
     clueRef,
-    reservedHeight,
+    hasMediaSlot,
     enabled: true,
   })
 
@@ -67,6 +54,10 @@ export default function QuestionOverlayText({
     ? ({ '--overlay-text-size': `${fontSizePx}px` } as CSSProperties)
     : undefined
 
+  const mediaSlot = hasMediaSlot
+    ? media ?? <div className="question-overlay-media question-overlay-media--pending" aria-hidden />
+    : null
+
   return (
     <div
       key={contentKey}
@@ -74,33 +65,40 @@ export default function QuestionOverlayText({
       className="question-overlay-content w-full"
       style={contentStyle}
     >
-      {beforeContent != null && (
-        <div ref={beforeRef} className="w-full">
-          {beforeContent}
-        </div>
-      )}
-
       <div
         key={clueKey}
         ref={clueRef}
+        aria-hidden={!showClueContent}
         className={`question-overlay-clue font-condensed font-bold w-full${
           clueRevealed ? '' : ' question-overlay-clue--pending'
-        }${clueClassName ? ` ${clueClassName}` : ''}`}
-        style={{ ...textStyle, ...clueStyle }}
+        }${!showClueContent ? ' question-overlay-clue--concealed' : ''}${
+          clueClassName ? ` ${clueClassName}` : ''
+        }`}
+        style={{
+          ...textStyle,
+          ...clueStyle,
+          ...(!showClueContent && clueMinHeight > 0 ? { minHeight: clueMinHeight } : undefined),
+        }}
       >
-        {clue}
+        {showClueContent ? clue : null}
       </div>
 
-      {media}
+      {mediaSlot}
 
       <div
         key={answerKey}
+        aria-hidden={!showAnswerContent}
         className={`question-overlay-answer font-condensed font-bold${
           answerRevealed ? '' : ' question-overlay-answer--pending'
-        }${answerClassName ? ` ${answerClassName}` : ''}`}
-        style={textStyle}
+        }${!showAnswerContent ? ' question-overlay-answer--concealed' : ''}${
+          answerClassName ? ` ${answerClassName}` : ''
+        }`}
+        style={{
+          ...textStyle,
+          ...(!showAnswerContent && answerMinHeight > 0 ? { minHeight: answerMinHeight } : undefined),
+        }}
       >
-        {answer || '—'}
+        {showAnswerContent ? answer || '—' : null}
       </div>
     </div>
   )

@@ -502,6 +502,7 @@ export default function PlayerPage() {
   const isDDPlayer = state.dailyDouble?.playerId === myId
   const ddPlayerInfo = state.dailyDouble ? state.players.find(p => p.id === state.dailyDouble!.playerId) : null
   const clueBlurred = settings.blurClueOnBuzz && uiPhase === 'buzzing' && state.buzzQueue.length > 0
+  const questionHasMedia = !!(displayQ?.mediaId || displayMedia || mediaLoading)
   const buzzingOpen = uiPhase === 'buzzing'
   const canShowBuzzDock =
     !isDD && state.clueRevealed && (uiPhase === 'question' || buzzingOpen) && !buzzedOut
@@ -927,56 +928,69 @@ export default function PlayerPage() {
 
               {/* Clue (shown in question/buzzing/revealed phases) */}
               {(uiPhase === 'question' || uiPhase === 'buzzing' || uiPhase === 'revealed') && (
-                <QuestionOverlayText
-                  clue={displayQ.question}
-                  answer={displayQ.answer || '—'}
-                  clueKey={`clue-${clueRevealKey}`}
-                  clueRevealed={displayClueRevealed}
-                  answerRevealed={uiPhase === 'revealed'}
-                  answerKey={`answer-${answerRevealKey}`}
-                  answerClassName={uiPhase === 'revealed' ? 'answer-reveal' : ''}
-                  clueClassName={displayClueRevealed && !displayMediaRevealed ? 'clue-reveal' : ''}
-                  clueStyle={{
-                    color: 'var(--white)',
-                    filter: clueBlurred ? 'blur(8px)' : 'none',
-                    transition: 'filter 0.3s ease',
-                    userSelect: clueBlurred ? 'none' : undefined,
-                  }}
-                  beforeContent={
-                    !displayClueRevealed && !displayMediaRevealed ? (
-                      <div className="font-condensed text-sm animate-pulse text-center" style={{ color: '#4a5580' }}>
-                        Waiting for host to reveal the clue…
-                      </div>
-                    ) : undefined
-                  }
-                  media={
-                    displayMedia && displayMediaRevealed ? (
-                      <QuestionMediaPlayer
-                        media={displayMedia}
-                        role="player"
-                        playback={state.mediaPlayback}
-                        mountKey={mediaRevealKey}
-                        mediaActive={displayMediaRevealed}
-                        loading={mediaLoading}
-                        className="question-overlay-media clue-reveal"
-                        style={{
-                          filter: clueBlurred ? 'blur(8px)' : 'none',
-                          transition: 'filter 0.3s ease',
-                        }}
-                      />
-                    ) : !displayMedia && mediaLoading && displayMediaRevealed ? (
-                      <QuestionMediaPlayer
-                        media={{ type: 'audio', dataUrl: '' }}
-                        role="player"
-                        playback={null}
-                        mountKey={mediaRevealKey}
-                        mediaActive={false}
-                        loading={true}
-                        className="question-overlay-media clue-reveal"
-                      />
-                    ) : undefined
-                  }
-                />
+                <>
+                  {!displayClueRevealed && !displayMediaRevealed && (
+                    <div className="question-overlay-waiting font-condensed text-sm animate-pulse">
+                      Waiting for host to reveal the clue…
+                    </div>
+                  )}
+                  <QuestionOverlayText
+                    clue={displayQ.question}
+                    answer={displayQ.answer || '—'}
+                    clueKey={`clue-${clueRevealKey}`}
+                    clueRevealed={displayClueRevealed}
+                    answerRevealed={uiPhase === 'revealed'}
+                    showClueContent={displayClueRevealed}
+                    showAnswerContent={uiPhase === 'revealed'}
+                    answerKey={`answer-${answerRevealKey}`}
+                    answerClassName={uiPhase === 'revealed' ? 'answer-reveal' : ''}
+                    clueClassName={displayClueRevealed && !displayMediaRevealed ? 'clue-reveal' : ''}
+                    hasMediaSlot={questionHasMedia}
+                    clueStyle={
+                      displayClueRevealed && clueBlurred
+                        ? {
+                            color: 'var(--white)',
+                            filter: 'blur(8px)',
+                            transition: 'filter 0.3s ease',
+                            userSelect: 'none',
+                          }
+                        : displayClueRevealed
+                        ? { color: 'var(--white)' }
+                        : undefined
+                    }
+                    media={
+                      displayMedia ? (
+                        <QuestionMediaPlayer
+                          media={displayMedia}
+                          role="player"
+                          playback={state.mediaPlayback}
+                          mountKey={mediaRevealKey}
+                          mediaActive={displayMediaRevealed && !overlayExiting}
+                          loading={mediaLoading}
+                          className={`question-overlay-media${displayMediaRevealed ? '' : ' question-overlay-media--pending'}`}
+                          style={
+                            clueBlurred && displayMediaRevealed
+                              ? {
+                                  filter: 'blur(8px)',
+                                  transition: 'filter 0.3s ease',
+                                }
+                              : undefined
+                          }
+                        />
+                      ) : questionHasMedia ? (
+                        <QuestionMediaPlayer
+                          media={{ type: 'audio', dataUrl: '' }}
+                          role="player"
+                          playback={null}
+                          mountKey={mediaRevealKey}
+                          mediaActive={false}
+                          loading={true}
+                          className="question-overlay-media question-overlay-media--pending"
+                        />
+                      ) : undefined
+                    }
+                  />
+                </>
               )}
             </div>
 

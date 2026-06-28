@@ -203,6 +203,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
               answerRevealed={phase === 'revealed'}
               answerKey={phase === 'revealed' ? `answer-${answerRevealKey}` : 'answer-pending'}
               answerClassName={phase === 'revealed' ? 'answer-reveal' : ''}
+              hasMediaSlot={!!activeMedia}
               media={
                 activeMedia ? (
                   <QuestionMediaPlayer

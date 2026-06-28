@@ -1557,10 +1557,28 @@ select:focus-visible {
   min-height: 0;
   overflow: hidden;
   padding: var(--space-lg);
+  position: relative;
   background: linear-gradient(165deg, rgba(15, 22, 71, 0.55) 0%, rgba(7, 12, 43, 0.35) 100%);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.question-overlay-waiting {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+  color: #4a5580;
+  pointer-events: none;
+  text-align: center;
+}
+.question-overlay-clue--concealed,
+.question-overlay-answer--concealed {
+  pointer-events: none;
+  user-select: none;
 }
 .question-overlay-sidebar {
   width: 18rem;

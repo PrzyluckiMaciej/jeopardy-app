@@ -12,6 +12,18 @@ interface MeasurerElements {
   answer: HTMLDivElement
 }
 
+export interface OverlayTextLayout {
+  fontSizePx: number | null
+  clueMinHeight: number
+  answerMinHeight: number
+}
+
+const EMPTY_LAYOUT: OverlayTextLayout = {
+  fontSizePx: null,
+  clueMinHeight: 0,
+  answerMinHeight: 0,
+}
+
 function parsePx(value: string): number {
   const n = parseFloat(value)
   return Number.isFinite(n) ? n : 0
@@ -108,6 +120,7 @@ interface Options {
   containerRef: RefObject<HTMLElement | null>
   clueRef: RefObject<HTMLElement | null>
   reservedHeight?: number
+  hasMediaSlot?: boolean
   enabled?: boolean
 }
 
@@ -117,15 +130,18 @@ export function useOverlayTextFontSize({
   containerRef,
   clueRef,
   reservedHeight = 0,
+  hasMediaSlot = false,
   enabled = true,
-}: Options): number | null {
-  const [fontSizePx, setFontSizePx] = useState<number | null>(null)
+}: Options): OverlayTextLayout {
+  const [layout, setLayout] = useState<OverlayTextLayout>(EMPTY_LAYOUT)
   const frameRef = useRef<number | null>(null)
   const observedMediaRef = useRef<HTMLElement | null>(null)
 
   const recalculate = useCallback(() => {
+    if (!enabled) return
+
     const container = containerRef.current
-    if (!container || !enabled) return
+    if (!container) return
 
     const width = container.clientWidth
     const containerHeight = container.clientHeight
@@ -134,7 +150,7 @@ export function useOverlayTextFontSize({
     const styles = getComputedStyle(container)
     const flexGap = parsePx(styles.rowGap || styles.gap)
     const mediaEl = getMediaElement(container)
-    const hasMedia = mediaEl != null
+    const hasMedia = hasMediaSlot || mediaEl != null
 
     let overhead = reservedHeight
     if (reservedHeight > 0) overhead += flexGap
@@ -165,7 +181,6 @@ export function useOverlayTextFontSize({
       measureHeights: measureAt,
     })
 
-    // Safety pass: shrink if rendered clue still overflows its box
     const clueEl = clueRef.current
     if (clueEl && clueEl.clientHeight > 0) {
       const prevFont = clueEl.style.fontSize
@@ -177,8 +192,13 @@ export function useOverlayTextFontSize({
       clueEl.style.fontSize = prevFont
     }
 
-    setFontSizePx(nextSize)
-  }, [answer, clue, clueRef, containerRef, enabled, reservedHeight])
+    const measured = measureAt(nextSize)
+    setLayout({
+      fontSizePx: nextSize,
+      clueMinHeight: measured.clueHeight,
+      answerMinHeight: measured.answerHeight,
+    })
+  }, [answer, clue, clueRef, containerRef, enabled, hasMediaSlot, reservedHeight])
 
   const scheduleRecalculate = useCallback(() => {
     if (frameRef.current != null) cancelAnimationFrame(frameRef.current)
@@ -189,12 +209,9 @@ export function useOverlayTextFontSize({
   }, [recalculate])
 
   useLayoutEffect(() => {
-    if (!enabled) {
-      setFontSizePx(null)
-      return
-    }
+    if (!enabled) return
     scheduleRecalculate()
-  }, [clue, answer, enabled, scheduleRecalculate])
+  }, [clue, answer, enabled, hasMediaSlot, scheduleRecalculate])
 
   useLayoutEffect(() => {
     if (!enabled) return
@@ -231,5 +248,6 @@ export function useOverlayTextFontSize({
     }
   }, [clueRef, containerRef, enabled, scheduleRecalculate])
 
-  return fontSizePx
+  if (!enabled) return EMPTY_LAYOUT
+  return layout
 }
