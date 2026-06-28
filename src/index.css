@@ -1767,11 +1767,29 @@ select:focus-visible {
   color: var(--gold);
   min-width: 7rem;
 }
-.question-media-controls__volume input[type='range'],
-.question-media-volume input[type='range'] {
+.question-media-controls__volume-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.question-media-controls__volume-btn:hover {
+  color: var(--gold-bright);
+}
+.question-media-controls__volume-btn:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.question-media-controls__volume .question-media-controls__seek,
+.question-media-volume .question-media-controls__seek {
   flex: 1;
   min-width: 5rem;
-  accent-color: var(--gold);
 }
 .question-media-volume {
   width: 100%;
