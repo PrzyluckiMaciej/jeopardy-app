@@ -13,6 +13,7 @@ import GameBoard from '../components/GameBoard'
 import Scoreboard from '../components/Scoreboard'
 import Podium from '../components/Podium'
 import QuestionMediaPlayer from '../components/QuestionMediaPlayer'
+import QuestionOverlayText from '../components/QuestionOverlayText'
 
 export default function PlayerPage() {
   const navigate = useNavigate()
@@ -501,6 +502,7 @@ export default function PlayerPage() {
   const isDDPlayer = state.dailyDouble?.playerId === myId
   const ddPlayerInfo = state.dailyDouble ? state.players.find(p => p.id === state.dailyDouble!.playerId) : null
   const clueBlurred = settings.blurClueOnBuzz && uiPhase === 'buzzing' && state.buzzQueue.length > 0
+  const questionHasMedia = !!(displayQ?.mediaId || displayMedia || mediaLoading)
   const buzzingOpen = uiPhase === 'buzzing'
   const canShowBuzzDock =
     !isDD && state.clueRevealed && (uiPhase === 'question' || buzzingOpen) && !buzzedOut
@@ -926,67 +928,70 @@ export default function PlayerPage() {
 
               {/* Clue (shown in question/buzzing/revealed phases) */}
               {(uiPhase === 'question' || uiPhase === 'buzzing' || uiPhase === 'revealed') && (
-                <div className="question-overlay-content flex flex-col items-center w-full max-w-2xl">
+                <>
                   {!displayClueRevealed && !displayMediaRevealed && (
-                    <div className="font-condensed text-sm animate-pulse text-center" style={{ color: '#4a5580' }}>
+                    <div className="question-overlay-waiting font-condensed text-sm animate-pulse">
                       Waiting for host to reveal the clue…
                     </div>
                   )}
-
-                  {displayMedia && displayMediaRevealed && (
-                    <QuestionMediaPlayer
-                      media={displayMedia}
-                      role="player"
-                      playback={state.mediaPlayback}
-                      mountKey={mediaRevealKey}
-                      mediaActive={displayMediaRevealed}
-                      loading={mediaLoading}
-                      className="question-overlay-media clue-reveal"
-                      style={{
-                        filter: clueBlurred ? 'blur(8px)' : 'none',
-                        transition: 'filter 0.3s ease',
-                      }}
-                    />
-                  )}
-
-                  {!displayMedia && mediaLoading && displayMediaRevealed && (
-                    <QuestionMediaPlayer
-                      media={{ type: 'audio', dataUrl: '' }}
-                      role="player"
-                      playback={null}
-                      mountKey={mediaRevealKey}
-                      mediaActive={false}
-                      loading={true}
-                      className="question-overlay-media clue-reveal"
-                    />
-                  )}
-
-                  {displayClueRevealed && (
-                    <div
-                      key={`clue-${clueRevealKey}`}
-                      className={`question-overlay-clue font-condensed font-bold max-w-2xl${
-                        displayMediaRevealed ? '' : ' clue-reveal'
-                      }`}
-                      style={{
-                        color: 'var(--white)',
-                        filter: clueBlurred ? 'blur(8px)' : 'none',
-                        transition: 'filter 0.3s ease',
-                        userSelect: clueBlurred ? 'none' : undefined,
-                      }}
-                    >
-                      {displayQ.question}
-                    </div>
-                  )}
-
-                  {uiPhase === 'revealed' && (
-                    <div
-                      key={`answer-${answerRevealKey}`}
-                      className="question-overlay-answer font-display answer-reveal"
-                    >
-                      {displayQ.answer || '—'}
-                    </div>
-                  )}
-                </div>
+                  <QuestionOverlayText
+                    clue={displayQ.question}
+                    answer={displayQ.answer || '—'}
+                    clueKey={`clue-${clueRevealKey}`}
+                    clueRevealed={displayClueRevealed}
+                    answerRevealed={uiPhase === 'revealed'}
+                    showClueContent={displayClueRevealed}
+                    showAnswerContent={uiPhase === 'revealed'}
+                    showMediaContent={displayMediaRevealed}
+                    answerKey={`answer-${answerRevealKey}`}
+                    answerClassName={uiPhase === 'revealed' ? 'answer-reveal' : ''}
+                    clueClassName={displayClueRevealed && !displayMediaRevealed ? 'clue-reveal' : ''}
+                    hasMediaSlot={questionHasMedia}
+                    clueStyle={
+                      displayClueRevealed && clueBlurred
+                        ? {
+                            color: 'var(--white)',
+                            filter: 'blur(8px)',
+                            transition: 'filter 0.3s ease',
+                            userSelect: 'none',
+                          }
+                        : displayClueRevealed
+                        ? { color: 'var(--white)' }
+                        : undefined
+                    }
+                    media={
+                      displayMediaRevealed && displayMedia ? (
+                        <QuestionMediaPlayer
+                          media={displayMedia}
+                          role="player"
+                          playback={state.mediaPlayback}
+                          mountKey={mediaRevealKey}
+                          mediaActive={!overlayExiting}
+                          loading={mediaLoading}
+                          className="question-overlay-media clue-reveal"
+                          style={
+                            clueBlurred
+                              ? {
+                                  filter: 'blur(8px)',
+                                  transition: 'filter 0.3s ease',
+                                }
+                              : undefined
+                          }
+                        />
+                      ) : displayMediaRevealed && !displayMedia && mediaLoading ? (
+                        <QuestionMediaPlayer
+                          media={{ type: 'audio', dataUrl: '' }}
+                          role="player"
+                          playback={null}
+                          mountKey={mediaRevealKey}
+                          mediaActive={false}
+                          loading={true}
+                          className="question-overlay-media clue-reveal"
+                        />
+                      ) : undefined
+                    }
+                  />
+                </>
               )}
             </div>
 

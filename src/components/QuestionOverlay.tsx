@@ -6,6 +6,7 @@ import * as net from '../lib/network'
 import { useGameStore } from '../store/gameStore'
 import { logEvent } from '../lib/logger'
 import QuestionMediaPlayer from './QuestionMediaPlayer'
+import QuestionOverlayText from './QuestionOverlayText'
 
 interface Props {
   state: GameState
@@ -194,35 +195,28 @@ export default function QuestionOverlay({ state, settings }: Props) {
           )}
 
           {showClue && (
-            <div key={`clue-${clueRevealKey}`} className="question-overlay-content flex flex-col items-center w-full max-w-2xl">
-              {activeMedia && (
-                <QuestionMediaPlayer
-                  media={activeMedia}
-                  role="host"
-                  playback={mediaPlayback}
-                  mountKey={clueRevealKey}
-                  mediaActive={mediaRevealed && !overlayExiting}
-                  className={`question-overlay-media${mediaRevealed ? '' : ' question-overlay-media--pending'}`}
-                />
-              )}
-
-              <div
-                className={`question-overlay-clue font-condensed font-bold max-w-2xl${
-                  clueRevealed ? '' : ' question-overlay-clue--pending'
-                }`}
-              >
-                {question.question}
-              </div>
-
-              <div
-                key={phase === 'revealed' ? `answer-${answerRevealKey}` : 'answer-pending'}
-                className={`question-overlay-answer font-display${
-                  phase === 'revealed' ? ' answer-reveal' : ' question-overlay-answer--pending'
-                }`}
-              >
-                {question.answer || '—'}
-              </div>
-            </div>
+            <QuestionOverlayText
+              contentKey={`clue-${clueRevealKey}`}
+              clue={question.question}
+              answer={question.answer || '—'}
+              clueRevealed={clueRevealed}
+              answerRevealed={phase === 'revealed'}
+              answerKey={phase === 'revealed' ? `answer-${answerRevealKey}` : 'answer-pending'}
+              answerClassName={phase === 'revealed' ? 'answer-reveal' : ''}
+              hasMediaSlot={!!activeMedia}
+              media={
+                activeMedia ? (
+                  <QuestionMediaPlayer
+                    media={activeMedia}
+                    role="host"
+                    playback={mediaPlayback}
+                    mountKey={clueRevealKey}
+                    mediaActive={mediaRevealed && !overlayExiting}
+                    className={`question-overlay-media${mediaRevealed ? '' : ' question-overlay-media--pending'}`}
+                  />
+                ) : undefined
+              }
+            />
           )}
         </div>
 
