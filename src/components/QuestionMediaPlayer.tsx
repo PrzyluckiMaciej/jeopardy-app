@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Pause, Play, Volume2, VolumeX } from 'lucide-react'
+import { Pause, Play, RotateCw, Volume2, VolumeX } from 'lucide-react'
 import type { MediaPlaybackState } from '../types'
 import * as net from '../lib/network'
 import { useGameStore } from '../store/gameStore'
@@ -181,6 +181,7 @@ function MediaSeekBar({ value, max, onChange, ariaLabel = 'Seek' }: MediaSeekBar
 
 interface HostControlsProps {
   isPaused: boolean
+  showReplay: boolean
   currentTime: number
   duration: number
   playbackRate: number
@@ -197,6 +198,7 @@ interface HostControlsProps {
 
 function HostControls({
   isPaused,
+  showReplay,
   currentTime,
   duration,
   playbackRate,
@@ -236,9 +238,15 @@ function HostControls({
               onControlInteract?.()
               onTogglePlay()
             }}
-            aria-label={isPaused ? 'Play' : 'Pause'}
+            aria-label={showReplay ? 'Replay' : isPaused ? 'Play' : 'Pause'}
           >
-            {isPaused ? <Play size={20} aria-hidden /> : <Pause size={20} aria-hidden />}
+            {showReplay ? (
+              <RotateCw size={20} aria-hidden />
+            ) : isPaused ? (
+              <Play size={20} aria-hidden />
+            ) : (
+              <Pause size={20} aria-hidden />
+            )}
           </button>
 
           <span className="question-media-player__overlay-time">
@@ -288,9 +296,15 @@ function HostControls({
         type="button"
         className="question-media-controls__btn"
         onClick={onTogglePlay}
-        aria-label={isPaused ? 'Play' : 'Pause'}
+        aria-label={showReplay ? 'Replay' : isPaused ? 'Play' : 'Pause'}
       >
-        {isPaused ? <Play size={18} aria-hidden /> : <Pause size={18} aria-hidden />}
+        {showReplay ? (
+          <RotateCw size={18} aria-hidden />
+        ) : isPaused ? (
+          <Play size={18} aria-hidden />
+        ) : (
+          <Pause size={18} aria-hidden />
+        )}
       </button>
 
       <span className="question-media-controls__time">
@@ -471,7 +485,12 @@ export default function QuestionMediaPlayer({
   const handleTogglePlay = useCallback(() => {
     const el = mediaRef.current
     if (!el || !isHost || !mediaActive) return
+    const atEnd = el.duration > 0 && el.currentTime >= el.duration - 0.1
     if (el.paused) {
+      if (atEnd) {
+        el.currentTime = 0
+        setCurrentTime(0)
+      }
       el.play()
         .then(() => publishPlayback(el))
         .catch(() => publishPlayback(el))
@@ -735,6 +754,8 @@ export default function QuestionMediaPlayer({
     onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
   }
 
+  const showReplay = duration > 0 && isPaused && currentTime >= duration - 0.1
+
   const playerVolumeControls = (
     <VolumeControls
       className={isVideo ? 'question-media-player__overlay-volume' : 'question-media-volume'}
@@ -777,6 +798,7 @@ export default function QuestionMediaPlayer({
               <HostControls
                 variant="overlay"
                 isPaused={isPaused}
+                showReplay={showReplay}
                 currentTime={currentTime}
                 duration={duration}
                 playbackRate={playbackRate}
@@ -806,6 +828,7 @@ export default function QuestionMediaPlayer({
             <HostControls
               variant="bar"
               isPaused={isPaused}
+              showReplay={showReplay}
               currentTime={currentTime}
               duration={duration}
               playbackRate={playbackRate}
