@@ -23,9 +23,13 @@ export function computeOverlayTextMaxPx(
   hasMedia = false,
 ): number {
   if (width <= 0 || heightBudget <= 0) return OVERLAY_TEXT_MIN_PX
-  const heightFactor = hasMedia ? 0.16 : 0.28
-  const widthFactor = hasMedia ? 0.055 : 0.09
-  const cap = hasMedia ? 36 : 56
+  const isMobile =
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(max-width: 767px)').matches
+  const heightFactor = hasMedia ? (isMobile ? 0.28 : 0.16) : isMobile ? 0.36 : 0.28
+  const widthFactor = hasMedia ? (isMobile ? 0.11 : 0.055) : isMobile ? 0.14 : 0.09
+  const cap = hasMedia ? (isMobile ? 56 : 36) : isMobile ? 72 : 56
   return Math.max(
     OVERLAY_TEXT_MIN_PX,
     Math.min(heightBudget * heightFactor, width * widthFactor, cap),

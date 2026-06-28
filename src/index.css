@@ -1626,9 +1626,9 @@ select:focus-visible {
   flex-direction: column;
   align-items: center;
 }
-.question-overlay-content:has(.question-overlay-media) {
-  display: grid;
-  grid-template-rows: auto minmax(clamp(7rem, 24vh, 34%), 1fr) minmax(var(--overlay-answer-min-height, 0px), auto);
+  .question-overlay-content:has(.question-overlay-media) {
+    display: grid;
+    grid-template-rows: minmax(0, auto) minmax(clamp(7rem, 24vh, 34%), 1fr) minmax(var(--overlay-answer-min-height, 0px), auto);
   align-items: center;
   justify-items: stretch;
   gap: clamp(0.375rem, 1.2cqh, 1rem);
@@ -1696,7 +1696,7 @@ select:focus-visible {
   }
   .question-overlay-content:has(.question-overlay-media) {
     display: grid;
-    grid-template-rows: auto minmax(clamp(9rem, 30cqh, 42%), 1fr) minmax(var(--overlay-answer-min-height, 0px), auto);
+    grid-template-rows: minmax(0, auto) minmax(clamp(9rem, 30cqh, 42%), 1fr) minmax(var(--overlay-answer-min-height, 0px), auto);
     justify-items: stretch;
     gap: clamp(0.375rem, 1.2cqh, 1rem);
   }
@@ -1782,17 +1782,37 @@ select:focus-visible {
   }
 }
 @media (max-width: 767px) {
+  .question-overlay-main {
+    container-type: size;
+    container-name: question-main;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .question-overlay-main .question-overlay-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    align-self: stretch;
+  }
   .question-overlay-content:has(.question-overlay-media) {
     max-width: 100%;
+  }
+  .question-overlay-clue,
+  .question-overlay-answer {
+    font-size: var(--overlay-text-size, clamp(1.25rem, 6vmin, 2.5rem));
   }
   .question-overlay-main:has(.question-media-player--audio) {
     justify-content: flex-start;
   }
-  .question-overlay-main {
-    overflow: hidden;
-  }
   .question-overlay-clue {
     line-height: 1.375;
+  }
+  .question-overlay-backdrop .question-overlay-main {
+    flex: 1 1 0;
+    min-height: min(70dvh, calc(100dvh - 11rem));
   }
 }
 .question-media-player {

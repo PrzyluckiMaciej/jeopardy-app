@@ -31,6 +31,7 @@ function parsePx(value: string): number {
 
 function getOverlayLineHeight(): number {
   if (typeof window === 'undefined') return 1.2
+  if (typeof window.matchMedia !== 'function') return 1.2
   return window.matchMedia('(min-width: 768px)').matches ? 1.2 : 1.375
 }
 
@@ -101,13 +102,60 @@ function measureBlockHeight(
 
 function getMediaReservedHeight(containerHeight: number): number {
   if (containerHeight <= 0) return 0
-  const isDesktop = typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches
-  const minH = isDesktop
-    ? Math.max(144, containerHeight * 0.28)
-    : Math.max(112, containerHeight * 0.24)
-  const targetH = containerHeight * (isDesktop ? 0.38 : 0.3)
+  const isDesktop =
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(min-width: 768px)').matches
+  if (!isDesktop) {
+    const vh = typeof window !== 'undefined' ? window.innerHeight : containerHeight
+    // Match mobile grid min track: clamp(7rem, 24vh, 34%) — use ~20% of container for text budget headroom
+    return Math.min(containerHeight * 0.3, Math.max(96, vh * 0.2))
+  }
+  const minH = Math.max(144, containerHeight * 0.28)
+  const targetH = containerHeight * 0.38
   const maxH = containerHeight * 0.52
   return Math.min(maxH, Math.max(minH, targetH))
+}
+
+function getMobileOverlayViewportHeight(main: HTMLElement): number {
+  if (typeof window === 'undefined') return 0
+  const viewportH = window.visualViewport?.height ?? window.innerHeight
+  const root = main.closest('.question-overlay-backdrop, .player-question-overlay')
+  const header = root?.querySelector('.question-overlay-header')
+  const headerH = header instanceof HTMLElement ? header.getBoundingClientRect().height : 52
+  const dock = document.querySelector('.player-action-zone[data-mobile-dock]')
+  const dockH = dock instanceof HTMLElement ? dock.getBoundingClientRect().height : 0
+  const layout = main.closest('.question-overlay-layout')
+  const layoutStyles = layout instanceof HTMLElement ? getComputedStyle(layout) : null
+  const layoutPad = layoutStyles
+    ? parsePx(layoutStyles.paddingTop) + parsePx(layoutStyles.paddingBottom)
+    : 24
+  const mainStyles = getComputedStyle(main)
+  const mainPad = parsePx(mainStyles.paddingTop) + parsePx(mainStyles.paddingBottom)
+  return Math.max(0, viewportH - headerH - dockH - layoutPad - mainPad - 12)
+}
+
+function getContainerHeight(container: HTMLElement): number {
+  const main = container.closest('.question-overlay-main')
+  if (!(main instanceof HTMLElement)) {
+    return container.clientHeight
+  }
+
+  const mainStyles = getComputedStyle(main)
+  const mainPad = parsePx(mainStyles.paddingTop) + parsePx(mainStyles.paddingBottom)
+  const mainInner = Math.max(0, main.clientHeight - mainPad)
+
+  const isMobile =
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(max-width: 767px)').matches
+
+  if (isMobile) {
+    const viewportFloor = getMobileOverlayViewportHeight(main)
+    return Math.max(mainInner, viewportFloor)
+  }
+
+  return mainInner > 0 ? mainInner : container.clientHeight
 }
 
 function getMediaElement(container: HTMLElement): HTMLElement | null {
@@ -144,7 +192,7 @@ export function useOverlayTextFontSize({
     if (!container) return
 
     const width = container.clientWidth
-    const containerHeight = container.clientHeight
+    const containerHeight = getContainerHeight(container)
     if (width <= 0 || containerHeight <= 0) return
 
     const styles = getComputedStyle(container)
@@ -170,7 +218,7 @@ export function useOverlayTextFontSize({
     })
 
     const maxPx = computeOverlayTextMaxPx(width, textBudget, hasMedia)
-    let nextSize = findLargestFittingFontSize({
+    const nextSize = findLargestFittingFontSize({
       clue: clueText,
       answer: answerText,
       width,
@@ -180,17 +228,6 @@ export function useOverlayTextFontSize({
       maxPx,
       measureHeights: measureAt,
     })
-
-    const clueEl = clueRef.current
-    if (clueEl && clueEl.clientHeight > 0) {
-      const prevFont = clueEl.style.fontSize
-      clueEl.style.fontSize = `${nextSize}px`
-      while (nextSize > OVERLAY_TEXT_MIN_PX && clueEl.scrollHeight > clueEl.clientHeight + 1) {
-        nextSize -= 1
-        clueEl.style.fontSize = `${nextSize}px`
-      }
-      clueEl.style.fontSize = prevFont
-    }
 
     const measured = measureAt(nextSize)
     setLayout({
@@ -222,6 +259,9 @@ export function useOverlayTextFontSize({
     const ro = new ResizeObserver(() => scheduleRecalculate())
     ro.observe(container)
 
+    const main = container.closest('.question-overlay-main')
+    if (main instanceof HTMLElement) ro.observe(main)
+
     const clue = clueRef.current
     if (clue) ro.observe(clue)
 
@@ -241,10 +281,17 @@ export function useOverlayTextFontSize({
     })
     mo.observe(container, { childList: true, subtree: true })
 
+    const viewport = window.visualViewport
+    const onViewportChange = () => scheduleRecalculate()
+    viewport?.addEventListener('resize', onViewportChange)
+    viewport?.addEventListener('scroll', onViewportChange)
+
     return () => {
       ro.disconnect()
       mo.disconnect()
       observedMediaRef.current = null
+      viewport?.removeEventListener('resize', onViewportChange)
+      viewport?.removeEventListener('scroll', onViewportChange)
     }
   }, [clueRef, containerRef, enabled, scheduleRecalculate])
 
