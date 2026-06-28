@@ -92,6 +92,26 @@ export default function HostPage() {
     return ids
   }
 
+  function collectMediaIdsFromBoards(boards: Board[]): string[] {
+    const ids = new Set<string>()
+    for (const board of boards) {
+      for (const id of collectBoardMediaIds(board)) ids.add(id)
+    }
+    return [...ids]
+  }
+
+  function collectMediaIdsFromBoardIds(boardIds: string[]): string[] {
+    const boards = boardIds
+      .map((id) => boardStore.getBoard(id))
+      .filter((b): b is Board => !!b)
+    return collectMediaIdsFromBoards(boards)
+  }
+
+  function manifestCoversBoard(board: Board): boolean {
+    const ids = collectBoardMediaIds(board)
+    return ids.every((id) => currentManifestIds.current.includes(id))
+  }
+
   async function loadMediaBlobs(mediaIds: string[]) {
     for (const id of mediaIds) {
       if (mediaBlobCache.current.has(id)) continue
@@ -144,18 +164,26 @@ export default function HostPage() {
     updateSyncStatusState()
   }
 
-  async function startPreTransfer(board: Board) {
-    const mediaIds = collectBoardMediaIds(board)
-    currentManifestIds.current = mediaIds
-    if (mediaIds.length === 0) {
+  async function startPreTransferMedia(mediaIds: string[], replace = false) {
+    const uniqueIds = replace
+      ? [...new Set(mediaIds)]
+      : [...new Set([...currentManifestIds.current, ...mediaIds])]
+
+    if (uniqueIds.length === 0) {
       clearMediaSync()
       return
     }
+    if (uniqueIds.join(',') === currentManifestIds.current.join(',')) return
 
+    currentManifestIds.current = uniqueIds
     initSyncForAllPlayers()
 
-    await loadMediaBlobs(mediaIds)
+    await loadMediaBlobs(uniqueIds)
     await sendManifestAndMedia(null)
+  }
+
+  async function startPreTransfer(board: Board) {
+    await startPreTransferMedia(collectBoardMediaIds(board), true)
   }
 
   function handleMediaAck(playerId: string, mediaId: string) {
@@ -184,9 +212,8 @@ export default function HostPage() {
   useEffect(() => {
     if (!state.board) return
     const mediaIds = collectBoardMediaIds(state.board)
-    if (mediaIds.length > 0 && currentManifestIds.current.join(',') !== mediaIds.join(',')) {
-      void startPreTransfer(state.board)
-    }
+    const newIds = mediaIds.filter((id) => !currentManifestIds.current.includes(id))
+    if (newIds.length > 0) void startPreTransferMedia(newIds, false)
   }, [state.board]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -374,7 +401,7 @@ export default function HostPage() {
   }
 
   function handleUnselectBoard() {
-    const { activeGameId } = useGameStore.getState().state
+    const { activeGameId, gameBoardIds } = useGameStore.getState().state
     setActiveBoard(null)
     setEditing(false)
     patchState({
@@ -391,13 +418,17 @@ export default function HostPage() {
     })
     net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
     closeBoardPicker()
-    clearMediaSync()
+    if (activeGameId) {
+      void startPreTransferMedia(collectMediaIdsFromBoardIds(gameBoardIds), true)
+    } else {
+      clearMediaSync()
+    }
   }
 
   function handleSelectGame(gameId: string, boardIds: string[]) {
     selectGame(gameId, boardIds)
     setActiveBoard(null)
-    clearMediaSync()
+    void startPreTransferMedia(collectMediaIdsFromBoardIds(boardIds), true)
     net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
     closeBoardPicker()
     setEditing(false)
@@ -415,7 +446,7 @@ export default function HostPage() {
     setBoardTransition(b.name)
     patchState({ board: b, answeredCells: [], phase: 'board' })
     net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
-    startPreTransfer(b)
+    if (!manifestCoversBoard(b)) void startPreTransfer(b)
 
     setTimeout(() => {
       const connectedPlayers = useGameStore.getState().state.players.filter(p => p.isConnected)
@@ -444,7 +475,7 @@ export default function HostPage() {
     setBoardTransition(b.name)
     patchState({ board: b, answeredCells: [], phase: 'board', activeQuestion: null, buzzQueue: [], activeMedia: null, mediaPlayback: null, dailyDouble: null })
     net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
-    startPreTransfer(b)
+    if (!manifestCoversBoard(b)) void startPreTransfer(b)
 
     setTimeout(() => {
       const connectedPlayers = useGameStore.getState().state.players.filter(p => p.isConnected)
@@ -461,7 +492,7 @@ export default function HostPage() {
       if (activeGameId) {
         patchState({ phase: 'gameStart', board: null, answeredCells: [], boardTransition: null })
         setActiveBoard(null)
-        clearMediaSync()
+        void startPreTransferMedia(collectMediaIdsFromBoardIds(gameBoardIds), true)
         net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
       }
       return
@@ -477,7 +508,7 @@ export default function HostPage() {
     setBoardTransition(b.name)
     patchState({ board: b, answeredCells: [], phase: 'board', activeQuestion: null, buzzQueue: [], activeMedia: null, mediaPlayback: null, dailyDouble: null })
     net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
-    startPreTransfer(b)
+    if (!manifestCoversBoard(b)) void startPreTransfer(b)
 
     setTimeout(() => {
       const connectedPlayers = useGameStore.getState().state.players.filter(p => p.isConnected)
@@ -866,7 +897,7 @@ export default function HostPage() {
                         setEditing(false)
                         const current = useGameStore.getState().state
                         net.broadcast({ type: 'SYNC_STATE', state: current })
-                        if (board) startPreTransfer(board)
+                        if (board) void startPreTransferMedia(collectBoardMediaIds(board), false)
                       }} />
                     ) : board ? (
                       <GameBoard
