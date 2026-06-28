@@ -677,17 +677,13 @@ export default function QuestionMediaPlayer({
   function handleToggleMute() {
     const effectivelyMuted = muted || volume === 0
     if (effectivelyMuted) {
-      const restoreVolume = volume > 0 ? volume : volumeBeforeMuteRef.current || 1
+      const restoreVolume = volumeBeforeMuteRef.current || 1
       setMuted(false)
-      if (volume === 0) {
-        handleVolumeChange(restoreVolume)
-      } else {
-        const el = mediaRef.current
-        if (el) applyVolume(el, volume)
-      }
+      handleVolumeChange(restoreVolume)
     } else {
       volumeBeforeMuteRef.current = volume
       setMuted(true)
+      setVolume(0)
       const el = mediaRef.current
       if (el) applyVolume(el, 0)
     }
