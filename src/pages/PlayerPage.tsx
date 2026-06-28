@@ -968,7 +968,7 @@ export default function PlayerPage() {
                           mountKey={mediaRevealKey}
                           mediaActive={!overlayExiting}
                           loading={mediaLoading}
-                          className="question-overlay-media"
+                          className="question-overlay-media clue-reveal"
                           style={
                             clueBlurred
                               ? {
@@ -986,7 +986,7 @@ export default function PlayerPage() {
                           mountKey={mediaRevealKey}
                           mediaActive={false}
                           loading={true}
-                          className="question-overlay-media"
+                          className="question-overlay-media clue-reveal"
                         />
                       ) : undefined
                     }

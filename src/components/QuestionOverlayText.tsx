@@ -53,7 +53,12 @@ export default function QuestionOverlayText({
     : undefined
 
   const contentStyle = fontSizePx
-    ? ({ '--overlay-text-size': `${fontSizePx}px` } as CSSProperties)
+    ? ({
+        '--overlay-text-size': `${fontSizePx}px`,
+        ...(answerMinHeight > 0 ? { '--overlay-answer-min-height': `${answerMinHeight}px` } : {}),
+      } as CSSProperties)
+    : answerMinHeight > 0
+    ? ({ '--overlay-answer-min-height': `${answerMinHeight}px` } as CSSProperties)
     : undefined
 
   const mediaSlot = hasMediaSlot
@@ -89,24 +94,21 @@ export default function QuestionOverlayText({
 
       {mediaSlot}
 
-      {showAnswerContent ? (
-        <div
-          key={answerKey}
-          className={`question-overlay-answer font-condensed font-bold${
-            !answerRevealed ? ' question-overlay-answer--pending' : ''
-          }${answerClassName ? ` ${answerClassName}` : ''}`}
-          style={textStyle}
-        >
-          {answer || '—'}
-        </div>
-      ) : (
-        <div
-          key={answerKey}
-          className="question-overlay-answer-spacer"
-          aria-hidden
-          style={answerMinHeight > 0 ? { minHeight: answerMinHeight } : undefined}
-        />
-      )}
+      <div
+        key={answerKey}
+        aria-hidden={!showAnswerContent}
+        className={`question-overlay-answer font-condensed font-bold${
+          showAnswerContent && !answerRevealed ? ' question-overlay-answer--pending' : ''
+        }${!showAnswerContent ? ' question-overlay-answer--player-hidden' : ''}${
+          answerClassName ? ` ${answerClassName}` : ''
+        }`}
+        style={{
+          ...textStyle,
+          ...(!showAnswerContent && answerMinHeight > 0 ? { minHeight: answerMinHeight } : undefined),
+        }}
+      >
+        {showAnswerContent ? answer || '—' : null}
+      </div>
     </div>
   )
 }
