@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Pause, Play, Volume2 } from 'lucide-react'
+import { Pause, Play, Volume2, VolumeX } from 'lucide-react'
 import type { MediaPlaybackState } from '../types'
 import * as net from '../lib/network'
 import { useGameStore } from '../store/gameStore'
@@ -106,9 +106,10 @@ interface MediaSeekBarProps {
   value: number
   max: number
   onChange: (value: number) => void
+  ariaLabel?: string
 }
 
-function MediaSeekBar({ value, max, onChange }: MediaSeekBarProps) {
+function MediaSeekBar({ value, max, onChange, ariaLabel = 'Seek' }: MediaSeekBarProps) {
   const trackRef = useRef<HTMLDivElement>(null)
   const ratio = max > 0 ? Math.min(1, Math.max(0, value / max)) : 0
 
@@ -147,7 +148,7 @@ function MediaSeekBar({ value, max, onChange }: MediaSeekBarProps) {
       aria-valuemin={0}
       aria-valuemax={max}
       aria-valuenow={value}
-      aria-label="Seek"
+      aria-label={ariaLabel}
       style={{ ['--seek-ratio' as string]: ratio }}
       onPointerDown={(e) => {
         e.currentTarget.setPointerCapture(e.pointerId)
@@ -167,6 +168,49 @@ function MediaSeekBar({ value, max, onChange }: MediaSeekBarProps) {
         className="question-media-controls__seek-thumb"
         style={{ left: `calc((100% - ${SEEK_THUMB_SIZE}) * ${ratio})` }}
         aria-hidden
+      />
+    </div>
+  )
+}
+
+interface VolumeControlsProps {
+  volume: number
+  muted: boolean
+  onVolumeChange: (value: number) => void
+  onToggleMute: () => void
+  className: string
+  iconSize?: number
+}
+
+function VolumeControls({
+  volume,
+  muted,
+  onVolumeChange,
+  onToggleMute,
+  className,
+  iconSize = 16,
+}: VolumeControlsProps) {
+  const isEffectivelyMuted = muted || volume === 0
+
+  return (
+    <div className={className}>
+      <button
+        type="button"
+        className="question-media-controls__volume-btn"
+        onClick={onToggleMute}
+        aria-label={isEffectivelyMuted ? 'Unmute' : 'Mute'}
+      >
+        {isEffectivelyMuted ? (
+          <VolumeX size={iconSize} aria-hidden />
+        ) : (
+          <Volume2 size={iconSize} aria-hidden />
+        )}
+      </button>
+      <MediaSeekBar
+        value={volume}
+        max={1}
+        onChange={onVolumeChange}
+        ariaLabel="Volume"
       />
     </div>
   )
@@ -192,6 +236,8 @@ export default function QuestionMediaPlayer({
   const [isPaused, setIsPaused] = useState(true)
   const [playbackRate, setPlaybackRate] = useState(1)
   const [volume, setVolume] = useState(readStoredVolume)
+  const [muted, setMuted] = useState(false)
+  const volumeBeforeMuteRef = useRef(volume)
 
   const isHost = role === 'host'
 
@@ -221,8 +267,8 @@ export default function QuestionMediaPlayer({
   useEffect(() => {
     const el = mediaRef.current
     if (!el || media.type === 'image') return
-    applyVolume(el, volume)
-  }, [volume, media.type, mountKey, applyVolume])
+    applyVolume(el, muted ? 0 : volume)
+  }, [volume, muted, media.type, mountKey, applyVolume])
 
   useEffect(() => {
     const el = mediaRef.current
@@ -359,6 +405,10 @@ export default function QuestionMediaPlayer({
   }, [media.type])
 
   function handleVolumeChange(v: number) {
+    if (v > 0) {
+      setMuted(false)
+      volumeBeforeMuteRef.current = v
+    }
     setVolume(v)
     try {
       sessionStorage.setItem(VOLUME_STORAGE_KEY, String(v))
@@ -367,6 +417,25 @@ export default function QuestionMediaPlayer({
     }
     const el = mediaRef.current
     if (el) applyVolume(el, v)
+  }
+
+  function handleToggleMute() {
+    const effectivelyMuted = muted || volume === 0
+    if (effectivelyMuted) {
+      const restoreVolume = volume > 0 ? volume : volumeBeforeMuteRef.current || 1
+      setMuted(false)
+      if (volume === 0) {
+        handleVolumeChange(restoreVolume)
+      } else {
+        const el = mediaRef.current
+        if (el) applyVolume(el, volume)
+      }
+    } else {
+      volumeBeforeMuteRef.current = volume
+      setMuted(true)
+      const el = mediaRef.current
+      if (el) applyVolume(el, 0)
+    }
   }
 
   function handleTogglePlay() {
@@ -477,32 +546,23 @@ export default function QuestionMediaPlayer({
             </select>
           </label>
 
-          <label className="question-media-controls__volume">
-            <Volume2 size={16} aria-hidden />
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={volume}
-              onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-              aria-label="Volume"
-            />
-          </label>
+          <VolumeControls
+            className="question-media-controls__volume"
+            volume={volume}
+            muted={muted}
+            onVolumeChange={handleVolumeChange}
+            onToggleMute={handleToggleMute}
+          />
         </div>
       ) : (
-        <label className="question-media-volume">
-          <Volume2 size={18} aria-hidden />
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={volume}
-            onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-            aria-label="Volume"
-          />
-        </label>
+        <VolumeControls
+          className="question-media-volume"
+          volume={volume}
+          muted={muted}
+          onVolumeChange={handleVolumeChange}
+          onToggleMute={handleToggleMute}
+          iconSize={18}
+        />
       )}
     </div>
   )
