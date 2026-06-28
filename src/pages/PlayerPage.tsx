@@ -8,7 +8,7 @@ import type { NetMessage, Player } from '../types'
 import { initialMediaPlaybackForType } from '../types'
 import { generateId, formatScore } from '../lib/utils'
 import { logEvent } from '../lib/logger'
-import { setCachedMedia, getOrCreateObjectUrl, clearCache } from '../lib/mediaCache'
+import { setCachedMedia, resolveActiveMedia, clearCache } from '../lib/mediaCache'
 import GameBoard from '../components/GameBoard'
 import Scoreboard from '../components/Scoreboard'
 import Podium from '../components/Podium'
@@ -90,20 +90,27 @@ export default function PlayerPage() {
       const blob = new Blob([data], { type: metadata.mimeType })
       setCachedMedia(metadata.mediaId, blob)
       net.send({ type: 'MEDIA_ACK', mediaId: metadata.mediaId }, peerId)
+
+      const currentState = useGameStore.getState().state
+      const question = currentState.activeQuestion?.question
+      if (question?.mediaId !== metadata.mediaId) return
+
       if (pendingMediaRequest.current === metadata.mediaId) {
         pendingMediaRequest.current = null
-        const objectUrl = getOrCreateObjectUrl(metadata.mediaId)
-        if (objectUrl) {
-          const currentState = useGameStore.getState().state
-          const question = currentState.activeQuestion?.question
-          if (question?.mediaId === metadata.mediaId && question.mediaType) {
-            patchState({
-              activeMedia: { type: question.mediaType, dataUrl: objectUrl },
-            })
-          }
-          setMediaLoading(false)
-        }
       }
+
+      const activeMedia = resolveActiveMedia(metadata.mediaId, question.mediaType)
+      if (!activeMedia) return
+
+      const patch: {
+        activeMedia: typeof activeMedia
+        mediaPlayback?: ReturnType<typeof initialMediaPlaybackForType>
+      } = { activeMedia }
+      if (currentState.mediaRevealed) {
+        patch.mediaPlayback = initialMediaPlaybackForType(activeMedia.type)
+      }
+      patchState(patch)
+      setMediaLoading(false)
     })
 
     net.onMessage((msg: NetMessage, peerId: string) => {
@@ -130,23 +137,17 @@ export default function PlayerPage() {
         wasInBuzzQueueRef.current = false
         setJudgeResult(null)
         const mediaId = msg.question.mediaId
-        const mediaType = msg.question.mediaType
-        let activeMedia: { type: 'image' | 'audio' | 'video'; dataUrl: string } | null = null
+        const activeMedia = resolveActiveMedia(mediaId, msg.question.mediaType)
 
-        if (mediaId && mediaType) {
-          const objectUrl = getOrCreateObjectUrl(mediaId)
-          if (objectUrl) {
-            activeMedia = { type: mediaType, dataUrl: objectUrl }
-            setMediaLoading(false)
-          } else {
-            setMediaLoading(true)
-            pendingMediaRequest.current = mediaId
-            if (hostPeerId.current) {
-              net.send({ type: 'MEDIA_REQUEST', mediaId }, hostPeerId.current)
-            }
+        if (mediaId && !activeMedia) {
+          setMediaLoading(true)
+          pendingMediaRequest.current = mediaId
+          if (hostPeerId.current) {
+            net.send({ type: 'MEDIA_REQUEST', mediaId }, hostPeerId.current)
           }
         } else {
           setMediaLoading(false)
+          pendingMediaRequest.current = null
         }
 
         patchState({
@@ -157,7 +158,7 @@ export default function PlayerPage() {
           clueRevealed: msg.clueRevealed ?? false,
           mediaRevealed: msg.mediaRevealed ?? false,
           mediaPlayback: msg.mediaRevealed
-            ? initialMediaPlaybackForType(mediaType)
+            ? initialMediaPlaybackForType(activeMedia?.type ?? msg.question.mediaType)
             : null,
         })
       }
@@ -180,23 +181,17 @@ export default function PlayerPage() {
         setDdWagerError('')
         setDdWagerSubmitted(false)
         const mediaId = msg.question.mediaId
-        const mediaType = msg.question.mediaType
-        let activeMedia: { type: 'image' | 'audio' | 'video'; dataUrl: string } | null = null
+        const activeMedia = resolveActiveMedia(mediaId, msg.question.mediaType)
 
-        if (mediaId && mediaType) {
-          const objectUrl = getOrCreateObjectUrl(mediaId)
-          if (objectUrl) {
-            activeMedia = { type: mediaType, dataUrl: objectUrl }
-            setMediaLoading(false)
-          } else {
-            setMediaLoading(true)
-            pendingMediaRequest.current = mediaId
-            if (hostPeerId.current) {
-              net.send({ type: 'MEDIA_REQUEST', mediaId }, hostPeerId.current)
-            }
+        if (mediaId && !activeMedia) {
+          setMediaLoading(true)
+          pendingMediaRequest.current = mediaId
+          if (hostPeerId.current) {
+            net.send({ type: 'MEDIA_REQUEST', mediaId }, hostPeerId.current)
           }
         } else {
           setMediaLoading(false)
+          pendingMediaRequest.current = null
         }
 
         patchState({
@@ -223,15 +218,19 @@ export default function PlayerPage() {
       }
       if (msg.type === 'DAILY_DOUBLE_REVEAL_CLUE') {
         const current = useGameStore.getState().state
-        const activeMedia = current.activeMedia
+        const question = current.activeQuestion?.question
+        const activeMedia =
+          current.activeMedia ??
+          resolveActiveMedia(question?.mediaId, question?.mediaType)
         const wasMediaRevealed = current.mediaRevealed
         const mediaRevealed = msg.mediaRevealed ?? wasMediaRevealed
         patchState({
           phase: 'question',
           clueRevealed: true,
+          ...(activeMedia && !current.activeMedia ? { activeMedia } : {}),
           mediaRevealed,
           mediaPlayback: mediaRevealed && !wasMediaRevealed
-            ? initialMediaPlaybackForType(activeMedia?.type)
+            ? initialMediaPlaybackForType(activeMedia?.type ?? current.activeMedia?.type)
             : current.mediaPlayback,
         })
       }
@@ -239,10 +238,26 @@ export default function PlayerPage() {
         patchState({ clueRevealed: true })
       }
       if (msg.type === 'REVEAL_MEDIA') {
-        const activeMedia = useGameStore.getState().state.activeMedia
+        const current = useGameStore.getState().state
+        const question = current.activeQuestion?.question
+        const activeMedia =
+          current.activeMedia ??
+          resolveActiveMedia(question?.mediaId, question?.mediaType)
+
+        if (question?.mediaId && !activeMedia) {
+          setMediaLoading(true)
+          pendingMediaRequest.current = question.mediaId
+          if (hostPeerId.current) {
+            net.send({ type: 'MEDIA_REQUEST', mediaId: question.mediaId }, hostPeerId.current)
+          }
+        }
+
         patchState({
+          ...(activeMedia && !current.activeMedia ? { activeMedia } : {}),
           mediaRevealed: true,
-          mediaPlayback: initialMediaPlaybackForType(activeMedia?.type),
+          mediaPlayback: initialMediaPlaybackForType(
+            activeMedia?.type ?? current.activeMedia?.type,
+          ),
         })
       }
       if (msg.type === 'START_BUZZING') {
@@ -876,9 +891,36 @@ export default function PlayerPage() {
                       <span className="font-display">${state.dailyDouble.wager}</span>
                     </div>
                   )}
-                  <div className="font-condensed text-sm animate-pulse text-center" style={{ color: '#4a5580' }}>
-                    Waiting for host to reveal the clue…
-                  </div>
+
+                  {displayMedia && displayMediaRevealed && (
+                    <QuestionMediaPlayer
+                      media={displayMedia}
+                      role="player"
+                      playback={state.mediaPlayback}
+                      mountKey={mediaRevealKey}
+                      mediaActive={displayMediaRevealed}
+                      loading={mediaLoading}
+                      className="question-overlay-media clue-reveal"
+                    />
+                  )}
+
+                  {!displayMedia && mediaLoading && displayMediaRevealed && (
+                    <QuestionMediaPlayer
+                      media={{ type: 'audio', dataUrl: '' }}
+                      role="player"
+                      playback={null}
+                      mountKey={mediaRevealKey}
+                      mediaActive={false}
+                      loading={true}
+                      className="question-overlay-media clue-reveal"
+                    />
+                  )}
+
+                  {!displayClueRevealed && (
+                    <div className="font-condensed text-sm animate-pulse text-center" style={{ color: '#4a5580' }}>
+                      Waiting for host to reveal the clue…
+                    </div>
+                  )}
                 </div>
               )}
 
