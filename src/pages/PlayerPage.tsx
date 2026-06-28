@@ -942,6 +942,7 @@ export default function PlayerPage() {
                     answerRevealed={uiPhase === 'revealed'}
                     showClueContent={displayClueRevealed}
                     showAnswerContent={uiPhase === 'revealed'}
+                    showMediaContent={displayMediaRevealed}
                     answerKey={`answer-${answerRevealKey}`}
                     answerClassName={uiPhase === 'revealed' ? 'answer-reveal' : ''}
                     clueClassName={displayClueRevealed && !displayMediaRevealed ? 'clue-reveal' : ''}
@@ -959,17 +960,17 @@ export default function PlayerPage() {
                         : undefined
                     }
                     media={
-                      displayMedia ? (
+                      displayMediaRevealed && displayMedia ? (
                         <QuestionMediaPlayer
                           media={displayMedia}
                           role="player"
                           playback={state.mediaPlayback}
                           mountKey={mediaRevealKey}
-                          mediaActive={displayMediaRevealed && !overlayExiting}
+                          mediaActive={!overlayExiting}
                           loading={mediaLoading}
-                          className={`question-overlay-media${displayMediaRevealed ? '' : ' question-overlay-media--pending'}`}
+                          className="question-overlay-media"
                           style={
-                            clueBlurred && displayMediaRevealed
+                            clueBlurred
                               ? {
                                   filter: 'blur(8px)',
                                   transition: 'filter 0.3s ease',
@@ -977,7 +978,7 @@ export default function PlayerPage() {
                               : undefined
                           }
                         />
-                      ) : questionHasMedia ? (
+                      ) : displayMediaRevealed && !displayMedia && mediaLoading ? (
                         <QuestionMediaPlayer
                           media={{ type: 'audio', dataUrl: '' }}
                           role="player"
@@ -985,7 +986,7 @@ export default function PlayerPage() {
                           mountKey={mediaRevealKey}
                           mediaActive={false}
                           loading={true}
-                          className="question-overlay-media question-overlay-media--pending"
+                          className="question-overlay-media"
                         />
                       ) : undefined
                     }

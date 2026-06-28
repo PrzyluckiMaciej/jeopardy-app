@@ -16,6 +16,7 @@ interface Props {
   answerRevealed?: boolean
   showClueContent?: boolean
   showAnswerContent?: boolean
+  showMediaContent?: boolean
 }
 
 export default function QuestionOverlayText({
@@ -33,6 +34,7 @@ export default function QuestionOverlayText({
   answerRevealed = true,
   showClueContent = true,
   showAnswerContent = true,
+  showMediaContent = true,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const clueRef = useRef<HTMLDivElement>(null)
@@ -55,7 +57,9 @@ export default function QuestionOverlayText({
     : undefined
 
   const mediaSlot = hasMediaSlot
-    ? media ?? <div className="question-overlay-media question-overlay-media--pending" aria-hidden />
+    ? showMediaContent
+      ? media
+      : <div className="question-overlay-media question-overlay-media--reserved" aria-hidden />
     : null
 
   return (
@@ -70,7 +74,7 @@ export default function QuestionOverlayText({
         ref={clueRef}
         aria-hidden={!showClueContent}
         className={`question-overlay-clue font-condensed font-bold w-full${
-          clueRevealed ? '' : ' question-overlay-clue--pending'
+          showClueContent && !clueRevealed ? ' question-overlay-clue--pending' : ''
         }${!showClueContent ? ' question-overlay-clue--concealed' : ''}${
           clueClassName ? ` ${clueClassName}` : ''
         }`}
@@ -89,7 +93,7 @@ export default function QuestionOverlayText({
         key={answerKey}
         aria-hidden={!showAnswerContent}
         className={`question-overlay-answer font-condensed font-bold${
-          answerRevealed ? '' : ' question-overlay-answer--pending'
+          showAnswerContent && !answerRevealed ? ' question-overlay-answer--pending' : ''
         }${!showAnswerContent ? ' question-overlay-answer--concealed' : ''}${
           answerClassName ? ` ${answerClassName}` : ''
         }`}

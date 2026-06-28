@@ -1580,6 +1580,17 @@ select:focus-visible {
   pointer-events: none;
   user-select: none;
 }
+.question-overlay-answer--concealed {
+  background: transparent;
+  border-color: transparent;
+  color: transparent;
+  padding: 0;
+  margin-top: 0;
+}
+.question-overlay-media--reserved {
+  visibility: hidden;
+  pointer-events: none;
+}
 .question-overlay-sidebar {
   width: 18rem;
   flex-shrink: 0;
