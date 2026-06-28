@@ -1,5 +1,6 @@
 import type { Board } from '../types'
 import { getMedia, saveMedia } from './db'
+import { mimeTypeToMediaType } from './mediaType'
 import { generateId } from './utils'
 
 export async function duplicateBoard(source: Board): Promise<Board> {
@@ -21,6 +22,7 @@ export async function duplicateBoard(source: Board): Promise<Board> {
             const rec = await getMedia(q.mediaId)
             if (rec) {
               mediaId = generateId()
+              if (!mediaType) mediaType = mimeTypeToMediaType(rec.mimeType)
               await saveMedia({
                 id: mediaId,
                 boardId: newBoardId,

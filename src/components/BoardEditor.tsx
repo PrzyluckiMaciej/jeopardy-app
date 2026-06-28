@@ -1,8 +1,9 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { Trash2, Upload, FileText, Image, Music, Video, Paperclip, HelpCircle } from 'lucide-react'
 import type { Board, Category, Question } from '../types'
 import { generateId } from '../lib/utils'
 import { saveMedia, deleteMedia, getMedia, blobToDataUrl } from '../lib/db'
+import { mimeTypeToMediaType, type MediaType } from '../lib/mediaType'
 
 interface Props {
   board: Board
@@ -25,6 +26,57 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
   const [editingRowText, setEditingRowText] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const initialBoard = useRef<Board>(board)
+  const boardRef = useRef(board)
+  const onChangeRef = useRef(onChange)
+  const [mediaTypesById, setMediaTypesById] = useState<Record<string, MediaType>>({})
+  boardRef.current = board
+  onChangeRef.current = onChange
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function resolveMediaTypes() {
+      const map: Record<string, MediaType> = {}
+      const patches = new Map<string, MediaType>()
+
+      for (const cat of board.categories) {
+        for (const q of cat.questions) {
+          if (!q.mediaId) continue
+          if (q.mediaType) {
+            map[q.mediaId] = q.mediaType
+          } else {
+            const rec = await getMedia(q.mediaId)
+            if (rec) {
+              const mediaType = mimeTypeToMediaType(rec.mimeType)
+              map[q.mediaId] = mediaType
+              patches.set(q.id, mediaType)
+            }
+          }
+        }
+      }
+
+      if (cancelled) return
+      setMediaTypesById(map)
+
+      if (patches.size === 0) return
+
+      const current = boardRef.current
+      const categories = current.categories.map((cat) => ({
+        ...cat,
+        questions: cat.questions.map((q) =>
+          patches.has(q.id) ? { ...q, mediaType: patches.get(q.id) } : q
+        ),
+      }))
+      const updated = { ...current, categories, updatedAt: Date.now() }
+      onChangeRef.current(updated)
+      initialBoard.current = updated
+    }
+
+    resolveMediaTypes()
+    return () => {
+      cancelled = true
+    }
+  }, [board.id])
 
   function discardChanges() {
     onChange(initialBoard.current)
@@ -131,6 +183,10 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
       if (rec) {
         const url = await blobToDataUrl(rec.blob)
         setMediaPreview(url)
+        if (!q.mediaType) {
+          const mediaType = mimeTypeToMediaType(rec.mimeType)
+          updateQuestion(catId, q.id, { mediaType })
+        }
       }
     }
   }
@@ -148,11 +204,7 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
       mimeType: file.type,
       blob: file,
     })
-    const mediaType: 'image' | 'audio' | 'video' = file.type.startsWith('image/')
-      ? 'image'
-      : file.type.startsWith('audio/')
-        ? 'audio'
-        : 'video'
+    const mediaType = mimeTypeToMediaType(file.type)
     updateQuestion(editingCell.categoryId, editingCell.questionId, { mediaId, mediaType })
     const url = await blobToDataUrl(file)
     setMediaPreview(url)
@@ -161,7 +213,7 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
   async function removeMedia() {
     if (!editingCell || !activeQ?.mediaId) return
     await deleteMedia(activeQ.mediaId)
-    updateQuestion(editingCell.categoryId, editingCell.questionId, { mediaId: undefined })
+    updateQuestion(editingCell.categoryId, editingCell.questionId, { mediaId: undefined, mediaType: undefined })
     setMediaPreview(null)
     if (fileRef.current) fileRef.current.value = ''
   }
@@ -316,6 +368,7 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                 const hasClue = !!q.question.trim()
                 const hasAnswer = !!q.answer.trim()
                 const isEmpty = !hasClue && !hasAnswer && !q.mediaId
+                const mediaType = q.mediaId ? (q.mediaType ?? mediaTypesById[q.mediaId]) : undefined
                 const iconStyle = { color: 'var(--gold)', opacity: 0.8 } as const
                 return (
                   <button
@@ -343,9 +396,9 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                       <div style={{ position: 'absolute', bottom: 5, left: 5, display: 'flex', gap: 3, alignItems: 'center' }}>
                         {hasClue && <HelpCircle size={16} style={iconStyle} />}
                         {q.mediaId && (
-                          q.mediaType === 'image' ? <Image size={16} style={iconStyle} />
-                          : q.mediaType === 'audio' ? <Music size={16} style={iconStyle} />
-                          : q.mediaType === 'video' ? <Video size={16} style={iconStyle} />
+                          mediaType === 'image' ? <Image size={16} style={iconStyle} />
+                          : mediaType === 'audio' ? <Music size={16} style={iconStyle} />
+                          : mediaType === 'video' ? <Video size={16} style={iconStyle} />
                           : <Paperclip size={16} style={iconStyle} />
                         )}
                       </div>
