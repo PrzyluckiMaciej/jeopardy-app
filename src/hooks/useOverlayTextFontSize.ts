@@ -139,12 +139,12 @@ export function useOverlayTextFontSize({
     let overhead = reservedHeight
     if (reservedHeight > 0) overhead += flexGap
     if (hasMedia) {
-      overhead += getMediaReservedHeight(containerHeight) + flexGap
+      overhead += getMediaReservedHeight(containerHeight) + flexGap * 2
     }
 
     const textBudget = Math.max(40, containerHeight - overhead)
 
-    const textGap = flexGap
+    const textGap = hasMedia ? 0 : flexGap
     const clueText = clue.trim() || ' '
     const answerText = answer.trim() || '—'
 

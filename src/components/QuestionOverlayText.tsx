@@ -80,8 +80,6 @@ export default function QuestionOverlayText({
         </div>
       )}
 
-      {media}
-
       <div
         key={clueKey}
         ref={clueRef}
@@ -92,6 +90,8 @@ export default function QuestionOverlayText({
       >
         {clue}
       </div>
+
+      {media}
 
       <div
         key={answerKey}
