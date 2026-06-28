@@ -758,7 +758,7 @@ export default function QuestionMediaPlayer({
 
   return (
     <div
-      className={`question-media-player${isHost ? '' : ' question-media-player--player'}${isVideo ? ' question-media-player--video' : ''}${className ? ` ${className}` : ''}`}
+      className={`question-media-player${isHost ? '' : ' question-media-player--player'}${isVideo ? ' question-media-player--video' : media.type === 'audio' ? ' question-media-player--audio' : ''}${className ? ` ${className}` : ''}`}
       style={style}
     >
       {isVideo ? (
