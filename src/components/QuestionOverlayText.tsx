@@ -52,14 +52,16 @@ export default function QuestionOverlayText({
     ? { fontSize: `${fontSizePx}px` }
     : undefined
 
-  const contentStyle = fontSizePx
-    ? ({
-        '--overlay-text-size': `${fontSizePx}px`,
-        ...(answerMinHeight > 0 ? { '--overlay-answer-min-height': `${answerMinHeight}px` } : {}),
-      } as CSSProperties)
-    : answerMinHeight > 0
-    ? ({ '--overlay-answer-min-height': `${answerMinHeight}px` } as CSSProperties)
-    : undefined
+  const contentStyle =
+    fontSizePx || clueMinHeight > 0 || answerMinHeight > 0
+      ? ({
+          ...(fontSizePx ? { '--overlay-text-size': `${fontSizePx}px` } : {}),
+          ...(hasMediaSlot && clueMinHeight > 0
+            ? { '--overlay-clue-max-height': `${clueMinHeight}px` }
+            : {}),
+          ...(answerMinHeight > 0 ? { '--overlay-answer-min-height': `${answerMinHeight}px` } : {}),
+        } as CSSProperties)
+      : undefined
 
   const mediaSlot = hasMediaSlot
     ? showMediaContent
@@ -87,6 +89,9 @@ export default function QuestionOverlayText({
           ...textStyle,
           ...clueStyle,
           ...(!showClueContent && clueMinHeight > 0 ? { minHeight: clueMinHeight } : undefined),
+          ...(hasMediaSlot && showClueContent && clueMinHeight > 0
+            ? { maxHeight: clueMinHeight }
+            : undefined),
         }}
       >
         {showClueContent ? clue : null}
@@ -105,6 +110,9 @@ export default function QuestionOverlayText({
         style={{
           ...textStyle,
           ...(!showAnswerContent && answerMinHeight > 0 ? { minHeight: answerMinHeight } : undefined),
+          ...(hasMediaSlot && showAnswerContent && answerMinHeight > 0
+            ? { maxHeight: answerMinHeight }
+            : undefined),
         }}
       >
         {showAnswerContent ? answer || '—' : null}

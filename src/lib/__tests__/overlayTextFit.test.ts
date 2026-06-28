@@ -1,9 +1,51 @@
 import {
+  computeMediaReservedHeight,
+  computeOverlayTextBudget,
   computeOverlayTextMaxPx,
   findLargestFittingFontSize,
   heightsFitBudget,
   OVERLAY_TEXT_MIN_PX,
 } from '../overlayTextFit'
+
+describe('computeMediaReservedHeight', () => {
+  it('reserves a substantial share on mobile', () => {
+    const reserved = computeMediaReservedHeight(500, true)
+    expect(reserved).toBeGreaterThanOrEqual(128)
+    expect(reserved).toBeLessThanOrEqual(200)
+  })
+
+  it('reserves more on desktop', () => {
+    const reserved = computeMediaReservedHeight(800, false)
+    expect(reserved).toBeGreaterThanOrEqual(190)
+  })
+})
+
+describe('computeOverlayTextBudget', () => {
+  it('caps mobile text budget when media is present', () => {
+    const budget = computeOverlayTextBudget({
+      containerHeight: 500,
+      hasMedia: true,
+      flexGap: 8,
+      isMobile: true,
+    })
+    expect(budget).toBeLessThanOrEqual(190)
+    expect(budget).toBeGreaterThan(40)
+  })
+
+  it('allows more text budget without media on mobile', () => {
+    const withMedia = computeOverlayTextBudget({
+      containerHeight: 500,
+      hasMedia: true,
+      isMobile: true,
+    })
+    const withoutMedia = computeOverlayTextBudget({
+      containerHeight: 500,
+      hasMedia: false,
+      isMobile: true,
+    })
+    expect(withoutMedia).toBeGreaterThan(withMedia)
+  })
+})
 
 describe('computeOverlayTextMaxPx', () => {
   it('returns min when budget or width is zero', () => {

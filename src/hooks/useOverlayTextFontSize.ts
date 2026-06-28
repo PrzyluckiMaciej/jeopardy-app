@@ -1,5 +1,6 @@
 import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import {
+  computeOverlayTextBudget,
   computeOverlayTextMaxPx,
   findLargestFittingFontSize,
   OVERLAY_TEXT_MIN_PX,
@@ -100,23 +101,6 @@ function measureBlockHeight(
   return el.getBoundingClientRect().height
 }
 
-function getMediaReservedHeight(containerHeight: number): number {
-  if (containerHeight <= 0) return 0
-  const isDesktop =
-    typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(min-width: 768px)').matches
-  if (!isDesktop) {
-    const vh = typeof window !== 'undefined' ? window.innerHeight : containerHeight
-    // Match mobile grid min track: clamp(7rem, 24vh, 34%) — use ~20% of container for text budget headroom
-    return Math.min(containerHeight * 0.3, Math.max(96, vh * 0.2))
-  }
-  const minH = Math.max(144, containerHeight * 0.28)
-  const targetH = containerHeight * 0.38
-  const maxH = containerHeight * 0.52
-  return Math.min(maxH, Math.max(minH, targetH))
-}
-
 function getMobileOverlayViewportHeight(main: HTMLElement): number {
   if (typeof window === 'undefined') return 0
   const viewportH = window.visualViewport?.height ?? window.innerHeight
@@ -152,7 +136,10 @@ function getContainerHeight(container: HTMLElement): number {
 
   if (isMobile) {
     const viewportFloor = getMobileOverlayViewportHeight(main)
-    return Math.max(mainInner, viewportFloor)
+    if (mainInner < Math.min(200, viewportFloor * 0.55)) {
+      return Math.max(mainInner, viewportFloor)
+    }
+    return mainInner > 0 ? mainInner : viewportFloor
   }
 
   return mainInner > 0 ? mainInner : container.clientHeight
@@ -200,13 +187,12 @@ export function useOverlayTextFontSize({
     const mediaEl = getMediaElement(container)
     const hasMedia = hasMediaSlot || mediaEl != null
 
-    let overhead = reservedHeight
-    if (reservedHeight > 0) overhead += flexGap
-    if (hasMedia) {
-      overhead += getMediaReservedHeight(containerHeight) + flexGap * 2
-    }
-
-    const textBudget = Math.max(40, containerHeight - overhead)
+    const textBudget = computeOverlayTextBudget({
+      containerHeight,
+      hasMedia,
+      reservedHeight,
+      flexGap,
+    })
 
     const textGap = hasMedia ? 0 : flexGap
     const clueText = clue.trim() || ' '
