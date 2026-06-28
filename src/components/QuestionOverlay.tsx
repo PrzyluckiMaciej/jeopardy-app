@@ -207,7 +207,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
               )}
 
               <div
-                className={`question-overlay-clue font-condensed font-bold text-3xl md:text-4xl leading-snug max-w-2xl${
+                className={`question-overlay-clue font-condensed font-bold max-w-2xl${
                   clueRevealed ? '' : ' question-overlay-clue--pending'
                 }`}
               >
@@ -216,7 +216,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
 
               <div
                 key={phase === 'revealed' ? `answer-${answerRevealKey}` : 'answer-pending'}
-                className={`question-overlay-answer font-display text-2xl md:text-3xl${
+                className={`question-overlay-answer font-display${
                   phase === 'revealed' ? ' answer-reveal' : ' question-overlay-answer--pending'
                 }`}
               >
