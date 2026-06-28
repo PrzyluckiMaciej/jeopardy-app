@@ -1645,6 +1645,14 @@ select:focus-visible {
     min-height: 0;
     max-height: 100%;
   }
+  .question-overlay-media .question-media-player--video {
+    height: auto;
+    flex: 0 1 auto;
+    align-self: center;
+  }
+  .question-overlay-media .question-media-player--video .question-media-player__stage {
+    flex: 0 1 auto;
+  }
   .question-overlay-media .question-media-player__element,
   .question-overlay-media .question-media-player__stage {
     flex: 1 1 0;
@@ -1739,9 +1747,6 @@ select:focus-visible {
   max-width: 100%;
   line-height: 0;
 }
-.question-media-player--player .question-media-player__stage {
-  cursor: pointer;
-}
 .question-media-player__video--no-pointer {
   pointer-events: none;
 }
@@ -1767,11 +1772,25 @@ select:focus-visible {
 .question-media-player--controls-visible .question-media-player__overlay,
 .question-media-player__stage:focus-within .question-media-player__overlay {
   opacity: 1;
-  pointer-events: auto;
 }
 @media (hover: hover) {
   .question-media-player__stage:hover .question-media-player__overlay {
     opacity: 1;
+  }
+}
+.question-media-player__overlay-toolbar,
+.question-media-player__overlay-seek {
+  pointer-events: none;
+}
+.question-media-player--controls-visible .question-media-player__overlay-toolbar,
+.question-media-player--controls-visible .question-media-player__overlay-seek,
+.question-media-player__stage:focus-within .question-media-player__overlay-toolbar,
+.question-media-player__stage:focus-within .question-media-player__overlay-seek {
+  pointer-events: auto;
+}
+@media (hover: hover) {
+  .question-media-player__stage:hover .question-media-player__overlay-toolbar,
+  .question-media-player__stage:hover .question-media-player__overlay-seek {
     pointer-events: auto;
   }
 }

@@ -459,18 +459,44 @@ export default function QuestionMediaPlayer({
     [scheduleHide, clearHideTimeout],
   )
 
+  const publishPlayback = useCallback(
+    (el: HTMLMediaElement) => {
+      const state = playbackFromElement(el)
+      setMediaPlayback(state)
+      net.broadcast({ type: 'MEDIA_PLAYBACK', playback: state })
+    },
+    [setMediaPlayback],
+  )
+
+  const handleTogglePlay = useCallback(() => {
+    const el = mediaRef.current
+    if (!el || !isHost || !mediaActive) return
+    if (el.paused) {
+      el.play()
+        .then(() => publishPlayback(el))
+        .catch(() => publishPlayback(el))
+    } else {
+      el.pause()
+      publishPlayback(el)
+    }
+  }, [isHost, mediaActive, publishPlayback])
+
   const handleStageClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (!isHost || !mediaActive) return
       const target = e.target as HTMLElement
-      if (!target.classList.contains('question-media-player__video')) return
-      handleTogglePlayRef.current()
+      if (
+        target.closest(
+          '.question-media-player__overlay-toolbar, .question-media-player__overlay-seek, button, select, label',
+        )
+      ) {
+        return
+      }
+      handleTogglePlay()
       handleControlInteract()
     },
-    [isHost, mediaActive, handleControlInteract],
+    [isHost, mediaActive, handleTogglePlay, handleControlInteract],
   )
-
-  const handleTogglePlayRef = useRef<() => void>(() => {})
 
   useEffect(() => {
     return () => {
@@ -480,15 +506,6 @@ export default function QuestionMediaPlayer({
   }, [clearHideTimeout, clearLeaveTimeout])
 
   const getLatestPlayback = useCallback(() => lastPlaybackRef.current, [])
-
-  const publishPlayback = useCallback(
-    (el: HTMLMediaElement) => {
-      const state = playbackFromElement(el)
-      setMediaPlayback(state)
-      net.broadcast({ type: 'MEDIA_PLAYBACK', playback: state })
-    },
-    [setMediaPlayback],
-  )
 
   const applyVolume = useCallback((el: HTMLMediaElement, v: number) => {
     el.volume = v
@@ -676,19 +693,6 @@ export default function QuestionMediaPlayer({
     }
   }
 
-  function handleTogglePlay() {
-    const el = mediaRef.current
-    if (!el || !isHost || !mediaActive) return
-    if (el.paused) {
-      el.play()
-        .then(() => publishPlayback(el))
-        .catch(() => publishPlayback(el))
-    } else {
-      el.pause()
-      publishPlayback(el)
-    }
-  }
-
   function handleSeek(value: number) {
     const el = mediaRef.current
     if (!el || !isHost || !mediaActive) return
@@ -703,8 +707,6 @@ export default function QuestionMediaPlayer({
     setPlaybackRate(rate)
     publishPlayback(el)
   }
-
-  handleTogglePlayRef.current = handleTogglePlay
 
   if (loading) {
     return (
@@ -774,10 +776,6 @@ export default function QuestionMediaPlayer({
           <div
             className={`question-media-player__overlay${isHost ? '' : ' question-media-player__overlay--player'}`}
             aria-hidden={!controlsVisible}
-            onPointerDown={(e) => {
-              e.stopPropagation()
-              handleControlInteract()
-            }}
           >
             {isHost ? (
               <HostControls
