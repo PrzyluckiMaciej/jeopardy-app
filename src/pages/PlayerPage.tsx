@@ -400,15 +400,7 @@ export default function PlayerPage() {
     prevScoreRef.current = score
   }, [myPlayer?.score])
 
-  const [boardFill, setBoardFill] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches,
-  )
-  useEffect(() => {
-    const mq = window.matchMedia('(min-width: 768px)')
-    const update = () => setBoardFill(mq.matches)
-    mq.addEventListener('change', update)
-    return () => mq.removeEventListener('change', update)
-  }, [])
+  const boardFill = true
 
   function handleBuzz() {
     if (hasBuzzed || state.phase !== 'buzzing') return

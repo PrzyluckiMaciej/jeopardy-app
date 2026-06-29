@@ -915,7 +915,20 @@ select:focus-visible {
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
+  display: flex;
+  flex-direction: column;
   -webkit-overflow-scrolling: touch;
+}
+.board-scroll-wrap > .game-board--fill {
+  flex: 1 1 0;
+  min-height: 0;
+  width: max-content;
+  min-width: 100%;
+}
+.board-scroll-wrap > .game-board--fill .game-board__grid {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: max(100%, calc(var(--board-cols) * var(--board-col-min)));
 }
 @media (max-width: 767px) {
   .board-scroll-wrap {
@@ -938,8 +951,18 @@ select:focus-visible {
 
 /* ── Game board fill-mode typography ─────────────────────────── */
 .game-board--fill {
+  display: flex;
+  flex-direction: column;
+  --board-col-min: 100px;
+  --board-header-min: 3rem;
   --board-category-font-size: clamp(0.75rem, 1.4vh, 0.875rem);
   --board-cell-value-font-size: clamp(0.75rem, min(3.5vw, 4vh), 1.35rem);
+}
+.game-board--fill .board-category {
+  overflow: hidden;
+  word-break: break-word;
+  hyphens: auto;
+  line-height: 1.15;
 }
 
 /* ── Game board touch targets ───────────────────────────────── */
@@ -2527,8 +2550,27 @@ select:focus-visible {
   }
   .player-main,
   .board-and-players {
+    display: grid !important;
+    grid-template-rows: minmax(0, 1fr) auto;
+    flex: 1;
+    min-height: 0;
     gap: 6px !important;
-    padding-bottom: 6px !important;
+    padding-top: 4px !important;
+    padding-bottom: max(6px, env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .board-scroll-wrap {
+    flex: none;
+    height: 100%;
+    min-height: 0;
+  }
+  .game-board--fill {
+    --board-col-min: 88px;
+    --board-header-min: 1.75rem;
+    --board-category-font-size: clamp(0.6875rem, 2.8vw, 0.8125rem);
+    --board-cell-value-font-size: clamp(0.6875rem, 3.2vw, 1rem);
+  }
+  .game-board--fill .game-board__grid {
+    gap: 4px;
   }
   .mobile-players-toggle[aria-expanded='true'] {
     background: rgba(212, 160, 23, 0.12);
@@ -2588,6 +2630,9 @@ select:focus-visible {
   .board-editor-toolbar {
     grid-template-columns: 1fr;
     grid-template-rows: auto;
+    padding-top: var(--space-xs);
+    padding-bottom: var(--space-xs);
+    gap: var(--space-xs);
   }
   .host-board-toolbar__left,
   .host-board-toolbar__center,

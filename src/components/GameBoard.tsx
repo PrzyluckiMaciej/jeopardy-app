@@ -22,8 +22,8 @@ export default function GameBoard({
 
   const gridStyle = fill
     ? {
-        gridTemplateColumns: `repeat(${board.categories.length}, minmax(0, 1fr))`,
-        gridTemplateRows: `minmax(3rem, auto) repeat(${rowCount}, minmax(0, 1fr))`,
+        gridTemplateColumns: `repeat(${board.categories.length}, minmax(var(--board-col-min, 100px), 1fr))`,
+        gridTemplateRows: `minmax(var(--board-header-min, 3rem), auto) repeat(${rowCount}, minmax(0, 1fr))`,
       }
     : {
         gridTemplateColumns: `repeat(${board.categories.length}, minmax(140px, 1fr))`,
@@ -31,7 +31,7 @@ export default function GameBoard({
 
   const rootClass = [
     'game-board',
-    fill ? 'game-board--fill h-full w-full min-h-0' : 'game-board--touch overflow-auto',
+    fill ? 'game-board--fill h-full min-w-full min-h-0' : 'game-board--touch overflow-auto',
   ].join(' ')
 
   return (
@@ -40,13 +40,13 @@ export default function GameBoard({
       style={{ '--board-cols': board.categories.length } as CSSProperties}
     >
       <div
-        className={`game-board__grid grid gap-2 ${fill ? 'h-full w-full' : 'min-w-max'}`}
+        className={`game-board__grid grid gap-2 ${fill ? 'h-full min-w-full' : 'min-w-max'}`}
         style={gridStyle}
       >
         {board.categories.map((cat) => (
           <div
             key={cat.id}
-            className={`flex items-center justify-center text-center px-2 rounded font-condensed font-bold uppercase min-h-0 ${fill ? 'py-2' : 'py-4'}`}
+            className={`board-category flex items-center justify-center text-center px-2 rounded font-condensed font-bold uppercase min-h-0 min-w-0 ${fill ? 'py-2' : 'py-4'}`}
             style={{
               background: 'var(--navy-mid)',
               border: '2px solid var(--navy-light)',
