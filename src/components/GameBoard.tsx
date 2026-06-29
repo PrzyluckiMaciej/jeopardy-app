@@ -23,7 +23,7 @@ export default function GameBoard({
   const gridStyle = fill
     ? {
         gridTemplateColumns: `repeat(${board.categories.length}, minmax(0, 1fr))`,
-        gridTemplateRows: `minmax(3rem, auto) repeat(${rowCount}, minmax(0, 1fr))`,
+        gridTemplateRows: `minmax(var(--board-header-min, 3rem), auto) repeat(${rowCount}, minmax(0, 1fr))`,
       }
     : {
         gridTemplateColumns: `repeat(${board.categories.length}, minmax(140px, 1fr))`,
