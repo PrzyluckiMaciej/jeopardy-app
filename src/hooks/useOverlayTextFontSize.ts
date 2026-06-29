@@ -149,6 +149,25 @@ function getMediaElement(container: HTMLElement): HTMLElement | null {
   return container.querySelector('.question-overlay-media')
 }
 
+/** Intrinsic rendered height of media content — not the flex slot wrapper. */
+function getIntrinsicMediaContentHeight(mediaEl: HTMLElement): number {
+  const candidates = [
+    mediaEl.querySelector('.question-media-player__stage'),
+    mediaEl.querySelector('video'),
+    mediaEl.querySelector('img'),
+    mediaEl.querySelector('.question-media-controls'),
+  ]
+
+  for (const node of candidates) {
+    if (node instanceof HTMLElement) {
+      const height = node.getBoundingClientRect().height
+      if (height > 0) return height
+    }
+  }
+
+  return 0
+}
+
 interface Options {
   clue: string
   answer: string
@@ -186,24 +205,30 @@ export function useOverlayTextFontSize({
     const flexGap = parsePx(styles.rowGap || styles.gap)
     const mediaEl = getMediaElement(container)
     const hasMedia = hasMediaSlot || mediaEl != null
+    const isReservedMedia = mediaEl?.classList.contains('question-overlay-media--reserved') ?? false
+    const measuredMediaContentHeight =
+      mediaEl && !isReservedMedia ? getIntrinsicMediaContentHeight(mediaEl) : 0
 
     const textBudget = computeOverlayTextBudget({
       containerHeight,
+      containerWidth: width,
       hasMedia,
       reservedHeight,
       flexGap,
+      mediaHeight: measuredMediaContentHeight,
     })
 
     const textGap = hasMedia ? 0 : flexGap
     const clueText = clue.trim() || ' '
     const answerText = answer.trim() || '—'
+    const longestTextChars = Math.max(clueText.length, answerText.length)
 
     const measureAt = (size: number) => ({
       clueHeight: measureBlockHeight('clue', clueText, width, size),
       answerHeight: measureBlockHeight('answer', answerText, width, size),
     })
 
-    const maxPx = computeOverlayTextMaxPx(width, textBudget, hasMedia)
+    const maxPx = computeOverlayTextMaxPx(width, textBudget, hasMedia, longestTextChars)
     const nextSize = findLargestFittingFontSize({
       clue: clueText,
       answer: answerText,
@@ -257,6 +282,15 @@ export function useOverlayTextFontSize({
         if (observedMediaRef.current) ro.unobserve(observedMediaRef.current)
         observedMediaRef.current = media
         ro.observe(media)
+        for (const inner of media.querySelectorAll(
+          'video, img, .question-media-player__stage, .question-media-controls',
+        )) {
+          ro.observe(inner)
+        }
+      }
+      const video = media?.querySelector('video')
+      if (video instanceof HTMLVideoElement) {
+        video.addEventListener('loadedmetadata', scheduleRecalculate, { once: true })
       }
     }
 

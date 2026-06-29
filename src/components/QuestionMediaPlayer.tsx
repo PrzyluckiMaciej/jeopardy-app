@@ -739,7 +739,10 @@ export default function QuestionMediaPlayer({
 
   if (media.type === 'image') {
     return (
-      <div className={className} style={style}>
+      <div
+        className={`question-media-player question-media-player--image${className ? ` ${className}` : ''}`}
+        style={style}
+      >
         <img src={media.dataUrl} alt="" />
       </div>
     )

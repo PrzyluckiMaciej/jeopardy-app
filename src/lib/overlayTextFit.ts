@@ -43,50 +43,77 @@ export function computeMediaReservedHeight(
   return Math.max(gridMin, mediaTarget)
 }
 
+/** Estimated intrinsic media height before content has rendered (flex layout). */
+export function estimateMediaContentHeight(
+  containerWidth: number,
+  containerHeight: number,
+  isMobile = isMobileViewport(),
+): number {
+  if (containerHeight <= 0) return 0
+  const byAspect = containerWidth > 0 ? containerWidth * (9 / 16) : 0
+  const cap = containerHeight * (isMobile ? 0.5 : 0.55)
+  const floor = isMobile ? 80 : 100
+  return Math.min(cap, Math.max(floor, byAspect))
+}
+
 export interface OverlayTextBudgetParams {
   containerHeight: number
+  containerWidth?: number
   hasMedia: boolean
   reservedHeight?: number
   flexGap?: number
   isMobile?: boolean
+  mediaHeight?: number
 }
 
 /** Height available for clue + answer after reserving media and other overhead. */
 export function computeOverlayTextBudget({
   containerHeight,
+  containerWidth = 0,
   hasMedia,
   reservedHeight = 0,
   flexGap = 0,
   isMobile = isMobileViewport(),
+  mediaHeight = 0,
 }: OverlayTextBudgetParams): number {
   if (containerHeight <= 0) return 40
 
   let overhead = reservedHeight
   if (reservedHeight > 0) overhead += flexGap
   if (hasMedia) {
-    overhead += computeMediaReservedHeight(containerHeight, isMobile) + flexGap * 2
+    const estimate = estimateMediaContentHeight(containerWidth, containerHeight, isMobile)
+    const raw = mediaHeight > 0 ? mediaHeight : estimate
+    const cap = containerHeight * (isMobile ? 0.44 : 0.5)
+    const reserved = Math.min(raw, cap)
+    overhead += reserved + flexGap * 2
   }
 
-  let budget = Math.max(40, containerHeight - overhead)
-  if (isMobile && hasMedia) {
-    budget = Math.min(budget, Math.floor(containerHeight * 0.38))
-  }
-  return budget
+  return Math.max(40, containerHeight - overhead)
+}
+
+function shortTextBoost(longestTextChars: number): number {
+  if (longestTextChars <= 0) return 1
+  if (longestTextChars <= 12) return 1.45
+  if (longestTextChars <= 24) return 1.25
+  if (longestTextChars <= 48) return 1.1
+  return 1
 }
 
 export function computeOverlayTextMaxPx(
   width: number,
   heightBudget: number,
   hasMedia = false,
+  longestTextChars = 0,
 ): number {
   if (width <= 0 || heightBudget <= 0) return OVERLAY_TEXT_MIN_PX
   const isMobile = isMobileViewport()
-  const heightFactor = hasMedia ? (isMobile ? 0.2 : 0.16) : isMobile ? 0.36 : 0.28
-  const widthFactor = hasMedia ? (isMobile ? 0.088 : 0.055) : isMobile ? 0.14 : 0.09
-  const cap = hasMedia ? (isMobile ? 42 : 36) : isMobile ? 72 : 56
+  const boost = shortTextBoost(longestTextChars)
+  const heightFactor = hasMedia ? (isMobile ? 0.38 : 0.26) : isMobile ? 0.42 : 0.32
+  const widthFactor = hasMedia ? (isMobile ? 0.14 : 0.08) : isMobile ? 0.16 : 0.11
+  const cap = (hasMedia ? (isMobile ? 60 : 46) : isMobile ? 80 : 64) * boost
   return Math.max(
     OVERLAY_TEXT_MIN_PX,
-    Math.min(heightBudget * heightFactor, width * widthFactor, cap),
+    Math.min(heightBudget * heightFactor * boost, width * widthFactor * boost, cap),
   )
 }
 
