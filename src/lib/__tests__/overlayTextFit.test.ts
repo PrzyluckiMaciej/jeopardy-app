@@ -21,20 +21,30 @@ describe('computeMediaReservedHeight', () => {
 })
 
 describe('computeOverlayTextBudget', () => {
-  it('caps mobile text budget when media is present', () => {
-    const budget = computeOverlayTextBudget({
+  it('subtracts measured media content height when provided', () => {
+    const estimated = computeOverlayTextBudget({
       containerHeight: 500,
+      containerWidth: 360,
       hasMedia: true,
       flexGap: 8,
       isMobile: true,
     })
-    expect(budget).toBeLessThanOrEqual(190)
-    expect(budget).toBeGreaterThan(40)
+    const withSmallMedia = computeOverlayTextBudget({
+      containerHeight: 500,
+      containerWidth: 360,
+      hasMedia: true,
+      flexGap: 8,
+      isMobile: true,
+      mediaHeight: 72,
+    })
+    expect(withSmallMedia).toBeGreaterThan(estimated)
+    expect(withSmallMedia).toBeGreaterThan(40)
   })
 
   it('allows more text budget without media on mobile', () => {
     const withMedia = computeOverlayTextBudget({
       containerHeight: 500,
+      containerWidth: 360,
       hasMedia: true,
       isMobile: true,
     })
@@ -54,9 +64,15 @@ describe('computeOverlayTextMaxPx', () => {
   })
 
   it('caps by height, width, and absolute max', () => {
-    expect(computeOverlayTextMaxPx(2000, 2000)).toBe(56)
-    expect(computeOverlayTextMaxPx(2000, 2000, true)).toBe(36)
-    expect(computeOverlayTextMaxPx(100, 100)).toBeLessThanOrEqual(56)
+    expect(computeOverlayTextMaxPx(2000, 2000)).toBe(64)
+    expect(computeOverlayTextMaxPx(2000, 2000, true)).toBe(46)
+    expect(computeOverlayTextMaxPx(100, 100)).toBeLessThanOrEqual(64)
+  })
+
+  it('allows larger type for short strings', () => {
+    const short = computeOverlayTextMaxPx(400, 300, false, 4)
+    const long = computeOverlayTextMaxPx(400, 300, false, 80)
+    expect(short).toBeGreaterThan(long)
   })
 })
 
