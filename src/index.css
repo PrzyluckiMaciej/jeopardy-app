@@ -922,10 +922,13 @@ select:focus-visible {
 .board-scroll-wrap > .game-board--fill {
   flex: 1 1 0;
   min-height: 0;
+  width: max-content;
+  min-width: 100%;
 }
 .board-scroll-wrap > .game-board--fill .game-board__grid {
   flex: 1 1 0;
   min-height: 0;
+  min-width: max(100%, calc(var(--board-cols) * var(--board-col-min)));
 }
 @media (max-width: 767px) {
   .board-scroll-wrap {
@@ -950,9 +953,16 @@ select:focus-visible {
 .game-board--fill {
   display: flex;
   flex-direction: column;
+  --board-col-min: 100px;
   --board-header-min: 3rem;
   --board-category-font-size: clamp(0.75rem, 1.4vh, 0.875rem);
   --board-cell-value-font-size: clamp(0.75rem, min(3.5vw, 4vh), 1.35rem);
+}
+.game-board--fill .board-category {
+  overflow: hidden;
+  word-break: break-word;
+  hyphens: auto;
+  line-height: 1.15;
 }
 
 /* ── Game board touch targets ───────────────────────────────── */
@@ -2554,9 +2564,10 @@ select:focus-visible {
     min-height: 0;
   }
   .game-board--fill {
+    --board-col-min: 88px;
     --board-header-min: 1.75rem;
-    --board-category-font-size: clamp(0.625rem, 2.8vw, 0.75rem);
-    --board-cell-value-font-size: clamp(0.625rem, 3.2vw, 0.9375rem);
+    --board-category-font-size: clamp(0.6875rem, 2.8vw, 0.8125rem);
+    --board-cell-value-font-size: clamp(0.6875rem, 3.2vw, 1rem);
   }
   .game-board--fill .game-board__grid {
     gap: 4px;
