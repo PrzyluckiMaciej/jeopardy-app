@@ -405,13 +405,16 @@ export default function QuestionMediaPlayer({
   const [muted, setMuted] = useState(false)
   const volumeBeforeMuteRef = useRef(volume)
   const [controlsVisible, setControlsVisible] = useState(false)
-  const [mediaAspect, setMediaAspect] = useState<number | null>(null)
+  const [mediaAspect, setMediaAspect] = useState<{ key: string; value: number } | null>(null)
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const leaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hoverCapableRef = useRef(canHover())
 
   const isHost = role === 'host'
   const isVideo = media.type === 'video'
+  const mediaAspectKey = `${mountKey}:${media.dataUrl}`
+  const resolvedMediaAspect =
+    mediaAspect?.key === mediaAspectKey ? mediaAspect.value : null
 
   const clearHideTimeout = useCallback(() => {
     if (hideTimeoutRef.current) {
@@ -533,16 +536,7 @@ export default function QuestionMediaPlayer({
 
   const setMediaRef = useCallback((el: HTMLVideoElement | HTMLAudioElement | null) => {
     mediaRef.current = el
-    if (el instanceof HTMLVideoElement && el.readyState >= HTMLMediaElement.HAVE_METADATA) {
-      if (el.videoWidth > 0 && el.videoHeight > 0) {
-        setMediaAspect(el.videoWidth / el.videoHeight)
-      }
-    }
   }, [])
-
-  useEffect(() => {
-    setMediaAspect(null)
-  }, [media.dataUrl, mountKey])
 
   useEffect(() => {
     lastPlaybackRef.current = playback
@@ -769,7 +763,7 @@ export default function QuestionMediaPlayer({
 
   const syncVideoAspect = (el: HTMLVideoElement) => {
     if (el.videoWidth > 0 && el.videoHeight > 0) {
-      setMediaAspect(el.videoWidth / el.videoHeight)
+      setMediaAspect({ key: mediaAspectKey, value: el.videoWidth / el.videoHeight })
     }
   }
 
@@ -794,7 +788,7 @@ export default function QuestionMediaPlayer({
 
   const playerStyle = {
     ...style,
-    ...(mediaAspect != null ? { '--media-aspect': mediaAspect } : {}),
+    ...(resolvedMediaAspect != null ? { '--media-aspect': resolvedMediaAspect } : {}),
   } as React.CSSProperties
 
   return (

@@ -279,7 +279,7 @@ export function useOverlayTextFontSize({
       clueMinHeight: measured.clueHeight,
       answerMinHeight: measured.answerHeight,
     })
-  }, [answer, clue, clueRef, containerRef, enabled, hasMediaSlot, reservedHeight])
+  }, [answer, clue, containerRef, enabled, hasMediaSlot, reservedHeight])
 
   const scheduleRecalculate = useCallback(() => {
     if (frameRef.current != null) cancelAnimationFrame(frameRef.current)
