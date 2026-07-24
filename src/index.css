@@ -1689,40 +1689,59 @@ select:focus-visible {
 }
 .question-overlay-media img,
 .question-overlay-media video,
-.question-overlay-media .question-media-player__video,
-.question-overlay-media .question-media-player__stage {
+.question-overlay-media .question-media-player__video {
   display: block;
+  width: 100%;
+  height: 100%;
   max-width: 100%;
-  width: auto;
-  height: auto;
+  max-height: 100%;
   object-fit: contain;
   border-radius: var(--radius-lg);
 }
-.question-overlay-media.question-media-player--image,
-.question-overlay-media:has(> img) {
-  width: fit-content;
-  max-width: 100%;
-}
 .question-overlay-media .question-media-player__stage {
   overflow: hidden;
+  border-radius: var(--radius-lg);
 }
 .question-overlay-media .question-media-player__video {
+  position: absolute;
+  inset: 0;
   border-radius: 0;
-  max-height: inherit;
+  max-height: none;
 }
 .question-overlay-media.question-media-player--video,
 .question-overlay-media.question-media-player--image {
-  height: auto;
+  min-height: 0;
   justify-content: center;
 }
+.question-overlay-media.question-media-player--video {
+  align-items: center;
+  container-type: size;
+  container-name: media-player;
+}
+.question-overlay-media.question-media-player--image,
+.question-overlay-media:has(> img) {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+}
+.question-overlay-media.question-media-player--image img,
+.question-overlay-media:has(> img) > img {
+  position: absolute;
+  inset: 0;
+}
 .question-overlay-media.question-media-player--video .question-media-player__stage {
+  /* Largest box of the video's aspect ratio that fits the player slot */
+  position: relative;
   flex: 0 0 auto;
   align-self: center;
-  display: inline-flex;
-  width: fit-content;
+  display: block;
+  aspect-ratio: var(--media-aspect, 16 / 9);
+  width: min(100cqw, calc(100cqh * var(--media-aspect, 1.777778)));
   max-width: 100%;
+  max-height: 100cqh;
   height: auto;
-  max-height: 100%;
+  min-width: 0;
+  min-height: 0;
 }
 .question-overlay-media.question-media-player--audio .question-media-player {
   height: auto;

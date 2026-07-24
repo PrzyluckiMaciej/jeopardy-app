@@ -2,6 +2,7 @@ import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from '
 import {
   computeOverlayTextBudget,
   computeOverlayTextMaxPx,
+  estimateMediaContentHeight,
   findLargestFittingFontSize,
   OVERLAY_TEXT_MIN_PX,
 } from '../lib/overlayTextFit'
@@ -149,8 +150,38 @@ function getMediaElement(container: HTMLElement): HTMLElement | null {
   return container.querySelector('.question-overlay-media')
 }
 
-/** Intrinsic rendered height of media content — not the flex slot wrapper. */
-function getIntrinsicMediaContentHeight(mediaEl: HTMLElement): number {
+function getMediaNaturalSize(mediaEl: HTMLElement): { width: number; height: number } | null {
+  const video = mediaEl.querySelector('video')
+  if (video instanceof HTMLVideoElement && video.videoWidth > 0 && video.videoHeight > 0) {
+    return { width: video.videoWidth, height: video.videoHeight }
+  }
+  const img = mediaEl.querySelector('img')
+  if (img instanceof HTMLImageElement && img.naturalWidth > 0 && img.naturalHeight > 0) {
+    return { width: img.naturalWidth, height: img.naturalHeight }
+  }
+  return null
+}
+
+/**
+ * Height media will occupy after scaling to fill the overlay slot (object-fit: contain).
+ * Falls back to the laid-out box when natural dimensions are not yet available.
+ */
+function getIntrinsicMediaContentHeight(
+  mediaEl: HTMLElement,
+  containerWidth: number,
+  containerHeight: number,
+): number {
+  const natural = getMediaNaturalSize(mediaEl)
+  if (natural) {
+    const maxWidth = mediaEl.clientWidth > 0 ? mediaEl.clientWidth : containerWidth
+    const maxHeight = estimateMediaContentHeight(containerWidth, containerHeight)
+    if (maxWidth > 0 && maxHeight > 0) {
+      const scale = Math.min(maxWidth / natural.width, maxHeight / natural.height)
+      const scaled = natural.height * scale
+      if (scaled > 0) return scaled
+    }
+  }
+
   const candidates = [
     mediaEl.querySelector('.question-media-player__stage'),
     mediaEl.querySelector('video'),
@@ -207,7 +238,9 @@ export function useOverlayTextFontSize({
     const hasMedia = hasMediaSlot || mediaEl != null
     const isReservedMedia = mediaEl?.classList.contains('question-overlay-media--reserved') ?? false
     const measuredMediaContentHeight =
-      mediaEl && !isReservedMedia ? getIntrinsicMediaContentHeight(mediaEl) : 0
+      mediaEl && !isReservedMedia
+        ? getIntrinsicMediaContentHeight(mediaEl, width, containerHeight)
+        : 0
 
     const textBudget = computeOverlayTextBudget({
       containerHeight,
