@@ -405,12 +405,16 @@ export default function QuestionMediaPlayer({
   const [muted, setMuted] = useState(false)
   const volumeBeforeMuteRef = useRef(volume)
   const [controlsVisible, setControlsVisible] = useState(false)
+  const [mediaAspect, setMediaAspect] = useState<{ key: string; value: number } | null>(null)
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const leaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hoverCapableRef = useRef(canHover())
 
   const isHost = role === 'host'
   const isVideo = media.type === 'video'
+  const mediaAspectKey = `${mountKey}:${media.dataUrl}`
+  const resolvedMediaAspect =
+    mediaAspect?.key === mediaAspectKey ? mediaAspect.value : null
 
   const clearHideTimeout = useCallback(() => {
     if (hideTimeoutRef.current) {
@@ -757,6 +761,12 @@ export default function QuestionMediaPlayer({
     onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
   }
 
+  const syncVideoAspect = (el: HTMLVideoElement) => {
+    if (el.videoWidth > 0 && el.videoHeight > 0) {
+      setMediaAspect({ key: mediaAspectKey, value: el.videoWidth / el.videoHeight })
+    }
+  }
+
   const showReplay = duration > 0 && isPaused && currentTime >= duration - 0.1
 
   const playerVolumeControls = (
@@ -776,10 +786,15 @@ export default function QuestionMediaPlayer({
     />
   )
 
+  const playerStyle = {
+    ...style,
+    ...(resolvedMediaAspect != null ? { '--media-aspect': resolvedMediaAspect } : {}),
+  } as React.CSSProperties
+
   return (
     <div
       className={`question-media-player${isHost ? '' : ' question-media-player--player'}${isVideo ? ' question-media-player--video' : media.type === 'audio' ? ' question-media-player--audio' : ''}${className ? ` ${className}` : ''}`}
-      style={style}
+      style={playerStyle}
     >
       {isVideo ? (
         <div
@@ -792,6 +807,7 @@ export default function QuestionMediaPlayer({
           <video
             {...mediaProps}
             className={`question-media-player__video${isHost ? '' : ' question-media-player__video--no-pointer'}`}
+            onLoadedMetadata={(e) => syncVideoAspect(e.currentTarget)}
           />
           <div
             className={`question-media-player__overlay${isHost ? '' : ' question-media-player__overlay--player'}`}
