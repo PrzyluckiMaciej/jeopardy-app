@@ -36,11 +36,7 @@ export default function SettingsPanel({
   const [editScore, setEditScore] = useState('')
 
   function toggle(key: keyof GameSettings) {
-    const updated = { ...settings, [key]: !settings[key] }
-    if (key === 'autoBuzzQueue' && !updated.autoBuzzQueue) {
-      updated.blurClueOnBuzz = false
-    }
-    onSettingsChange(updated)
+    onSettingsChange({ ...settings, [key]: !settings[key] })
   }
 
   function startEdit(p: Player) {
@@ -88,7 +84,12 @@ export default function SettingsPanel({
               description="Blurs the clue when any player buzzes in"
               value={settings.blurClueOnBuzz}
               onChange={() => toggle('blurClueOnBuzz')}
-              disabled={!settings.autoBuzzQueue}
+            />
+            <Toggle
+              label="Pause media on buzz"
+              description="Pauses audio or video when the first player buzzes in"
+              value={settings.pauseMediaOnBuzz}
+              onChange={() => toggle('pauseMediaOnBuzz')}
             />
             <Toggle
               label="Auto-reveal clue"

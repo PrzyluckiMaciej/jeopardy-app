@@ -128,6 +128,7 @@ export interface GameSettings {
   allowNegativeScore: boolean
   autoBuzzQueue: boolean
   blurClueOnBuzz: boolean
+  pauseMediaOnBuzz: boolean
   autoRevealClue: boolean
   autoRevealMedia: boolean
 }
