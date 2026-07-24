@@ -1625,6 +1625,8 @@ select:focus-visible {
   text-align: center;
   font-size: var(--overlay-text-size, clamp(1.125rem, 4.5cqh, 2.25rem));
   overflow: visible;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
 }
 .question-overlay-clue--pending {
   opacity: 0.45;
@@ -2142,6 +2144,9 @@ select:focus-visible {
   max-width: 100%;
   align-self: center;
   box-sizing: border-box;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  text-align: center;
 }
 .question-overlay-content:has(.question-overlay-media) .question-overlay-answer {
   margin-top: var(--space-sm);

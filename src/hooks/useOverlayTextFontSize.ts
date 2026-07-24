@@ -48,7 +48,7 @@ function createMeasurer(kind: MeasureKind): HTMLDivElement {
   el.style.fontFamily = "'Barlow Condensed', sans-serif"
   el.style.fontWeight = '700'
   el.style.textAlign = 'center'
-  el.style.whiteSpace = 'normal'
+  el.style.whiteSpace = 'pre-wrap'
   el.style.wordBreak = 'break-word'
   el.style.overflowWrap = 'break-word'
 
