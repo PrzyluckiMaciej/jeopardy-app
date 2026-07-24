@@ -91,6 +91,12 @@ export default function SettingsPanel({
               disabled={!settings.autoBuzzQueue}
             />
             <Toggle
+              label="Pause media on buzz"
+              description="Pauses audio or video when the first player buzzes in"
+              value={settings.pauseMediaOnBuzz}
+              onChange={() => toggle('pauseMediaOnBuzz')}
+            />
+            <Toggle
               label="Auto-reveal clue"
               description="Show the clue text to players as soon as a question opens"
               value={settings.autoRevealClue}

@@ -180,6 +180,7 @@ const defaultSettings: GameSettings = {
   allowNegativeScore: false,
   autoBuzzQueue: false,
   blurClueOnBuzz: false,
+  pauseMediaOnBuzz: false,
   autoRevealClue: false,
   autoRevealMedia: false,
 }

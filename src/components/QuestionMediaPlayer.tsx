@@ -395,7 +395,10 @@ export default function QuestionMediaPlayer({
   const mediaRef = useRef<HTMLMediaElement | null>(null)
   const applyingRef = useRef(false)
   const lastPlaybackRef = useRef<MediaPlaybackState | null>(playback)
+  const prevBuzzQueueLengthRef = useRef<number | null>(null)
   const setMediaPlayback = useGameStore((s) => s.setMediaPlayback)
+  const pauseMediaOnBuzz = useGameStore((s) => s.settings.pauseMediaOnBuzz)
+  const buzzQueueLength = useGameStore((s) => s.state.buzzQueue.length)
 
   const [duration, setDuration] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
@@ -561,6 +564,28 @@ export default function QuestionMediaPlayer({
     applyPlaybackWhenReady(el, playback, applyingRef, getLatestPlayback, controller.signal)
     return () => controller.abort()
   }, [playback, isHost, media.type, mountKey, mediaActive, getLatestPlayback])
+
+  useEffect(() => {
+    prevBuzzQueueLengthRef.current = null
+  }, [mountKey])
+
+  useEffect(() => {
+    if (prevBuzzQueueLengthRef.current === null) {
+      prevBuzzQueueLengthRef.current = buzzQueueLength
+      return
+    }
+
+    const prevLength = prevBuzzQueueLengthRef.current
+    prevBuzzQueueLengthRef.current = buzzQueueLength
+
+    if (!isHost || !pauseMediaOnBuzz || !mediaActive) return
+    if (media.type !== 'audio' && media.type !== 'video') return
+    if (prevLength !== 0 || buzzQueueLength === 0) return
+
+    const el = mediaRef.current
+    if (!el || el.paused) return
+    el.pause()
+  }, [buzzQueueLength, pauseMediaOnBuzz, isHost, mediaActive, media.type])
 
   useEffect(() => {
     if (media.type === 'image') return
