@@ -1,5 +1,16 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Trash2, Upload, FileText, Image, Music, Video, Paperclip, HelpCircle } from 'lucide-react'
+import {
+  Trash2,
+  Upload,
+  FileText,
+  Image,
+  Music,
+  Video,
+  Paperclip,
+  HelpCircle,
+  Save,
+  LogOut,
+} from 'lucide-react'
 import type { Board, Category, Question } from '../types'
 import { generateId } from '../lib/utils'
 import { saveMedia, deleteMedia, getMedia, blobToDataUrl } from '../lib/db'
@@ -17,19 +28,20 @@ interface EditingCell {
 }
 
 export default function BoardEditor({ board, onChange, onClose }: Props) {
+  const [draft, setDraft] = useState<Board>(board)
+  const [dirty, setDirty] = useState(false)
+  const [showExitConfirm, setShowExitConfirm] = useState(false)
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null)
   const [panelExiting, setPanelExiting] = useState(false)
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
-  const [boardName, setBoardName] = useState(board.name)
   const [mediaPreview, setMediaPreview] = useState<string | null>(null)
   const [editingRowPts, setEditingRowPts] = useState<number | null>(null)
   const [editingRowText, setEditingRowText] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
-  const initialBoard = useRef<Board>(board)
-  const boardRef = useRef(board)
+  const draftRef = useRef(draft)
   const onChangeRef = useRef(onChange)
   const [mediaTypesById, setMediaTypesById] = useState<Record<string, MediaType>>({})
-  boardRef.current = board
+  draftRef.current = draft
   onChangeRef.current = onChange
 
   useEffect(() => {
@@ -39,7 +51,7 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
       const map: Record<string, MediaType> = {}
       const patches = new Map<string, MediaType>()
 
-      for (const cat of boardRef.current.categories) {
+      for (const cat of draftRef.current.categories) {
         for (const q of cat.questions) {
           if (!q.mediaId) continue
           if (q.mediaType) {
@@ -60,7 +72,7 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
 
       if (patches.size === 0) return
 
-      const current = boardRef.current
+      const current = draftRef.current
       const categories = current.categories.map((cat) => ({
         ...cat,
         questions: cat.questions.map((q) =>
@@ -68,8 +80,9 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
         ),
       }))
       const updated = { ...current, categories, updatedAt: Date.now() }
+      setDraft(updated)
       onChangeRef.current(updated)
-      initialBoard.current = updated
+      setDirty(false)
     }
 
     resolveMediaTypes()
@@ -78,56 +91,85 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
     }
   }, [board.id])
 
-  function discardChanges() {
-    onChange(initialBoard.current)
+  function saveDraft() {
+    onChange(draftRef.current)
+    setDirty(false)
+  }
+
+  function requestExit() {
+    if (!dirty) {
+      onClose()
+      return
+    }
+    setShowExitConfirm(true)
+  }
+
+  function saveAndExit() {
+    onChange(draftRef.current)
+    setDirty(false)
+    setShowExitConfirm(false)
+    onClose()
+  }
+
+  function discardAndExit() {
+    setShowExitConfirm(false)
     onClose()
   }
 
   const activeQ = editingCell
-    ? board.categories.find((c) => c.id === editingCell.categoryId)
+    ? draft.categories.find((c) => c.id === editingCell.categoryId)
         ?.questions.find((q) => q.id === editingCell.questionId) ?? null
     : null
   const activeCategory = editingCell
-    ? board.categories.find((c) => c.id === editingCell.categoryId) ?? null
+    ? draft.categories.find((c) => c.id === editingCell.categoryId) ?? null
     : null
 
-  const updateBoard = useCallback(
-    (patch: Partial<Board>) => {
-      onChange({ ...board, ...patch, updatedAt: Date.now() })
-    },
-    [board, onChange]
-  )
+  const updateBoard = useCallback((patch: Partial<Board>) => {
+    setDraft((prev) => ({ ...prev, ...patch, updatedAt: Date.now() }))
+    setDirty(true)
+  }, [])
 
   function updateCategory(catId: string, patch: Partial<Category>) {
-    updateBoard({
-      categories: board.categories.map((c) => (c.id === catId ? { ...c, ...patch } : c)),
-    })
+    setDraft((prev) => ({
+      ...prev,
+      updatedAt: Date.now(),
+      categories: prev.categories.map((c) => (c.id === catId ? { ...c, ...patch } : c)),
+    }))
+    setDirty(true)
   }
 
   function updateQuestion(catId: string, qId: string, patch: Partial<Question>) {
-    updateCategory(catId, {
-      questions: board.categories
-        .find((c) => c.id === catId)!
-        .questions.map((q) => (q.id === qId ? { ...q, ...patch } : q)),
-    })
+    setDraft((prev) => ({
+      ...prev,
+      updatedAt: Date.now(),
+      categories: prev.categories.map((c) =>
+        c.id === catId
+          ? {
+              ...c,
+              questions: c.questions.map((q) => (q.id === qId ? { ...q, ...patch } : q)),
+            }
+          : c
+      ),
+    }))
+    setDirty(true)
   }
 
   function addCategory() {
     const newCat: Category = {
       id: generateId(),
       name: 'New Category',
-      questions: board.pointValues.map((pts) => ({
+      questions: draft.pointValues.map((pts) => ({
         id: generateId(),
         question: '',
         answer: '',
         points: pts,
       })),
     }
-    updateBoard({ categories: [...board.categories, newCat] })
+    updateBoard({ categories: [...draft.categories, newCat] })
   }
 
   function removeCategory(catId: string) {
-    updateBoard({ categories: board.categories.filter((c) => c.id !== catId) })
+    updateBoard({ categories: draft.categories.filter((c) => c.id !== catId) })
     if (editingCell?.categoryId === catId) closePanel()
   }
 
@@ -164,10 +206,10 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
     setEditingRowPts(null)
     const newPts = parseInt(editingRowText, 10)
     if (isNaN(newPts) || newPts <= 0 || newPts === oldPts) return
-    if (board.pointValues.some((v) => v !== oldPts && v === newPts)) return
+    if (draft.pointValues.some((v) => v !== oldPts && v === newPts)) return
 
-    const newPointValues = board.pointValues.map((v) => (v === oldPts ? newPts : v)).sort((a, b) => a - b)
-    const newCategories = board.categories.map((cat) => ({
+    const newPointValues = draft.pointValues.map((v) => (v === oldPts ? newPts : v)).sort((a, b) => a - b)
+    const newCategories = draft.categories.map((cat) => ({
       ...cat,
       questions: cat.questions.map((q) => (q.points === oldPts ? { ...q, points: newPts } : q)),
     }))
@@ -199,7 +241,7 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
     const mediaId = activeQ.mediaId ?? generateId()
     await saveMedia({
       id: mediaId,
-      boardId: board.id,
+      boardId: draft.id,
       questionId: activeQ.id,
       mimeType: file.type,
       blob: file,
@@ -232,20 +274,28 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
         <div className="board-editor-toolbar__center">
           <input
             className="board-editor-toolbar__name"
-            value={boardName}
-            onChange={(e) => {
-              setBoardName(e.target.value)
-              updateBoard({ name: e.target.value })
-            }}
+            value={draft.name}
+            onChange={(e) => updateBoard({ name: e.target.value })}
           />
         </div>
 
         <div className="board-editor-toolbar__right">
-          <button className="btn-ghost text-sm" onClick={discardChanges}>
-            Discard
+          <button
+            className="btn-gold text-sm btn-with-icon"
+            onClick={saveDraft}
+            disabled={!dirty}
+            title="Save board"
+          >
+            <Save size={16} aria-hidden />
+            <span>Save</span>
           </button>
-          <button className="btn-gold text-sm" onClick={onClose}>
-            Save &amp; Close
+          <button
+            className="btn-ghost text-sm btn-with-icon"
+            onClick={requestExit}
+            title="Exit editor"
+          >
+            <LogOut size={16} aria-hidden />
+            <span>Exit</span>
           </button>
         </div>
       </div>
@@ -255,13 +305,13 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
         <div className="overflow-auto min-w-0 h-full">
           <div
             className="grid gap-2 min-w-max"
-            style={{ gridTemplateColumns: `72px repeat(${board.categories.length}, minmax(140px, 1fr))` }}
+            style={{ gridTemplateColumns: `72px repeat(${draft.categories.length}, minmax(140px, 1fr))` }}
           >
             {/* Row label column spacer for header row */}
             <div />
 
             {/* Category headers */}
-            {board.categories.map((cat) => (
+            {draft.categories.map((cat) => (
               <div key={cat.id} className="relative group">
                 {editingCategoryId === cat.id ? (
                   <input
@@ -312,7 +362,7 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
             ))}
 
             {/* Question cells with editable row point value labels */}
-            {board.pointValues.map((pts) => [
+            {draft.pointValues.map((pts) => [
               /* Row label */
               editingRowPts === pts ? (
                 <input
@@ -361,7 +411,7 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                 </button>
               ),
               /* Question cells for this row */
-              ...board.categories.map((cat) => {
+              ...draft.categories.map((cat) => {
                 const q = cat.questions.find((q) => q.points === pts)
                 if (!q) return <div key={`${cat.id}-${pts}`} />
                 const isActive = editingCell?.questionId === q.id
@@ -421,7 +471,7 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                       </div>
                     )}
 
-                    {board.dailyDoubleQuestionId === q.id && (
+                    {draft.dailyDoubleQuestionId === q.id && (
                       <div className="dd-badge">DD</div>
                     )}
                   </button>
@@ -558,17 +608,17 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
               className="board-editor-dd-toggle"
               style={{
                 background:
-                  board.dailyDoubleQuestionId === activeQ.id
+                  draft.dailyDoubleQuestionId === activeQ.id
                     ? 'rgba(212,160,23,0.15)'
                     : 'var(--navy)',
                 border: `1px solid ${
-                  board.dailyDoubleQuestionId === activeQ.id
+                  draft.dailyDoubleQuestionId === activeQ.id
                     ? 'rgba(212,160,23,0.45)'
                     : 'var(--navy-light)'
                 }`,
               }}
               onClick={() => {
-                const isDD = board.dailyDoubleQuestionId === activeQ.id
+                const isDD = draft.dailyDoubleQuestionId === activeQ.id
                 updateBoard({ dailyDoubleQuestionId: isDD ? undefined : activeQ.id })
               }}
             >
@@ -582,7 +632,7 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                 className="w-11 h-6 rounded-full relative transition-colors flex-shrink-0"
                 style={{
                   background:
-                    board.dailyDoubleQuestionId === activeQ.id ? 'var(--gold)' : 'var(--navy-light)',
+                    draft.dailyDoubleQuestionId === activeQ.id ? 'var(--gold)' : 'var(--navy-light)',
                 }}
               >
                 <div
@@ -590,7 +640,7 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                   style={{
                     background: 'var(--navy-mid)',
                     left:
-                      board.dailyDoubleQuestionId === activeQ.id ? 'calc(100% - 22px)' : '2px',
+                      draft.dailyDoubleQuestionId === activeQ.id ? 'calc(100% - 22px)' : '2px',
                   }}
                 />
               </div>
@@ -598,6 +648,34 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
           </div>
         )}
       </div>
+
+      {showExitConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(6,11,40,0.85)' }}
+        >
+          <div className="panel modal-enter flex flex-col gap-4 max-w-sm w-full text-center">
+            <div className="font-display text-2xl" style={{ color: 'var(--gold-bright)' }}>
+              Unsaved changes
+            </div>
+            <div className="font-condensed text-base" style={{ color: 'var(--white)' }}>
+              You have unsaved changes. Save before leaving, or discard them?
+            </div>
+            <div className="flex flex-col gap-2">
+              <button className="btn-gold w-full btn-with-icon justify-center" onClick={saveAndExit}>
+                <Save size={16} aria-hidden />
+                <span>Save &amp; Exit</span>
+              </button>
+              <button className="btn-ghost w-full" onClick={discardAndExit}>
+                Discard &amp; Exit
+              </button>
+              <button className="btn-ghost w-full" onClick={() => setShowExitConfirm(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
