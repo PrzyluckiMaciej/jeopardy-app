@@ -179,6 +179,7 @@ const defaultSettings: GameSettings = {
   pointDeduction: false,
   allowNegativeScore: false,
   autoBuzzQueue: false,
+  autoBuzzQueueOnMedia: false,
   blurClueOnBuzz: false,
   pauseMediaOnBuzz: false,
   autoRevealClue: false,

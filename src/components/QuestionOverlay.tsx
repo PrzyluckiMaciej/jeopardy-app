@@ -46,6 +46,17 @@ export default function QuestionOverlay({ state, settings }: Props) {
   const category = state.board?.categories.find(c => c.id === categoryId)
   const gameplay = getCategoryGameplaySettings(category, settings)
   const hasClue = !!question.question.trim()
+  const hasMedia = !!question.mediaId || !!activeMedia
+  const autoBuzzOnClue = gameplay.autoBuzzQueue && hasClue
+  const autoBuzzOnMedia = gameplay.autoBuzzQueueOnMedia && hasMedia
+  const autoBuzzPending = autoBuzzOnClue || autoBuzzOnMedia
+  const autoBuzzHint = autoBuzzOnClue && autoBuzzOnMedia
+    ? 'Buzz queue opens automatically on clue or media reveal'
+    : autoBuzzOnClue
+      ? 'Buzz queue opens automatically on clue reveal'
+      : autoBuzzOnMedia
+        ? 'Buzz queue opens automatically on media reveal'
+        : null
 
   function handleStartBuzzing() {
     store.startBuzzing()
@@ -103,7 +114,8 @@ export default function QuestionOverlay({ state, settings }: Props) {
   function handleRevealClue() {
     store.revealClue()
     net.broadcast({ type: 'REVEAL_CLUE' })
-    if (gameplay.autoBuzzQueue && !isDD) {
+    // Only open once — skip if media reveal already started buzzing
+    if (gameplay.autoBuzzQueue && !isDD && phase === 'question') {
       store.startBuzzing()
       net.broadcast({ type: 'START_BUZZING' })
     }
@@ -112,6 +124,11 @@ export default function QuestionOverlay({ state, settings }: Props) {
   function handleRevealMedia() {
     store.revealMedia()
     net.broadcast({ type: 'REVEAL_MEDIA' })
+    // Only open once — skip if clue reveal already started buzzing
+    if (gameplay.autoBuzzQueueOnMedia && !isDD && phase === 'question') {
+      store.startBuzzing()
+      net.broadcast({ type: 'START_BUZZING' })
+    }
   }
 
   function handleReveal() {
@@ -281,7 +298,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
               </div>
             )}
 
-            {!isDD && phase === 'question' && (clueRevealed || !hasClue) && (!gameplay.autoBuzzQueue || !hasClue) && (
+            {!isDD && phase === 'question' && (clueRevealed || !hasClue) && !autoBuzzPending && (
               <button
                 type="button"
                 className="btn-gold w-full py-3 btn-with-icon justify-center"
@@ -291,6 +308,16 @@ export default function QuestionOverlay({ state, settings }: Props) {
                 <Bell size={18} aria-hidden />
                 <span>Open buzzing</span>
               </button>
+            )}
+
+            {!isDD && phase === 'question' && autoBuzzHint && (
+              <div
+                className="flex items-start gap-2 text-sm font-condensed text-subtle"
+                role="status"
+              >
+                <Bell size={14} className="flex-shrink-0 mt-0.5 opacity-70" aria-hidden />
+                <span>{autoBuzzHint}</span>
+              </div>
             )}
 
             {!isDD && phase === 'buzzing' && (

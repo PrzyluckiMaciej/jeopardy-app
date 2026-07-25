@@ -3,6 +3,7 @@ import type { Category, CategorySettings, GameSettings } from '../types'
 export function categorySettingsFromGlobal(global: GameSettings): CategorySettings {
   return {
     autoBuzzQueue: global.autoBuzzQueue,
+    autoBuzzQueueOnMedia: global.autoBuzzQueueOnMedia,
     blurClueOnBuzz: global.blurClueOnBuzz,
     pauseMediaOnBuzz: global.pauseMediaOnBuzz,
     autoRevealClue: global.autoRevealClue,
@@ -15,8 +16,10 @@ export function getCategoryGameplaySettings(
   category: Category | undefined,
   global: GameSettings,
 ): CategorySettings {
+  const fromGlobal = categorySettingsFromGlobal(global)
   if (!category || category.syncSettingsWithGlobal !== false) {
-    return categorySettingsFromGlobal(global)
+    return fromGlobal
   }
-  return category.settings ?? categorySettingsFromGlobal(global)
+  // Merge so older saved category snapshots pick up new gameplay fields.
+  return category.settings ? { ...fromGlobal, ...category.settings } : fromGlobal
 }
