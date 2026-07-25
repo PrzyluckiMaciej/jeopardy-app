@@ -15,6 +15,7 @@ import {
   type NameSession,
 } from '../lib/playerJoin'
 import BoardEditor from '../components/BoardEditor'
+import ConfirmModal from '../components/ConfirmModal'
 import GameBoard from '../components/GameBoard'
 import QuestionOverlay from '../components/QuestionOverlay'
 import SettingsPanel from '../components/SettingsPanel'
@@ -64,6 +65,7 @@ export default function HostPage() {
   const [boardPickerExiting, setBoardPickerExiting] = useState(false)
   const [copyFeedback, setCopyFeedback] = useState<'hidden' | 'visible' | 'hiding'>('hidden')
   const [showDdNoControlAlert, setShowDdNoControlAlert] = useState(false)
+  const [boardPendingDelete, setBoardPendingDelete] = useState<Board | null>(null)
   const [boardTransitionExiting, setBoardTransitionExiting] = useState(false)
 
   const [pickerGame, setPickerGame] = useState<string | null>(null)
@@ -921,6 +923,7 @@ export default function HostPage() {
                         board={board}
                         globalSettings={settings}
                         onChange={handleBoardChange}
+                        onDelete={() => handleDeleteBoard(board.id)}
                         onClose={() => {
                           setEditing(false)
                           const current = useGameStore.getState().state
@@ -1224,7 +1227,7 @@ export default function HostPage() {
                           type="button"
                           className="board-picker-delete-btn"
                           title="Delete board"
-                          onClick={(e) => { e.stopPropagation(); handleDeleteBoard(b.id) }}
+                          onClick={(e) => { e.stopPropagation(); setBoardPendingDelete(b) }}
                         >
                           <Trash2 size={11} />
                         </button>
@@ -1327,6 +1330,20 @@ export default function HostPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {boardPendingDelete && (
+        <ConfirmModal
+          title="Delete board?"
+          message={`Permanently delete “${boardPendingDelete.name}”? This cannot be undone.`}
+          confirmLabel="Delete board"
+          danger
+          onConfirm={() => {
+            handleDeleteBoard(boardPendingDelete.id)
+            setBoardPendingDelete(null)
+          }}
+          onCancel={() => setBoardPendingDelete(null)}
+        />
       )}
     </div>
   )
