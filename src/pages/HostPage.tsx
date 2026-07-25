@@ -61,6 +61,7 @@ export default function HostPage() {
   const [editing, setEditing] = useState(false)
   const [activeBoard, setActiveBoard] = useState<Board | null>(null)
   const [showBoardPicker, setShowBoardPicker] = useState(false)
+  const [boardPickerExiting, setBoardPickerExiting] = useState(false)
   const [copyFeedback, setCopyFeedback] = useState<'hidden' | 'visible' | 'hiding'>('hidden')
   const [showDdNoControlAlert, setShowDdNoControlAlert] = useState(false)
   const [boardTransitionExiting, setBoardTransitionExiting] = useState(false)
@@ -682,15 +683,29 @@ export default function HostPage() {
     setNewGameName('')
     setEditingGameId(null)
     setEditingGameName('')
+    setBoardPickerExiting(false)
     setShowBoardPicker(true)
   }
 
   function closeBoardPicker() {
+    if (boardPickerExiting) return
+    setBoardPickerExiting(true)
+  }
+
+  function finishCloseBoardPicker() {
     setCreatingGame(false)
     setNewGameName('')
     setEditingGameId(null)
     setEditingGameName('')
+    setBoardPickerExiting(false)
     setShowBoardPicker(false)
+  }
+
+  function handleBoardPickerExitAnimationEnd(e: React.AnimationEvent<HTMLDivElement>) {
+    if (!boardPickerExiting) return
+    if (e.target !== e.currentTarget) return
+    if (e.animationName !== 'fadeSlideDown') return
+    finishCloseBoardPicker()
   }
 
   function commitNewGame() {
@@ -1011,10 +1026,19 @@ export default function HostPage() {
 
       {/* Board picker modal */}
       {showBoardPicker && (
-        <div className="board-picker-overlay">
-          <div className="panel modal-enter board-picker-modal">
+        <div
+          className={`board-picker-overlay${boardPickerExiting ? ' board-picker-overlay--exit' : ''}`}
+          onClick={closeBoardPicker}
+        >
+          <div
+            className={`panel board-picker-modal${boardPickerExiting ? ' modal-exit' : ' modal-enter'}`}
+            onClick={(e) => e.stopPropagation()}
+            onAnimationEnd={handleBoardPickerExitAnimationEnd}
+            role="dialog"
+            aria-labelledby="board-picker-title"
+          >
             <div className="board-picker-header">
-              <h2 className="board-picker-header__title">Select Board</h2>
+              <h2 id="board-picker-title" className="board-picker-header__title">Select Board</h2>
               <button
                 type="button"
                 className="board-picker-close"
