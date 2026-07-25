@@ -485,6 +485,30 @@ select:focus-visible {
 .modal-enter {
   animation: fadeSlideUp 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
+@keyframes fadeSlideDown {
+  0%   { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(14px) scale(0.97); }
+}
+.modal-exit {
+  animation: fadeSlideDown 0.18s ease-in forwards;
+  pointer-events: none;
+}
+.board-picker-overlay--exit {
+  animation: overlayFadeOut 0.18s ease-in forwards;
+  pointer-events: none;
+}
+
+.category-settings-toggles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+}
+
+@media (max-width: 640px) {
+  .category-settings-toggles {
+    grid-template-columns: 1fr;
+  }
+}
 
 /* Question overlay sidebar panels & status lines */
 @keyframes overlaySidebarIn {

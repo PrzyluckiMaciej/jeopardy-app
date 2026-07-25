@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Pencil, Trash2, Crown, Check, X, RefreshCw } from 'lucide-react'
 import type { GameSettings, Player, PlayerSyncStatus } from '../types'
 import { formatScore } from '../lib/utils'
+import SettingsToggle from './SettingsToggle'
 
 interface Props {
   settings: GameSettings
@@ -60,44 +61,44 @@ export default function SettingsPanel({
             Game settings
           </div>
           <div className="flex flex-col gap-4">
-            <Toggle
+            <SettingsToggle
               label="Point deduction"
               description="Wrong answers deduct the question value"
               value={settings.pointDeduction}
               onChange={() => toggle('pointDeduction')}
             />
-            <Toggle
+            <SettingsToggle
               label="Negative points"
               description="Deductions can reduce a score below zero"
               value={settings.allowNegativeScore}
               onChange={() => toggle('allowNegativeScore')}
               disabled={!settings.pointDeduction}
             />
-            <Toggle
+            <SettingsToggle
               label="Auto buzz queue"
               description="Players can buzz immediately after the clue is revealed"
               value={settings.autoBuzzQueue}
               onChange={() => toggle('autoBuzzQueue')}
             />
-            <Toggle
+            <SettingsToggle
               label="Blur clue on buzz"
               description="Blurs the clue when any player buzzes in"
               value={settings.blurClueOnBuzz}
               onChange={() => toggle('blurClueOnBuzz')}
             />
-            <Toggle
+            <SettingsToggle
               label="Pause media on buzz"
               description="Pauses audio or video when the first player buzzes in"
               value={settings.pauseMediaOnBuzz}
               onChange={() => toggle('pauseMediaOnBuzz')}
             />
-            <Toggle
+            <SettingsToggle
               label="Auto-reveal clue"
               description="Show the clue text to players as soon as a question opens"
               value={settings.autoRevealClue}
               onChange={() => toggle('autoRevealClue')}
             />
-            <Toggle
+            <SettingsToggle
               label="Auto-reveal media"
               description="Show attached media to players as soon as a question opens"
               value={settings.autoRevealMedia}
@@ -287,60 +288,6 @@ export default function SettingsPanel({
             </div>
           )}
         </div>
-      </div>
-    </div>
-  )
-}
-
-function Toggle({
-  label,
-  description,
-  value,
-  onChange,
-  disabled,
-}: {
-  label: string
-  description: string
-  value: boolean
-  onChange: () => void
-  disabled?: boolean
-}) {
-  return (
-    <div
-      role="switch"
-      aria-checked={value}
-      className={`settings-toggle${disabled ? ' settings-toggle--disabled' : ''}`}
-      onClick={disabled ? undefined : onChange}
-    >
-      <div className="flex-1 min-w-0">
-        <div className="font-condensed font-bold" style={{ fontSize: '1.0625rem', lineHeight: 1.3 }}>
-          {label}
-        </div>
-        <div
-          className="leading-relaxed"
-          style={{ color: '#6b7db3', fontSize: '0.9375rem', marginTop: 'var(--space-xs)' }}
-        >
-          {description}
-        </div>
-      </div>
-      <div
-        className="rounded-full relative transition-colors flex-shrink-0"
-        style={{
-          background: value ? 'var(--gold)' : 'var(--navy-light)',
-          width: 48,
-          height: 26,
-        }}
-      >
-        <div
-          className="absolute rounded-full transition-transform"
-          style={{
-            background: 'var(--navy-mid)',
-            width: 22,
-            height: 22,
-            top: 2,
-            left: value ? 'calc(100% - 24px)' : 2,
-          }}
-        />
       </div>
     </div>
   )

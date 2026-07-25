@@ -15,10 +15,22 @@ export interface Question {
   mediaType?: 'image' | 'audio' | 'video'
 }
 
+export interface CategorySettings {
+  autoBuzzQueue: boolean
+  blurClueOnBuzz: boolean
+  pauseMediaOnBuzz: boolean
+  autoRevealClue: boolean
+  autoRevealMedia: boolean
+}
+
 export interface Category {
   id: string
   name: string
   questions: Question[] // ordered by difficulty (index 0 = lowest points)
+  /** When true/undefined, use live global settings. Default: synced. */
+  syncSettingsWithGlobal?: boolean
+  /** Snapshot used when sync is off; updated when sync is turned on. */
+  settings?: CategorySettings
 }
 
 export interface Board {

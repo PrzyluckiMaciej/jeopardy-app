@@ -127,6 +127,13 @@ describe('createDefaultBoard', () => {
     })
   })
 
+  it('each category defaults to syncing settings with global', () => {
+    const board = createDefaultBoard()
+    board.categories.forEach((cat) => {
+      expect(cat.syncSettingsWithGlobal).toBe(true)
+    })
+  })
+
   it('sets pointValues array on the board', () => {
     const board = createDefaultBoard()
     expect(board.pointValues).toEqual([200, 400, 600, 800, 1000])
