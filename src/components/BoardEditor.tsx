@@ -252,7 +252,12 @@ export default function BoardEditor({ board, globalSettings, onChange, onClose }
       blob: file,
     })
     const mediaType = mimeTypeToMediaType(file.type)
-    updateQuestion(editingCell.categoryId, editingCell.questionId, { mediaId, mediaType })
+    const isAv = mediaType === 'audio' || mediaType === 'video'
+    updateQuestion(editingCell.categoryId, editingCell.questionId, {
+      mediaId,
+      mediaType,
+      autoplayMedia: isAv ? (activeQ.autoplayMedia ?? true) : undefined,
+    })
     const url = await blobToDataUrl(file)
     setMediaPreview(url)
   }
@@ -260,7 +265,11 @@ export default function BoardEditor({ board, globalSettings, onChange, onClose }
   async function removeMedia() {
     if (!editingCell || !activeQ?.mediaId) return
     await deleteMedia(activeQ.mediaId)
-    updateQuestion(editingCell.categoryId, editingCell.questionId, { mediaId: undefined, mediaType: undefined })
+    updateQuestion(editingCell.categoryId, editingCell.questionId, {
+      mediaId: undefined,
+      mediaType: undefined,
+      autoplayMedia: undefined,
+    })
     setMediaPreview(null)
     if (fileRef.current) fileRef.current.value = ''
   }
@@ -575,74 +584,103 @@ export default function BoardEditor({ board, globalSettings, onChange, onClose }
               >
                 Media attachment
               </label>
-              {mediaPreview ? (
-                <div className="relative">
-                  {activeQ.mediaId && (
-                    <>
-                      {mediaPreview.startsWith('data:image') && (
-                        <img
-                          src={mediaPreview}
-                          className="w-full rounded mb-2"
-                          style={{ maxHeight: 140, objectFit: 'contain' }}
-                        />
-                      )}
-                      {mediaPreview.startsWith('data:audio') && (
-                        <audio controls src={mediaPreview} className="w-full mb-2" />
-                      )}
-                      {mediaPreview.startsWith('data:video') && (
-                        <video
-                          controls
-                          src={mediaPreview}
-                          className="w-full rounded mb-2"
-                          style={{ maxHeight: 120 }}
-                        />
-                      )}
-                    </>
-                  )}
-                  <button
-                    className="btn-ghost text-xs w-full btn-with-icon justify-center"
-                    onClick={removeMedia}
-                    title="Remove attached media from this question"
+              <div className="board-editor-media-group">
+                {mediaPreview ? (
+                  <>
+                    {activeQ.mediaId && (
+                      <>
+                        {mediaPreview.startsWith('data:image') && (
+                          <img
+                            src={mediaPreview}
+                            className="w-full rounded"
+                            style={{ maxHeight: 140, objectFit: 'contain' }}
+                          />
+                        )}
+                        {mediaPreview.startsWith('data:audio') && (
+                          <audio controls src={mediaPreview} className="w-full" />
+                        )}
+                        {mediaPreview.startsWith('data:video') && (
+                          <video
+                            controls
+                            src={mediaPreview}
+                            className="w-full rounded"
+                            style={{ maxHeight: 120 }}
+                          />
+                        )}
+                      </>
+                    )}
+                    <button
+                      className="btn-ghost text-xs w-full btn-with-icon justify-center"
+                      onClick={removeMedia}
+                      title="Remove attached media from this question"
+                    >
+                      <Trash2 size={14} aria-hidden />
+                      <span>Remove</span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <input
+                      ref={fileRef}
+                      type="file"
+                      accept="image/*,audio/*,video/*"
+                      className="hidden"
+                      onChange={handleMediaUpload}
+                      id="media-upload"
+                    />
+                    <label
+                      htmlFor="media-upload"
+                      className="btn-ghost text-sm w-full btn-with-icon justify-center py-2 cursor-pointer"
+                      title="Attach an image, audio clip, or video to this question"
+                    >
+                      <Upload size={16} aria-hidden />
+                      <span>Attach media</span>
+                    </label>
+                  </>
+                )}
+                {(activeQ.mediaType === 'audio' ||
+                  activeQ.mediaType === 'video' ||
+                  mediaPreview?.startsWith('data:audio') ||
+                  mediaPreview?.startsWith('data:video')) && (
+                  <div
+                    className="board-editor-dd-toggle"
+                    role="switch"
+                    aria-checked={activeQ.autoplayMedia !== false}
+                    onClick={() =>
+                      updateQuestion(editingCell.categoryId, activeQ.id, {
+                        autoplayMedia: activeQ.autoplayMedia === false,
+                      })
+                    }
                   >
-                    <Trash2 size={14} aria-hidden />
-                    <span>Remove</span>
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    accept="image/*,audio/*,video/*"
-                    className="hidden"
-                    onChange={handleMediaUpload}
-                    id="media-upload"
-                  />
-                  <label
-                    htmlFor="media-upload"
-                    className="btn-ghost text-sm w-full btn-with-icon justify-center py-2 cursor-pointer"
-                    title="Attach an image, audio clip, or video to this question"
-                  >
-                    <Upload size={16} aria-hidden />
-                    <span>Attach media</span>
-                  </label>
-                </>
-              )}
+                    <div className="flex-1">
+                      <div className="font-condensed font-bold text-sm">Autoplay</div>
+                      <div className="text-xs" style={{ color: '#4a5580' }}>
+                        Start playing when media is revealed
+                      </div>
+                    </div>
+                    <div
+                      className="w-11 h-6 rounded-full relative transition-colors flex-shrink-0"
+                      style={{
+                        background:
+                          activeQ.autoplayMedia !== false ? 'var(--gold)' : 'var(--navy-light)',
+                      }}
+                    >
+                      <div
+                        className="absolute top-0.5 w-5 h-5 rounded-full transition-transform"
+                        style={{
+                          background: 'var(--navy-mid)',
+                          left:
+                            activeQ.autoplayMedia !== false ? 'calc(100% - 22px)' : '2px',
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div
               className="board-editor-dd-toggle"
-              style={{
-                background:
-                  draft.dailyDoubleQuestionId === activeQ.id
-                    ? 'rgba(212,160,23,0.15)'
-                    : 'var(--navy)',
-                border: `1px solid ${
-                  draft.dailyDoubleQuestionId === activeQ.id
-                    ? 'rgba(212,160,23,0.45)'
-                    : 'var(--navy-light)'
-                }`,
-              }}
               onClick={() => {
                 const isDD = draft.dailyDoubleQuestionId === activeQ.id
                 updateBoard({ dailyDoubleQuestionId: isDD ? undefined : activeQ.id })

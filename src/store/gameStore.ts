@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type { Board, Game, GameState, GameSettings, MediaPlaybackState, Player, Question } from '../types'
-import { initialMediaPlaybackForType } from '../types'
+import { initialMediaPlaybackForType, questionMediaAutoplay } from '../types'
 
 // ---- Board editor store (persisted) ----
 interface BoardStore {
@@ -265,7 +265,7 @@ export const useGameStore = create<GameStore>()(
               clueRevealed,
               mediaRevealed,
               mediaPlayback: mediaRevealed
-                ? initialMediaPlaybackForType(mediaType)
+                ? initialMediaPlaybackForType(mediaType, questionMediaAutoplay(question))
                 : null,
             },
           }
@@ -332,7 +332,10 @@ export const useGameStore = create<GameStore>()(
           state: {
             ...s.state,
             mediaRevealed: true,
-            mediaPlayback: initialMediaPlaybackForType(s.state.activeMedia?.type),
+            mediaPlayback: initialMediaPlaybackForType(
+              s.state.activeMedia?.type,
+              questionMediaAutoplay(s.state.activeQuestion?.question),
+            ),
           },
         })),
 
@@ -382,7 +385,10 @@ export const useGameStore = create<GameStore>()(
               clueRevealed: true,
               mediaRevealed,
               mediaPlayback: mediaRevealed && !s.state.mediaRevealed
-                ? initialMediaPlaybackForType(s.state.activeMedia?.type)
+                ? initialMediaPlaybackForType(
+                    s.state.activeMedia?.type,
+                    questionMediaAutoplay(s.state.activeQuestion?.question),
+                  )
                 : s.state.mediaPlayback,
             },
           }

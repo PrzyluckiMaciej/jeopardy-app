@@ -41,6 +41,10 @@ export async function duplicateBoard(source: Board): Promise<Board> {
             id: newQuestionId,
             mediaId,
             mediaType,
+            autoplayMedia:
+              mediaId && (mediaType === 'audio' || mediaType === 'video')
+                ? q.autoplayMedia
+                : undefined,
           }
         })
       )
