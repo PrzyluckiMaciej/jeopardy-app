@@ -47,8 +47,16 @@ export default function QuestionOverlay({ state, settings }: Props) {
   const gameplay = getCategoryGameplaySettings(category, settings)
   const hasClue = !!question.question.trim()
   const hasMedia = !!question.mediaId || !!activeMedia
-  const autoBuzzPending =
-    (gameplay.autoBuzzQueue && hasClue) || (gameplay.autoBuzzQueueOnMedia && hasMedia)
+  const autoBuzzOnClue = gameplay.autoBuzzQueue && hasClue
+  const autoBuzzOnMedia = gameplay.autoBuzzQueueOnMedia && hasMedia
+  const autoBuzzPending = autoBuzzOnClue || autoBuzzOnMedia
+  const autoBuzzHint = autoBuzzOnClue && autoBuzzOnMedia
+    ? 'Buzz queue opens automatically on clue or media reveal'
+    : autoBuzzOnClue
+      ? 'Buzz queue opens automatically on clue reveal'
+      : autoBuzzOnMedia
+        ? 'Buzz queue opens automatically on media reveal'
+        : null
 
   function handleStartBuzzing() {
     store.startBuzzing()
@@ -300,6 +308,16 @@ export default function QuestionOverlay({ state, settings }: Props) {
                 <Bell size={18} aria-hidden />
                 <span>Open buzzing</span>
               </button>
+            )}
+
+            {!isDD && phase === 'question' && autoBuzzHint && (
+              <div
+                className="flex items-start gap-2 text-sm font-condensed text-subtle"
+                role="status"
+              >
+                <Bell size={14} className="flex-shrink-0 mt-0.5 opacity-70" aria-hidden />
+                <span>{autoBuzzHint}</span>
+              </div>
             )}
 
             {!isDD && phase === 'buzzing' && (
