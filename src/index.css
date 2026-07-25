@@ -306,6 +306,20 @@ select:focus-visible {
 }
 .btn-ghost:hover { border-color: var(--border-emphasis); background: rgba(255,255,255,0.04); }
 
+.btn-danger {
+  background: var(--danger-muted);
+  color: #e07070;
+  border: 1.5px solid rgba(239, 68, 68, 0.4);
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+}
+.btn-danger:hover {
+  background: rgba(239, 68, 68, 0.28);
+  border-color: rgba(239, 68, 68, 0.55);
+  color: #f09090;
+}
+
 /* Icon + short label (Phase 5 toolbar / controls) */
 .btn-with-icon {
   display: inline-flex;
