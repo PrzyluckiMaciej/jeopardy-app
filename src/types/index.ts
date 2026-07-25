@@ -13,6 +13,8 @@ export interface Question {
   points: number
   mediaId?: string // reference to MediaAttachment in IndexedDB
   mediaType?: 'image' | 'audio' | 'video'
+  /** When false, audio/video stays paused on reveal. Default: true. */
+  autoplayMedia?: boolean
 }
 
 export interface CategorySettings {
@@ -70,10 +72,18 @@ export const INITIAL_MEDIA_PLAYBACK: MediaPlaybackState = {
   playbackRate: 1,
 }
 
+export function questionMediaAutoplay(question?: Pick<Question, 'autoplayMedia'> | null): boolean {
+  return question?.autoplayMedia !== false
+}
+
 export function initialMediaPlaybackForType(
   type?: 'image' | 'audio' | 'video',
+  autoplay = true,
 ): MediaPlaybackState | null {
-  return type === 'audio' || type === 'video' ? INITIAL_MEDIA_PLAYBACK : null
+  if (type !== 'audio' && type !== 'video') return null
+  return autoplay
+    ? INITIAL_MEDIA_PLAYBACK
+    : { paused: true, currentTime: 0, playbackRate: 1 }
 }
 
 export type GamePhase =

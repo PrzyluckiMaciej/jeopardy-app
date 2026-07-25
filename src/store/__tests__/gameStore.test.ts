@@ -192,6 +192,47 @@ describe('useGameStore', () => {
       useGameStore.getState().openCard('cat-1', makeQuestion())
       expect(useGameStore.getState().state.activeMedia).toBeNull()
     })
+
+    it('autoplays audio when media is revealed by default', () => {
+      useGameStore.getState().openCard(
+        'cat-1',
+        makeQuestion({ mediaType: 'audio' }),
+        'data:audio/mp3;base64,abc',
+        { media: true },
+      )
+      expect(useGameStore.getState().state.mediaPlayback).toEqual({
+        paused: false,
+        currentTime: 0,
+        playbackRate: 1,
+      })
+    })
+
+    it('keeps audio paused on reveal when autoplayMedia is false', () => {
+      useGameStore.getState().openCard(
+        'cat-1',
+        makeQuestion({ mediaType: 'audio', autoplayMedia: false }),
+        'data:audio/mp3;base64,abc',
+        { media: true },
+      )
+      expect(useGameStore.getState().state.mediaPlayback).toEqual({
+        paused: true,
+        currentTime: 0,
+        playbackRate: 1,
+      })
+    })
+  })
+
+  describe('revealMedia', () => {
+    it('respects autoplayMedia when revealing media after open', () => {
+      useGameStore.getState().openCard(
+        'cat-1',
+        makeQuestion({ mediaType: 'video', autoplayMedia: false }),
+        'data:video/mp4;base64,abc',
+      )
+      useGameStore.getState().revealMedia()
+      expect(useGameStore.getState().state.mediaRevealed).toBe(true)
+      expect(useGameStore.getState().state.mediaPlayback?.paused).toBe(true)
+    })
   })
 
   describe('closeCard', () => {

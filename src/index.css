@@ -929,6 +929,25 @@ select:focus-visible {
   padding: var(--space-md) var(--space-lg);
   border-radius: var(--radius-lg);
   cursor: pointer;
+  background: var(--navy);
+  border: 1px solid var(--navy-light);
+}
+
+.board-editor-media-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding: var(--space-md);
+  border-radius: var(--radius-lg);
+  background: var(--navy);
+  border: 1px solid var(--navy-light);
+}
+
+.board-editor-media-group .board-editor-dd-toggle {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
 }
 
 /* ── Board horizontal scroll with edge fade hint ────────────── */

@@ -403,6 +403,9 @@ export default function QuestionMediaPlayer({
     const category = s.state.board?.categories.find((c) => c.id === categoryId)
     return getCategoryGameplaySettings(category, s.settings).pauseMediaOnBuzz
   })
+  const shouldAutoplay = useGameStore((s) =>
+    s.state.activeQuestion?.question.autoplayMedia !== false,
+  )
   const buzzQueueLength = useGameStore((s) => s.state.buzzQueue.length)
 
   const [duration, setDuration] = useState(0)
@@ -611,6 +614,12 @@ export default function QuestionMediaPlayer({
       applyingRef.current = true
       el.playbackRate = 1
       el.currentTime = 0
+      if (!shouldAutoplay) {
+        el.pause()
+        applyingRef.current = false
+        if (!controller.signal.aborted) publishPlayback(el)
+        return
+      }
       el.play()
         .catch(() => {})
         .finally(() => {
@@ -626,7 +635,7 @@ export default function QuestionMediaPlayer({
     }
 
     return () => controller.abort()
-  }, [mountKey, media.dataUrl, media.type, isHost, mediaActive, publishPlayback])
+  }, [mountKey, media.dataUrl, media.type, isHost, mediaActive, publishPlayback, shouldAutoplay])
 
   useEffect(() => {
     if (media.type === 'image') return

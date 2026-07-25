@@ -5,7 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useGameStore } from '../store/gameStore'
 import * as net from '../lib/network'
 import type { NetMessage, Player } from '../types'
-import { initialMediaPlaybackForType } from '../types'
+import { initialMediaPlaybackForType, questionMediaAutoplay } from '../types'
 import { generateId, formatScore } from '../lib/utils'
 import { getCategoryGameplaySettings } from '../lib/settings'
 import { logEvent } from '../lib/logger'
@@ -109,7 +109,10 @@ export default function PlayerPage() {
         mediaPlayback?: ReturnType<typeof initialMediaPlaybackForType>
       } = { activeMedia }
       if (currentState.mediaRevealed) {
-        patch.mediaPlayback = initialMediaPlaybackForType(activeMedia.type)
+        patch.mediaPlayback = initialMediaPlaybackForType(
+          activeMedia.type,
+          questionMediaAutoplay(question),
+        )
       }
       patchState(patch)
       setMediaLoading(false)
@@ -160,7 +163,10 @@ export default function PlayerPage() {
           clueRevealed: msg.clueRevealed ?? false,
           mediaRevealed: msg.mediaRevealed ?? false,
           mediaPlayback: msg.mediaRevealed
-            ? initialMediaPlaybackForType(activeMedia?.type ?? msg.question.mediaType)
+            ? initialMediaPlaybackForType(
+                activeMedia?.type ?? msg.question.mediaType,
+                questionMediaAutoplay(msg.question),
+              )
             : null,
         })
       }
@@ -232,7 +238,10 @@ export default function PlayerPage() {
           ...(activeMedia && !current.activeMedia ? { activeMedia } : {}),
           mediaRevealed,
           mediaPlayback: mediaRevealed && !wasMediaRevealed
-            ? initialMediaPlaybackForType(activeMedia?.type ?? current.activeMedia?.type)
+            ? initialMediaPlaybackForType(
+                activeMedia?.type ?? current.activeMedia?.type,
+                questionMediaAutoplay(question),
+              )
             : current.mediaPlayback,
         })
       }
@@ -259,6 +268,7 @@ export default function PlayerPage() {
           mediaRevealed: true,
           mediaPlayback: initialMediaPlaybackForType(
             activeMedia?.type ?? current.activeMedia?.type,
+            questionMediaAutoplay(question),
           ),
         })
       }
