@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Check, X, ArrowLeft, CheckCircle, Bell, Eye } from 'lucide-react'
 import type { GameState, GameSettings } from '../types'
 import { cellId, formatScore } from '../lib/utils'
+import { getCategoryGameplaySettings } from '../lib/settings'
 import * as net from '../lib/network'
 import { useGameStore } from '../store/gameStore'
 import { logEvent } from '../lib/logger'
@@ -42,6 +43,8 @@ export default function QuestionOverlay({ state, settings }: Props) {
   const { question, categoryId } = activeQuestion
   const isDD = dailyDouble !== null
   const ddPlayer = isDD ? players.find(p => p.id === dailyDouble.playerId) : null
+  const category = state.board?.categories.find(c => c.id === categoryId)
+  const gameplay = getCategoryGameplaySettings(category, settings)
 
   function handleStartBuzzing() {
     store.startBuzzing()
@@ -88,7 +91,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
 
   function handleRevealDailyDoubleClue() {
     pendingDdAction.current = () => {
-      const revealMedia = settings.autoRevealMedia
+      const revealMedia = gameplay.autoRevealMedia
       store.revealDailyDoubleClue(revealMedia)
       const { mediaRevealed } = useGameStore.getState().state
       net.broadcast({ type: 'DAILY_DOUBLE_REVEAL_CLUE', mediaRevealed })
@@ -99,7 +102,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
   function handleRevealClue() {
     store.revealClue()
     net.broadcast({ type: 'REVEAL_CLUE' })
-    if (settings.autoBuzzQueue && !isDD) {
+    if (gameplay.autoBuzzQueue && !isDD) {
       store.startBuzzing()
       net.broadcast({ type: 'START_BUZZING' })
     }
@@ -132,7 +135,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
     setOverlayExiting(true)
   }
 
-  const categoryName = state.board?.categories.find(c => c.id === categoryId)?.name ?? ''
+  const categoryName = category?.name ?? ''
   const showClue = phase === 'question' || phase === 'buzzing' || phase === 'revealed'
 
   return (
@@ -277,7 +280,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
               </div>
             )}
 
-            {!isDD && phase === 'question' && !settings.autoBuzzQueue && clueRevealed && (
+            {!isDD && phase === 'question' && !gameplay.autoBuzzQueue && clueRevealed && (
               <button
                 type="button"
                 className="btn-gold w-full py-3 btn-with-icon justify-center"

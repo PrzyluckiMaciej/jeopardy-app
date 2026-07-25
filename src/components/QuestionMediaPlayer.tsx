@@ -3,6 +3,7 @@ import { Pause, Play, RotateCw, Volume2, VolumeX } from 'lucide-react'
 import type { MediaPlaybackState } from '../types'
 import * as net from '../lib/network'
 import { useGameStore } from '../store/gameStore'
+import { getCategoryGameplaySettings } from '../lib/settings'
 
 const VOLUME_STORAGE_KEY = 'jeopardy-media-volume'
 const SPEED_OPTIONS = [0.5, 1, 1.25, 1.5, 2] as const
@@ -397,7 +398,11 @@ export default function QuestionMediaPlayer({
   const lastPlaybackRef = useRef<MediaPlaybackState | null>(playback)
   const prevBuzzQueueLengthRef = useRef<number | null>(null)
   const setMediaPlayback = useGameStore((s) => s.setMediaPlayback)
-  const pauseMediaOnBuzz = useGameStore((s) => s.settings.pauseMediaOnBuzz)
+  const pauseMediaOnBuzz = useGameStore((s) => {
+    const categoryId = s.state.activeQuestion?.categoryId
+    const category = s.state.board?.categories.find((c) => c.id === categoryId)
+    return getCategoryGameplaySettings(category, s.settings).pauseMediaOnBuzz
+  })
   const buzzQueueLength = useGameStore((s) => s.state.buzzQueue.length)
 
   const [duration, setDuration] = useState(0)

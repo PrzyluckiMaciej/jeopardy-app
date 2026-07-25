@@ -7,6 +7,7 @@ import * as net from '../lib/network'
 import type { NetMessage, Player } from '../types'
 import { initialMediaPlaybackForType } from '../types'
 import { generateId, formatScore } from '../lib/utils'
+import { getCategoryGameplaySettings } from '../lib/settings'
 import { logEvent } from '../lib/logger'
 import { setCachedMedia, resolveActiveMedia, clearCache } from '../lib/mediaCache'
 import GameBoard from '../components/GameBoard'
@@ -450,7 +451,9 @@ export default function PlayerPage() {
       ? state.buzzQueue.length + 1
       : 0
   const activeQ = state.activeQuestion?.question
-  const categoryName = state.board?.categories.find(c => c.id === state.activeQuestion?.categoryId)?.name ?? ''
+  const activeCategory = state.board?.categories.find(c => c.id === state.activeQuestion?.categoryId)
+  const categoryName = activeCategory?.name ?? ''
+  const gameplay = getCategoryGameplaySettings(activeCategory, settings)
   const showOverlay = ['question', 'buzzing', 'revealed', 'dailyDouble', 'dailyDoubleBet'].includes(state.phase) && !!state.activeQuestion?.question
 
   // Board transition splash — refs updated during render; exit triggered when synced title clears
@@ -493,7 +496,7 @@ export default function PlayerPage() {
   const displayMediaRevealed = overlayExiting ? lastMediaRevealed.current : state.mediaRevealed
   const isDDPlayer = state.dailyDouble?.playerId === myId
   const ddPlayerInfo = state.dailyDouble ? state.players.find(p => p.id === state.dailyDouble!.playerId) : null
-  const clueBlurred = settings.blurClueOnBuzz && uiPhase === 'buzzing' && state.buzzQueue.length > 0
+  const clueBlurred = gameplay.blurClueOnBuzz && uiPhase === 'buzzing' && state.buzzQueue.length > 0
   const questionHasMedia = !!(displayQ?.mediaId || displayMedia || mediaLoading)
   const buzzingOpen = uiPhase === 'buzzing'
   const canShowBuzzDock =

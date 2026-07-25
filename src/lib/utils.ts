@@ -40,6 +40,7 @@ export function createDefaultBoard(): import('../types').Board {
     categories: Array.from({ length: 6 }, (_, ci) => ({
       id: generateId(),
       name: `Category ${ci + 1}`,
+      syncSettingsWithGlobal: true,
       questions: pointValues.map((points) => ({
         id: generateId(),
         question: '',

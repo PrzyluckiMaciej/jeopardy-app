@@ -10,14 +10,17 @@ import {
   HelpCircle,
   Save,
   LogOut,
+  Settings,
 } from 'lucide-react'
-import type { Board, Category, Question } from '../types'
+import type { Board, Category, GameSettings, Question } from '../types'
 import { generateId } from '../lib/utils'
 import { saveMedia, deleteMedia, getMedia, blobToDataUrl } from '../lib/db'
 import { mimeTypeToMediaType, type MediaType } from '../lib/mediaType'
+import CategorySettingsModal from './CategorySettingsModal'
 
 interface Props {
   board: Board
+  globalSettings: GameSettings
   onChange: (board: Board) => void
   onClose: () => void
 }
@@ -27,13 +30,14 @@ interface EditingCell {
   questionId: string
 }
 
-export default function BoardEditor({ board, onChange, onClose }: Props) {
+export default function BoardEditor({ board, globalSettings, onChange, onClose }: Props) {
   const [draft, setDraft] = useState<Board>(board)
   const [dirty, setDirty] = useState(false)
   const [showExitConfirm, setShowExitConfirm] = useState(false)
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null)
   const [panelExiting, setPanelExiting] = useState(false)
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
+  const [settingsCategoryId, setSettingsCategoryId] = useState<string | null>(null)
   const [mediaPreview, setMediaPreview] = useState<string | null>(null)
   const [editingRowPts, setEditingRowPts] = useState<number | null>(null)
   const [editingRowText, setEditingRowText] = useState('')
@@ -158,6 +162,7 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
     const newCat: Category = {
       id: generateId(),
       name: 'New Category',
+      syncSettingsWithGlobal: true,
       questions: draft.pointValues.map((pts) => ({
         id: generateId(),
         question: '',
@@ -347,6 +352,25 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                   </div>
                 )}
                 <button
+                  type="button"
+                  className="absolute top-1 left-1 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:brightness-75"
+                  style={{
+                    background: 'var(--navy-light)',
+                    color: 'var(--gold)',
+                    border: '1px solid rgba(212,175,55,0.35)',
+                    transition: 'opacity 150ms, filter 150ms',
+                  }}
+                  title="Category settings"
+                  aria-label={`Settings for ${cat.name}`}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setSettingsCategoryId(cat.id)
+                  }}
+                >
+                  <Settings size={11} aria-hidden />
+                </button>
+                <button
+                  type="button"
                   className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:brightness-75"
                   style={{
                     background: 'var(--red)',
@@ -354,9 +378,11 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
                     border: 'none',
                     transition: 'opacity 150ms, filter 150ms',
                   }}
+                  title="Delete category"
+                  aria-label={`Delete ${cat.name}`}
                   onClick={() => removeCategory(cat.id)}
                 >
-                  <Trash2 size={11} />
+                  <Trash2 size={11} aria-hidden />
                 </button>
               </div>
             ))}
@@ -648,6 +674,19 @@ export default function BoardEditor({ board, onChange, onClose }: Props) {
           </div>
         )}
       </div>
+
+      {settingsCategoryId && (() => {
+        const settingsCat = draft.categories.find((c) => c.id === settingsCategoryId)
+        if (!settingsCat) return null
+        return (
+          <CategorySettingsModal
+            category={settingsCat}
+            globalSettings={globalSettings}
+            onChange={(patch) => updateCategory(settingsCat.id, patch)}
+            onClose={() => setSettingsCategoryId(null)}
+          />
+        )
+      })()}
 
       {showExitConfirm && (
         <div

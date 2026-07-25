@@ -5,6 +5,7 @@ import { useGameStore, useBoardStore } from '../store/gameStore'
 import * as net from '../lib/network'
 import type { Board, Player, NetMessage, Question, GameSettings, PlayerSyncStatus } from '../types'
 import { createDefaultBoard, cellId } from '../lib/utils'
+import { getCategoryGameplaySettings } from '../lib/settings'
 import { duplicateBoard } from '../lib/duplicateBoard'
 import { getMedia, blobToDataUrl } from '../lib/db'
 import { logEvent } from '../lib/logger'
@@ -591,11 +592,13 @@ export default function HostPage() {
       startDailyDouble(ddPlayerId)
       net.broadcast({ type: 'DAILY_DOUBLE_REVEAL', playerId: ddPlayerId, categoryId, question })
     } else {
-      const clueRevealed = settings.autoRevealClue
-      const mediaRevealed = settings.autoRevealMedia
+      const category = currentBoard?.categories.find((c) => c.id === categoryId)
+      const catSettings = getCategoryGameplaySettings(category, settings)
+      const clueRevealed = catSettings.autoRevealClue
+      const mediaRevealed = catSettings.autoRevealMedia
       openCard(categoryId, question, mediaDataUrl, { clue: clueRevealed, media: mediaRevealed })
       net.broadcast({ type: 'OPEN_CARD', categoryId, question, clueRevealed, mediaRevealed })
-      if (settings.autoBuzzQueue && clueRevealed) {
+      if (catSettings.autoBuzzQueue && clueRevealed) {
         store.startBuzzing()
         net.broadcast({ type: 'START_BUZZING' })
       }
@@ -893,12 +896,17 @@ export default function HostPage() {
                   {/* Board — grows to fill space above scoreboard */}
                   <div className="board-scroll-wrap">
                     {editing && board ? (
-                      <BoardEditor board={board} onChange={handleBoardChange} onClose={() => {
-                        setEditing(false)
-                        const current = useGameStore.getState().state
-                        net.broadcast({ type: 'SYNC_STATE', state: current })
-                        if (board) void startPreTransferMedia(collectBoardMediaIds(board), false)
-                      }} />
+                      <BoardEditor
+                        board={board}
+                        globalSettings={settings}
+                        onChange={handleBoardChange}
+                        onClose={() => {
+                          setEditing(false)
+                          const current = useGameStore.getState().state
+                          net.broadcast({ type: 'SYNC_STATE', state: current })
+                          if (board) void startPreTransferMedia(collectBoardMediaIds(board), false)
+                        }}
+                      />
                     ) : board ? (
                       <GameBoard
                         board={board}
