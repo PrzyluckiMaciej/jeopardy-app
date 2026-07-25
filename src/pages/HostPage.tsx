@@ -594,11 +594,14 @@ export default function HostPage() {
     } else {
       const category = currentBoard?.categories.find((c) => c.id === categoryId)
       const catSettings = getCategoryGameplaySettings(category, settings)
-      const clueRevealed = catSettings.autoRevealClue
+      const hasClue = !!question.question.trim()
+      // Empty clue: nothing to reveal — skip straight to open-buzzing controls
+      // (do not auto-open buzz queue even if that setting is on).
+      const clueRevealed = !hasClue || catSettings.autoRevealClue
       const mediaRevealed = catSettings.autoRevealMedia
       openCard(categoryId, question, mediaDataUrl, { clue: clueRevealed, media: mediaRevealed })
       net.broadcast({ type: 'OPEN_CARD', categoryId, question, clueRevealed, mediaRevealed })
-      if (catSettings.autoBuzzQueue && clueRevealed) {
+      if (hasClue && catSettings.autoBuzzQueue && clueRevealed) {
         store.startBuzzing()
         net.broadcast({ type: 'START_BUZZING' })
       }

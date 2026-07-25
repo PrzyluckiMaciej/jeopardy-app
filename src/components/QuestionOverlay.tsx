@@ -45,6 +45,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
   const ddPlayer = isDD ? players.find(p => p.id === dailyDouble.playerId) : null
   const category = state.board?.categories.find(c => c.id === categoryId)
   const gameplay = getCategoryGameplaySettings(category, settings)
+  const hasClue = !!question.question.trim()
 
   function handleStartBuzzing() {
     store.startBuzzing()
@@ -280,7 +281,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
               </div>
             )}
 
-            {!isDD && phase === 'question' && !gameplay.autoBuzzQueue && clueRevealed && (
+            {!isDD && phase === 'question' && (clueRevealed || !hasClue) && (!gameplay.autoBuzzQueue || !hasClue) && (
               <button
                 type="button"
                 className="btn-gold w-full py-3 btn-with-icon justify-center"
@@ -298,7 +299,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
               </div>
             )}
 
-            {showClue && !clueRevealed && (
+            {showClue && hasClue && !clueRevealed && (
               <button
                 type="button"
                 className="btn-outline w-full btn-with-icon justify-center"
