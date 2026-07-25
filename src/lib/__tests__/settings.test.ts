@@ -99,7 +99,8 @@ describe('getCategoryGameplaySettings', () => {
   })
 
   it('fills in new gameplay fields missing from older category snapshots', () => {
-    const { autoBuzzQueueOnMedia: _omit, ...legacy } = categorySettingsFromGlobal(globalOff)
+    const legacy: Partial<CategorySettings> = { ...categorySettingsFromGlobal(globalOff) }
+    delete legacy.autoBuzzQueueOnMedia
     expect(
       getCategoryGameplaySettings(
         category({ syncSettingsWithGlobal: false, settings: legacy as CategorySettings }),
