@@ -96,9 +96,21 @@ export default function BoardEditor({ board, globalSettings, onChange, onClose }
   }, [board.id])
 
   function saveDraft() {
-    onChange(draftRef.current)
+    onChangeRef.current(draftRef.current)
     setDirty(false)
   }
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault()
+        onChangeRef.current(draftRef.current)
+        setDirty(false)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   function requestExit() {
     if (!dirty) {
@@ -298,7 +310,7 @@ export default function BoardEditor({ board, globalSettings, onChange, onClose }
             className="btn-gold text-sm btn-with-icon"
             onClick={saveDraft}
             disabled={!dirty}
-            title="Save board"
+            title="Save board (Ctrl+S)"
           >
             <Save size={16} aria-hidden />
             <span>Save</span>
