@@ -2,12 +2,13 @@ import {
   categorySettingsFromGlobal,
   getCategoryGameplaySettings,
 } from '../settings'
-import type { Category, GameSettings } from '../../types'
+import type { Category, CategorySettings, GameSettings } from '../../types'
 
 const globalOn: GameSettings = {
   pointDeduction: true,
   allowNegativeScore: true,
   autoBuzzQueue: true,
+  autoBuzzQueueOnMedia: true,
   blurClueOnBuzz: true,
   pauseMediaOnBuzz: true,
   autoRevealClue: true,
@@ -18,6 +19,7 @@ const globalOff: GameSettings = {
   pointDeduction: false,
   allowNegativeScore: false,
   autoBuzzQueue: false,
+  autoBuzzQueueOnMedia: false,
   blurClueOnBuzz: false,
   pauseMediaOnBuzz: false,
   autoRevealClue: false,
@@ -34,9 +36,10 @@ function category(partial: Partial<Category> = {}): Category {
 }
 
 describe('categorySettingsFromGlobal', () => {
-  it('copies only the five gameplay fields', () => {
+  it('copies only the gameplay fields', () => {
     expect(categorySettingsFromGlobal(globalOn)).toEqual({
       autoBuzzQueue: true,
+      autoBuzzQueueOnMedia: true,
       blurClueOnBuzz: true,
       pauseMediaOnBuzz: true,
       autoRevealClue: true,
@@ -93,5 +96,15 @@ describe('getCategoryGameplaySettings', () => {
     const cat = category({ syncSettingsWithGlobal: true })
     expect(getCategoryGameplaySettings(cat, globalOff).autoBuzzQueue).toBe(false)
     expect(getCategoryGameplaySettings(cat, globalOn).autoBuzzQueue).toBe(true)
+  })
+
+  it('fills in new gameplay fields missing from older category snapshots', () => {
+    const { autoBuzzQueueOnMedia: _omit, ...legacy } = categorySettingsFromGlobal(globalOff)
+    expect(
+      getCategoryGameplaySettings(
+        category({ syncSettingsWithGlobal: false, settings: legacy as CategorySettings }),
+        globalOn,
+      ).autoBuzzQueueOnMedia,
+    ).toBe(true)
   })
 })

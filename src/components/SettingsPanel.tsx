@@ -75,10 +75,16 @@ export default function SettingsPanel({
               disabled={!settings.pointDeduction}
             />
             <SettingsToggle
-              label="Auto buzz queue"
+              label="Auto buzz queue on clue"
               description="Players can buzz immediately after the clue is revealed"
               value={settings.autoBuzzQueue}
               onChange={() => toggle('autoBuzzQueue')}
+            />
+            <SettingsToggle
+              label="Auto buzz queue on media"
+              description="Players can buzz immediately after the media is revealed"
+              value={settings.autoBuzzQueueOnMedia}
+              onChange={() => toggle('autoBuzzQueueOnMedia')}
             />
             <SettingsToggle
               label="Blur clue on buzz"

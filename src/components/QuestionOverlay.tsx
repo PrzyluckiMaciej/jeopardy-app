@@ -46,6 +46,9 @@ export default function QuestionOverlay({ state, settings }: Props) {
   const category = state.board?.categories.find(c => c.id === categoryId)
   const gameplay = getCategoryGameplaySettings(category, settings)
   const hasClue = !!question.question.trim()
+  const hasMedia = !!question.mediaId || !!activeMedia
+  const autoBuzzPending =
+    (gameplay.autoBuzzQueue && hasClue) || (gameplay.autoBuzzQueueOnMedia && hasMedia)
 
   function handleStartBuzzing() {
     store.startBuzzing()
@@ -103,7 +106,8 @@ export default function QuestionOverlay({ state, settings }: Props) {
   function handleRevealClue() {
     store.revealClue()
     net.broadcast({ type: 'REVEAL_CLUE' })
-    if (gameplay.autoBuzzQueue && !isDD) {
+    // Only open once — skip if media reveal already started buzzing
+    if (gameplay.autoBuzzQueue && !isDD && phase === 'question') {
       store.startBuzzing()
       net.broadcast({ type: 'START_BUZZING' })
     }
@@ -112,6 +116,11 @@ export default function QuestionOverlay({ state, settings }: Props) {
   function handleRevealMedia() {
     store.revealMedia()
     net.broadcast({ type: 'REVEAL_MEDIA' })
+    // Only open once — skip if clue reveal already started buzzing
+    if (gameplay.autoBuzzQueueOnMedia && !isDD && phase === 'question') {
+      store.startBuzzing()
+      net.broadcast({ type: 'START_BUZZING' })
+    }
   }
 
   function handleReveal() {
@@ -281,7 +290,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
               </div>
             )}
 
-            {!isDD && phase === 'question' && (clueRevealed || !hasClue) && (!gameplay.autoBuzzQueue || !hasClue) && (
+            {!isDD && phase === 'question' && (clueRevealed || !hasClue) && !autoBuzzPending && (
               <button
                 type="button"
                 className="btn-gold w-full py-3 btn-with-icon justify-center"

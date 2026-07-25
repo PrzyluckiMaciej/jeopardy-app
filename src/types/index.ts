@@ -19,6 +19,7 @@ export interface Question {
 
 export interface CategorySettings {
   autoBuzzQueue: boolean
+  autoBuzzQueueOnMedia: boolean
   blurClueOnBuzz: boolean
   pauseMediaOnBuzz: boolean
   autoRevealClue: boolean
@@ -149,6 +150,7 @@ export interface GameSettings {
   pointDeduction: boolean
   allowNegativeScore: boolean
   autoBuzzQueue: boolean
+  autoBuzzQueueOnMedia: boolean
   blurClueOnBuzz: boolean
   pauseMediaOnBuzz: boolean
   autoRevealClue: boolean

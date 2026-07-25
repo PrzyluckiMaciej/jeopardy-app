@@ -110,10 +110,16 @@ export default function CategorySettingsModal({
 
         <div className="category-settings-toggles">
           <SettingsToggle
-            label="Auto buzz queue"
+            label="Auto buzz queue on clue"
             description="Players can buzz immediately after the clue is revealed"
             value={effective.autoBuzzQueue}
             onChange={() => toggleSetting('autoBuzzQueue')}
+          />
+          <SettingsToggle
+            label="Auto buzz queue on media"
+            description="Players can buzz immediately after the media is revealed"
+            value={effective.autoBuzzQueueOnMedia}
+            onChange={() => toggleSetting('autoBuzzQueueOnMedia')}
           />
           <SettingsToggle
             label="Blur clue on buzz"
