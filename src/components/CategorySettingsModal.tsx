@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { X } from 'lucide-react'
 import type { Category, CategorySettings, GameSettings } from '../types'
 import {
@@ -26,8 +27,21 @@ export default function CategorySettingsModal({
   onChange,
   onClose,
 }: Props) {
+  const [exiting, setExiting] = useState(false)
   const synced = category.syncSettingsWithGlobal !== false
   const effective = getCategoryGameplaySettings(category, globalSettings)
+
+  function requestClose() {
+    if (exiting) return
+    setExiting(true)
+  }
+
+  function handleExitAnimationEnd(e: React.AnimationEvent<HTMLDivElement>) {
+    if (!exiting) return
+    if (e.target !== e.currentTarget) return
+    if (e.animationName !== 'fadeSlideDown') return
+    onClose()
+  }
 
   function setSync(enabled: boolean) {
     if (enabled) {
@@ -52,11 +66,15 @@ export default function CategorySettingsModal({
   }
 
   return (
-    <div className="board-picker-overlay" onClick={onClose}>
+    <div
+      className={`board-picker-overlay${exiting ? ' board-picker-overlay--exit' : ''}`}
+      onClick={requestClose}
+    >
       <div
-        className="panel modal-enter flex flex-col gap-6 max-w-md w-full"
+        className={`panel flex flex-col gap-6 max-w-2xl w-full${exiting ? ' modal-exit' : ' modal-enter'}`}
         style={{ maxHeight: '90vh', overflow: 'auto' }}
         onClick={(e) => e.stopPropagation()}
+        onAnimationEnd={handleExitAnimationEnd}
         role="dialog"
         aria-labelledby="category-settings-title"
       >
@@ -76,7 +94,7 @@ export default function CategorySettingsModal({
           <button
             type="button"
             className="board-picker-close"
-            onClick={onClose}
+            onClick={requestClose}
             aria-label="Close category settings"
           >
             <X size={18} aria-hidden />
@@ -90,7 +108,7 @@ export default function CategorySettingsModal({
           onChange={() => setSync(!synced)}
         />
 
-        <div className="flex flex-col gap-4">
+        <div className="category-settings-toggles">
           <SettingsToggle
             label="Auto buzz queue"
             description="Players can buzz immediately after the clue is revealed"
