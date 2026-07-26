@@ -197,24 +197,24 @@ export const useBoardStore = create<BoardStore>()(
       },
       deleteFolder: (id) =>
         set((s) => {
-          const folder = s.folders.find((f) => f.id === id)
-          if (!folder) return s
-          const parentId = folder.parentId
-          let nextFolders = s.folders.filter((f) => f.id !== id)
-          const toPromote = s.folders.filter((f) => f.parentId === id)
-          for (const child of toPromote) {
-            const uniqueName = uniqueFolderName(nextFolders, parentId, child.name, child.id)
-            nextFolders = nextFolders.map((f) =>
-              f.id === child.id
-                ? { ...f, parentId, name: uniqueName, updatedAt: Date.now() }
-                : f
-            )
-          }
+          if (!s.folders.some((f) => f.id === id)) return s
+          const folderIdsToDelete = new Set(
+            s.folders
+              .filter((f) => f.id === id || isDescendantFolder(s.folders, f.id, id))
+              .map((f) => f.id),
+          )
+          const boardIdsToDelete = new Set(
+            s.boards
+              .filter((b) => b.folderId != null && folderIdsToDelete.has(b.folderId))
+              .map((b) => b.id),
+          )
           return {
-            folders: nextFolders,
-            boards: s.boards.map((b) =>
-              b.folderId === id ? { ...b, folderId: parentId, updatedAt: Date.now() } : b
-            ),
+            folders: s.folders.filter((f) => !folderIdsToDelete.has(f.id)),
+            boards: s.boards.filter((b) => !boardIdsToDelete.has(b.id)),
+            games: s.games.map((g) => ({
+              ...g,
+              boardIds: g.boardIds.filter((bid) => !boardIdsToDelete.has(bid)),
+            })),
           }
         }),
       moveBoardToFolder: (boardId, folderId) =>

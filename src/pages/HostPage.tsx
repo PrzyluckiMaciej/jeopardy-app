@@ -1416,7 +1416,7 @@ export default function HostPage() {
       {folderPendingDelete && (
         <ConfirmModal
           title="Delete folder?"
-          message={`Remove “${folderPendingDelete.name}”? Boards and folders inside will move up to the parent folder.`}
+          message={`Remove “${folderPendingDelete.name}”? All boards and folders inside will be deleted as well.`}
           confirmLabel="Delete folder"
           danger
           onConfirm={() => {

@@ -144,27 +144,28 @@ describe('useBoardStore', () => {
       expect(useBoardStore.getState().folders.find((f) => f.id === twin)?.parentId).toBe(dest)
     })
 
-    it('uniquifies promoted children when deleting a folder', () => {
-      const root = useBoardStore.getState().createFolder('Root')
-      useBoardStore.getState().createFolder('Clash', root)
-      const mid = useBoardStore.getState().createFolder('Mid', root)
-      const nested = useBoardStore.getState().createFolder('Clash', mid)
-      useBoardStore.getState().deleteFolder(mid)
-      expect(useBoardStore.getState().folders.find((f) => f.id === nested)?.parentId).toBe(root)
-      expect(useBoardStore.getState().folders.find((f) => f.id === nested)?.name).toBe('Clash (2)')
-    })
-
-    it('deletes a folder and reparents children to its parent', () => {
+    it('deletes a folder and all nested folders and boards', () => {
       const rootId = useBoardStore.getState().createFolder('Root')
       const midId = useBoardStore.getState().createFolder('Mid', rootId)
       const nestedId = useBoardStore.getState().createFolder('Nested', midId)
       useBoardStore.getState().saveBoard(makeBoard({ id: 'b1', folderId: midId }))
+      useBoardStore.getState().saveBoard(makeBoard({ id: 'b2', folderId: nestedId }))
+      useBoardStore.getState().saveBoard(makeBoard({ id: 'b3', folderId: rootId }))
+      useBoardStore.getState().createGame('G')
+      const gameId = useBoardStore.getState().games[0].id
+      useBoardStore.getState().addBoardToGame(gameId, 'b1')
+      useBoardStore.getState().addBoardToGame(gameId, 'b3')
 
       useBoardStore.getState().deleteFolder(midId)
 
-      expect(useBoardStore.getState().folders.find((f) => f.id === midId)).toBeUndefined()
-      expect(useBoardStore.getState().folders.find((f) => f.id === nestedId)?.parentId).toBe(rootId)
-      expect(useBoardStore.getState().boards.find((b) => b.id === 'b1')?.folderId).toBe(rootId)
+      const state = useBoardStore.getState()
+      expect(state.folders.find((f) => f.id === midId)).toBeUndefined()
+      expect(state.folders.find((f) => f.id === nestedId)).toBeUndefined()
+      expect(state.folders.find((f) => f.id === rootId)).toBeDefined()
+      expect(state.boards.find((b) => b.id === 'b1')).toBeUndefined()
+      expect(state.boards.find((b) => b.id === 'b2')).toBeUndefined()
+      expect(state.boards.find((b) => b.id === 'b3')?.folderId).toBe(rootId)
+      expect(state.games[0].boardIds).toEqual(['b3'])
     })
 
     it('moves a board into a folder', () => {
