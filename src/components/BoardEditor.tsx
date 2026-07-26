@@ -308,15 +308,6 @@ export default function BoardEditor({ board, globalSettings, onChange, onClose, 
 
         <div className="board-editor-toolbar__right">
           <button
-            className="btn-gold text-sm btn-with-icon"
-            onClick={saveDraft}
-            disabled={!dirty}
-            title="Save board (Ctrl+S)"
-          >
-            <Save size={16} aria-hidden />
-            <span>Save</span>
-          </button>
-          <button
             className="btn-ghost text-sm btn-with-icon"
             style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}
             onClick={onDelete}
@@ -324,6 +315,15 @@ export default function BoardEditor({ board, globalSettings, onChange, onClose, 
           >
             <Trash2 size={16} aria-hidden />
             <span>Delete</span>
+          </button>
+          <button
+            className="btn-gold text-sm btn-with-icon"
+            onClick={saveDraft}
+            disabled={!dirty}
+            title="Save board (Ctrl+S)"
+          >
+            <Save size={16} aria-hidden />
+            <span>Save</span>
           </button>
           <button
             className="btn-ghost text-sm btn-with-icon"
