@@ -1480,6 +1480,13 @@ select:focus-visible {
   padding: var(--space-lg);
   color: #4a5580;
 }
+.board-picker-hint {
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: #4a5580;
+  margin: 0 0 var(--space-sm);
+  flex-shrink: 0;
+}
 
 /* ── Board picker tree / folders ────────────────────────────── */
 .board-picker-tree {

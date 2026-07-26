@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
-import { Settings, Trash2, Pencil, Check, Copy, CopyPlus, FolderOpen, FolderPlus, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, RotateCcw, Shuffle, X, Users } from 'lucide-react'
+import { Settings, Trash2, Pencil, Check, Copy, FolderOpen, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, RotateCcw, Shuffle, X, Users } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useGameStore, useBoardStore } from '../store/gameStore'
 import * as net from '../lib/network'
@@ -7,6 +7,7 @@ import type { Board, BoardFolder, Player, NetMessage, Question, GameSettings, Pl
 import { createDefaultBoard, cellId } from '../lib/utils'
 import { getCategoryGameplaySettings } from '../lib/settings'
 import { duplicateBoard } from '../lib/duplicateBoard'
+import { duplicateFolder } from '../lib/duplicateFolder'
 import { getMedia, blobToDataUrl } from '../lib/db'
 import { logEvent } from '../lib/logger'
 import {
@@ -70,6 +71,7 @@ export default function HostPage() {
   const [boardPendingDelete, setBoardPendingDelete] = useState<Board | null>(null)
   const [folderPendingDelete, setFolderPendingDelete] = useState<BoardFolder | null>(null)
   const [renameFolderId, setRenameFolderId] = useState<string | null>(null)
+  const [renameBoardId, setRenameBoardId] = useState<string | null>(null)
   const [boardContextMenu, setBoardContextMenu] = useState<{
     x: number
     y: number
@@ -428,11 +430,6 @@ export default function HostPage() {
     startPreTransfer(b)
   }
 
-  function handleCreateFolder() {
-    const id = boardStore.createFolder('New Folder', null)
-    setRenameFolderId(id)
-  }
-
   function openBoardRowContextMenu(
     e: ReactMouseEvent,
     board: Board,
@@ -444,6 +441,11 @@ export default function HostPage() {
       y: e.clientY,
       items: [
         { id: 'edit', label: 'Edit', onSelect: () => handleEditBoard(board) },
+        {
+          id: 'duplicate',
+          label: 'Duplicate',
+          onSelect: () => { void handleDuplicateBoard(board) },
+        },
         {
           id: 'delete',
           label: 'Delete',
@@ -603,13 +605,22 @@ export default function HostPage() {
     }
   }
 
-  function handleNewBoard() {
-    const b = createDefaultBoard()
+  async function handleDuplicateFolder(folder: BoardFolder) {
+    await duplicateFolder(
+      folder,
+      boardStore.folders,
+      boardStore.boards,
+      boardStore.createFolder,
+      boardStore.saveBoard,
+    )
+  }
+
+  function handleNewBoard(folderId: string | null = null) {
+    const b = { ...createDefaultBoard(), folderId }
     boardStore.saveBoard(b)
-    setActiveBoard(b)
-    patchState({ board: b, answeredCells: [], phase: 'board' })
-    setEditing(true)
-    closeBoardPicker()
+    setRenameFolderId(null)
+    setRenameBoardId(b.id)
+    if (pickerGame !== null) setPickerGame(null)
   }
 
   function handleBoardChange(b: Board) {
@@ -993,7 +1004,7 @@ export default function HostPage() {
                       <div className="h-full flex flex-col items-center justify-center gap-4">
                         <div className="font-condensed text-lg" style={{ color: '#4a5580' }}>No board loaded</div>
                         <div className="flex gap-3">
-                          <button className="btn-gold" onClick={handleNewBoard}>Create new board</button>
+                          <button className="btn-gold" onClick={() => handleNewBoard()}>Create new board</button>
                           {boardStore.boards.length > 0 && (
                             <button className="btn-outline" onClick={openBoardPicker}>Load existing board</button>
                           )}
@@ -1214,6 +1225,11 @@ export default function HostPage() {
 
               <div className="board-picker-boards">
                 <div className="board-picker-section-label">Boards</div>
+                {pickerGame === null && (
+                  <p className="board-picker-hint">
+                    Right-click empty space or a folder to create items, or a board/folder to edit, duplicate, or delete.
+                  </p>
+                )}
                 {pickerGame === null ? (
                   <BoardPickerTree
                     boards={boardStore.boards}
@@ -1222,9 +1238,13 @@ export default function HostPage() {
                     onEditBoard={handleEditBoard}
                     onDeleteBoard={(b) => setBoardPendingDelete(b)}
                     onDuplicateBoard={(b) => { void handleDuplicateBoard(b) }}
+                    onDuplicateFolder={(f) => { void handleDuplicateFolder(f) }}
                     onRequestDeleteFolder={(f) => setFolderPendingDelete(f)}
+                    onCreateBoard={handleNewBoard}
                     renameFolderId={renameFolderId}
                     onRenameFolderIdChange={setRenameFolderId}
+                    renameBoardId={renameBoardId}
+                    onRenameBoardIdChange={setRenameBoardId}
                   />
                 ) : (
                 <div className="board-picker-boards__scroll">
@@ -1276,22 +1296,6 @@ export default function HostPage() {
                         >
                           –
                         </button>
-                        <button
-                          type="button"
-                          className="board-picker-icon-btn"
-                          title="Duplicate board"
-                          onClick={(e) => { e.stopPropagation(); void handleDuplicateBoard(b) }}
-                        >
-                          <CopyPlus size={11} />
-                        </button>
-                        <button
-                          type="button"
-                          className="board-picker-delete-btn"
-                          title="Delete board"
-                          onClick={(e) => { e.stopPropagation(); setBoardPendingDelete(b) }}
-                        >
-                          <Trash2 size={11} />
-                        </button>
                       </div>
                     </div>
                   ))}
@@ -1339,20 +1343,10 @@ export default function HostPage() {
                       Play Game
                     </button>
                   )}
-                  {pickerGame === null && (
-                    <button
-                      type="button"
-                      className="btn-ghost flex items-center justify-center gap-1.5"
-                      onClick={handleCreateFolder}
-                    >
-                      <FolderPlus size={16} />
-                      New Folder
-                    </button>
-                  )}
                   <button
                     type="button"
-                    className={`btn-gold${pickerGame && pickerBoards.length > 0 ? '' : ' flex-1'}`}
-                    onClick={handleNewBoard}
+                    className={`btn-gold${pickerGame && pickerBoards.length > 0 ? '' : ' w-full'}`}
+                    onClick={() => handleNewBoard()}
                   >
                     + Create New Board
                   </button>
@@ -1412,6 +1406,7 @@ export default function HostPage() {
           danger
           onConfirm={() => {
             handleDeleteBoard(boardPendingDelete.id)
+            if (renameBoardId === boardPendingDelete.id) setRenameBoardId(null)
             setBoardPendingDelete(null)
           }}
           onCancel={() => setBoardPendingDelete(null)}

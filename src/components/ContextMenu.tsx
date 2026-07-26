@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 export interface ContextMenuItem {
   id: string
@@ -16,6 +17,7 @@ interface Props {
 
 export default function ContextMenu({ x, y, items, onClose }: Props) {
   const ref = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState({ left: x, top: y })
 
   useEffect(() => {
     function handlePointerDown(e: MouseEvent) {
@@ -39,9 +41,12 @@ export default function ContextMenu({ x, y, items, onClose }: Props) {
     }
   }, [onClose])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = ref.current
-    if (!el) return
+    if (!el) {
+      setPos({ left: x, top: y })
+      return
+    }
     const rect = el.getBoundingClientRect()
     const pad = 8
     let left = x
@@ -52,15 +57,14 @@ export default function ContextMenu({ x, y, items, onClose }: Props) {
     if (top + rect.height > window.innerHeight - pad) {
       top = Math.max(pad, window.innerHeight - rect.height - pad)
     }
-    el.style.left = `${left}px`
-    el.style.top = `${top}px`
+    setPos({ left, top })
   }, [x, y, items])
 
-  return (
+  return createPortal(
     <div
       ref={ref}
       className="context-menu"
-      style={{ left: x, top: y }}
+      style={{ left: pos.left, top: pos.top }}
       role="menu"
     >
       {items.map((item) => (
@@ -77,6 +81,7 @@ export default function ContextMenu({ x, y, items, onClose }: Props) {
           {item.label}
         </button>
       ))}
-    </div>
+    </div>,
+    document.body
   )
 }

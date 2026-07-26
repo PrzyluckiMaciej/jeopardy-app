@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type DragEvent, type MouseEvent } from 'react'
-import { Check, ChevronDown, ChevronRight, CopyPlus, Folder, FolderOpen, Trash2 } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, Folder, FolderOpen } from 'lucide-react'
 import type { Board, BoardFolder } from '../types'
 import { useBoardStore } from '../store/gameStore'
 import ContextMenu, { type ContextMenuItem } from './ContextMenu'
@@ -17,10 +17,15 @@ interface Props {
   onEditBoard: (board: Board) => void
   onDeleteBoard: (board: Board) => void
   onDuplicateBoard: (board: Board) => void
+  onDuplicateFolder: (folder: BoardFolder) => void
   onRequestDeleteFolder: (folder: BoardFolder) => void
+  onCreateBoard: (folderId: string | null) => void
   /** When set, start inline rename for this folder id (e.g. after create). */
   renameFolderId?: string | null
   onRenameFolderIdChange?: (id: string | null) => void
+  /** When set, start inline rename for this board id (e.g. after create). */
+  renameBoardId?: string | null
+  onRenameBoardIdChange?: (id: string | null) => void
 }
 
 function isFolderInside(folders: BoardFolder[], folderId: string, ancestorId: string): boolean {
@@ -51,46 +56,100 @@ export default function BoardPickerTree({
   onEditBoard,
   onDeleteBoard,
   onDuplicateBoard,
+  onDuplicateFolder,
   onRequestDeleteFolder,
-  renameFolderId: controlledRenameId,
+  onCreateBoard,
+  renameFolderId: controlledRenameFolderId,
   onRenameFolderIdChange,
+  renameBoardId: controlledRenameBoardId,
+  onRenameBoardIdChange,
 }: Props) {
   const moveBoardToFolder = useBoardStore((s) => s.moveBoardToFolder)
   const moveFolder = useBoardStore((s) => s.moveFolder)
   const renameFolder = useBoardStore((s) => s.renameFolder)
   const createFolder = useBoardStore((s) => s.createFolder)
+  const saveBoard = useBoardStore((s) => s.saveBoard)
 
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set())
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null)
   const [activeDrag, setActiveDrag] = useState<DragPayload | null>(null)
-  const [internalRenameId, setInternalRenameId] = useState<string | null>(null)
-  const [renameValue, setRenameValue] = useState('')
+  const [internalRenameFolderId, setInternalRenameFolderId] = useState<string | null>(null)
+  const [internalRenameBoardId, setInternalRenameBoardId] = useState<string | null>(null)
+  const [folderRenameValue, setFolderRenameValue] = useState('')
+  const [boardRenameValue, setBoardRenameValue] = useState('')
   const [menu, setMenu] = useState<{
     x: number
     y: number
     items: ContextMenuItem[]
   } | null>(null)
 
-  const editingFolderId = controlledRenameId !== undefined ? controlledRenameId : internalRenameId
+  const editingFolderId =
+    controlledRenameFolderId !== undefined ? controlledRenameFolderId : internalRenameFolderId
+  const editingBoardId =
+    controlledRenameBoardId !== undefined ? controlledRenameBoardId : internalRenameBoardId
 
   useEffect(() => {
     if (editingFolderId) {
       const folder = folders.find((f) => f.id === editingFolderId)
-      if (folder) setRenameValue(folder.name)
+      if (folder) setFolderRenameValue(folder.name)
     }
   }, [editingFolderId, folders])
 
+  useEffect(() => {
+    if (editingBoardId) {
+      const board = boards.find((b) => b.id === editingBoardId)
+      if (board) setBoardRenameValue(board.name)
+    }
+  }, [editingBoardId, boards])
+
+  // Ensure parent folders are expanded so the rename field is visible
+  useEffect(() => {
+    if (!editingBoardId) return
+    const board = boards.find((b) => b.id === editingBoardId)
+    if (!board?.folderId) return
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      let id: string | null = board.folderId ?? null
+      let changed = false
+      while (id) {
+        if (next.has(id)) {
+          next.delete(id)
+          changed = true
+        }
+        id = folders.find((f) => f.id === id)?.parentId ?? null
+      }
+      return changed ? next : prev
+    })
+  }, [editingBoardId, boards, folders])
+
   const setEditingFolderId = useCallback(
     (id: string | null, name?: string) => {
+      if (onRenameBoardIdChange) onRenameBoardIdChange(null)
+      else setInternalRenameBoardId(null)
       if (onRenameFolderIdChange) {
         onRenameFolderIdChange(id)
       } else {
-        setInternalRenameId(id)
+        setInternalRenameFolderId(id)
       }
-      if (id && name !== undefined) setRenameValue(name)
-      else if (!id) setRenameValue('')
+      if (id && name !== undefined) setFolderRenameValue(name)
+      else if (!id) setFolderRenameValue('')
     },
-    [onRenameFolderIdChange]
+    [onRenameFolderIdChange, onRenameBoardIdChange]
+  )
+
+  const setEditingBoardId = useCallback(
+    (id: string | null, name?: string) => {
+      if (onRenameFolderIdChange) onRenameFolderIdChange(null)
+      else setInternalRenameFolderId(null)
+      if (onRenameBoardIdChange) {
+        onRenameBoardIdChange(id)
+      } else {
+        setInternalRenameBoardId(id)
+      }
+      if (id && name !== undefined) setBoardRenameValue(name)
+      else if (!id) setBoardRenameValue('')
+    },
+    [onRenameBoardIdChange, onRenameFolderIdChange]
   )
 
   const childFolders = useMemo(() => {
@@ -144,6 +203,11 @@ export default function BoardPickerTree({
       y: e.clientY,
       items: [
         {
+          id: 'new-board',
+          label: 'New Board',
+          onSelect: () => onCreateBoard(null),
+        },
+        {
           id: 'new-folder',
           label: 'New Folder',
           onSelect: () => {
@@ -163,9 +227,19 @@ export default function BoardPickerTree({
       y: e.clientY,
       items: [
         {
+          id: 'new-board',
+          label: 'New Board',
+          onSelect: () => onCreateBoard(folder.id),
+        },
+        {
           id: 'rename',
           label: 'Rename',
           onSelect: () => setEditingFolderId(folder.id, folder.name),
+        },
+        {
+          id: 'duplicate',
+          label: 'Duplicate',
+          onSelect: () => onDuplicateFolder(folder),
         },
         {
           id: 'delete',
@@ -190,6 +264,11 @@ export default function BoardPickerTree({
           onSelect: () => onEditBoard(board),
         },
         {
+          id: 'duplicate',
+          label: 'Duplicate',
+          onSelect: () => onDuplicateBoard(board),
+        },
+        {
           id: 'delete',
           label: 'Delete',
           danger: true,
@@ -200,9 +279,18 @@ export default function BoardPickerTree({
   }
 
   function commitRename(folderId: string) {
-    const name = renameValue.trim()
+    const name = folderRenameValue.trim()
     if (name) renameFolder(folderId, name)
     setEditingFolderId(null)
+  }
+
+  function commitBoardRename(boardId: string) {
+    const name = boardRenameValue.trim()
+    const board = boards.find((b) => b.id === boardId)
+    if (board && name) {
+      saveBoard({ ...board, name, updatedAt: Date.now() })
+    }
+    setEditingBoardId(null)
   }
 
   function setDragData(e: DragEvent, payload: DragPayload) {
@@ -252,12 +340,14 @@ export default function BoardPickerTree({
   }
 
   function renderBoardRow(board: Board, depth: number) {
+    const isEditing = editingBoardId === board.id
+
     return (
       <div
         key={board.id}
         className="board-picker-board-row board-picker-tree-row"
         style={{ paddingLeft: depth * 16 }}
-        draggable
+        draggable={!isEditing}
         onDragStart={(e) => {
           setDragData(e, { type: 'board', id: board.id })
         }}
@@ -270,39 +360,43 @@ export default function BoardPickerTree({
           e.stopPropagation()
           clearDrag()
         }}
-        onContextMenu={(e) => openBoardMenu(e, board)}
+        onContextMenu={(e) => {
+          if (isEditing) return
+          openBoardMenu(e, board)
+        }}
       >
-        <button
-          type="button"
-          className="board-picker-board-btn"
-          onClick={() => onSelectBoard(board)}
-        >
-          <span className="font-condensed font-bold">{board.name}</span>
-        </button>
-        <div className="board-picker-board-row__actions">
+        {isEditing ? (
+          <div className="flex items-center gap-1 flex-1 min-w-0">
+            <input
+              className="board-picker-input"
+              value={boardRenameValue}
+              onChange={(e) => setBoardRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitBoardRename(board.id)
+                if (e.key === 'Escape') setEditingBoardId(null)
+              }}
+              onBlur={() => commitBoardRename(board.id)}
+              autoFocus
+              onClick={(e) => e.stopPropagation()}
+            />
+            <button
+              type="button"
+              className="board-picker-save-btn"
+              onClick={() => commitBoardRename(board.id)}
+              title="Save"
+            >
+              <Check size={14} />
+            </button>
+          </div>
+        ) : (
           <button
             type="button"
-            className="board-picker-icon-btn"
-            title="Duplicate board"
-            onClick={(e) => {
-              e.stopPropagation()
-              void onDuplicateBoard(board)
-            }}
+            className="board-picker-board-btn"
+            onClick={() => onSelectBoard(board)}
           >
-            <CopyPlus size={11} />
+            <span className="font-condensed font-bold">{board.name}</span>
           </button>
-          <button
-            type="button"
-            className="board-picker-delete-btn"
-            title="Delete board"
-            onClick={(e) => {
-              e.stopPropagation()
-              onDeleteBoard(board)
-            }}
-          >
-            <Trash2 size={11} />
-          </button>
-        </div>
+        )}
       </div>
     )
   }
@@ -354,8 +448,8 @@ export default function BoardPickerTree({
               <FolderOpen size={14} className="flex-shrink-0 opacity-70" />
               <input
                 className="board-picker-input"
-                value={renameValue}
-                onChange={(e) => setRenameValue(e.target.value)}
+                value={folderRenameValue}
+                onChange={(e) => setFolderRenameValue(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') commitRename(folder.id)
                   if (e.key === 'Escape') setEditingFolderId(null)
