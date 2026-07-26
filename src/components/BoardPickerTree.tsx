@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type DragEvent, type MouseEvent } from 'react'
+import { useCallback, useMemo, useState, type DragEvent, type MouseEvent } from 'react'
 import { Check, ChevronDown, ChevronRight, Folder, FolderOpen } from 'lucide-react'
 import type { Board, BoardFolder } from '../types'
 import { useBoardStore } from '../store/gameStore'
@@ -9,6 +9,11 @@ const DND_MIME = 'application/x-jeopardy-picker'
 type DragPayload =
   | { type: 'board'; id: string }
   | { type: 'folder'; id: string }
+
+interface RenameDraft {
+  id: string
+  value: string
+}
 
 interface Props {
   boards: Board[]
@@ -49,6 +54,19 @@ function parseDragPayload(e: DragEvent): DragPayload | null {
   return null
 }
 
+function ancestorFolderIds(
+  folders: BoardFolder[],
+  startFolderId: string | null | undefined,
+): Set<string> {
+  const ids = new Set<string>()
+  let id: string | null = startFolderId ?? null
+  while (id) {
+    ids.add(id)
+    id = folders.find((f) => f.id === id)?.parentId ?? null
+  }
+  return ids
+}
+
 export default function BoardPickerTree({
   boards,
   folders,
@@ -75,8 +93,8 @@ export default function BoardPickerTree({
   const [activeDrag, setActiveDrag] = useState<DragPayload | null>(null)
   const [internalRenameFolderId, setInternalRenameFolderId] = useState<string | null>(null)
   const [internalRenameBoardId, setInternalRenameBoardId] = useState<string | null>(null)
-  const [folderRenameValue, setFolderRenameValue] = useState('')
-  const [boardRenameValue, setBoardRenameValue] = useState('')
+  const [folderRenameDraft, setFolderRenameDraft] = useState<RenameDraft | null>(null)
+  const [boardRenameDraft, setBoardRenameDraft] = useState<RenameDraft | null>(null)
   const [menu, setMenu] = useState<{
     x: number
     y: number
@@ -88,51 +106,35 @@ export default function BoardPickerTree({
   const editingBoardId =
     controlledRenameBoardId !== undefined ? controlledRenameBoardId : internalRenameBoardId
 
-  useEffect(() => {
-    if (editingFolderId) {
-      const folder = folders.find((f) => f.id === editingFolderId)
-      if (folder) setFolderRenameValue(folder.name)
-    }
-  }, [editingFolderId, folders])
+  const folderRenameValue =
+    folderRenameDraft?.id === editingFolderId
+      ? folderRenameDraft.value
+      : (folders.find((f) => f.id === editingFolderId)?.name ?? '')
 
-  useEffect(() => {
-    if (editingBoardId) {
-      const board = boards.find((b) => b.id === editingBoardId)
-      if (board) setBoardRenameValue(board.name)
-    }
-  }, [editingBoardId, boards])
+  const boardRenameValue =
+    boardRenameDraft?.id === editingBoardId
+      ? boardRenameDraft.value
+      : (boards.find((b) => b.id === editingBoardId)?.name ?? '')
 
-  // Ensure parent folders are expanded so the rename field is visible
-  useEffect(() => {
-    if (!editingBoardId) return
+  // Keep ancestors of a board being renamed expanded (derived, no effect)
+  const forceExpandedIds = useMemo(() => {
+    if (!editingBoardId) return new Set<string>()
     const board = boards.find((b) => b.id === editingBoardId)
-    if (!board?.folderId) return
-    setCollapsed((prev) => {
-      const next = new Set(prev)
-      let id: string | null = board.folderId ?? null
-      let changed = false
-      while (id) {
-        if (next.has(id)) {
-          next.delete(id)
-          changed = true
-        }
-        id = folders.find((f) => f.id === id)?.parentId ?? null
-      }
-      return changed ? next : prev
-    })
+    return ancestorFolderIds(folders, board?.folderId)
   }, [editingBoardId, boards, folders])
 
   const setEditingFolderId = useCallback(
     (id: string | null, name?: string) => {
       if (onRenameBoardIdChange) onRenameBoardIdChange(null)
       else setInternalRenameBoardId(null)
+      setBoardRenameDraft(null)
       if (onRenameFolderIdChange) {
         onRenameFolderIdChange(id)
       } else {
         setInternalRenameFolderId(id)
       }
-      if (id && name !== undefined) setFolderRenameValue(name)
-      else if (!id) setFolderRenameValue('')
+      if (id && name !== undefined) setFolderRenameDraft({ id, value: name })
+      else setFolderRenameDraft(null)
     },
     [onRenameFolderIdChange, onRenameBoardIdChange]
   )
@@ -141,13 +143,14 @@ export default function BoardPickerTree({
     (id: string | null, name?: string) => {
       if (onRenameFolderIdChange) onRenameFolderIdChange(null)
       else setInternalRenameFolderId(null)
+      setFolderRenameDraft(null)
       if (onRenameBoardIdChange) {
         onRenameBoardIdChange(id)
       } else {
         setInternalRenameBoardId(id)
       }
-      if (id && name !== undefined) setBoardRenameValue(name)
-      else if (!id) setBoardRenameValue('')
+      if (id && name !== undefined) setBoardRenameDraft({ id, value: name })
+      else setBoardRenameDraft(null)
     },
     [onRenameBoardIdChange, onRenameFolderIdChange]
   )
@@ -287,8 +290,8 @@ export default function BoardPickerTree({
   function commitBoardRename(boardId: string) {
     const name = boardRenameValue.trim()
     const board = boards.find((b) => b.id === boardId)
-    if (board && name) {
-      saveBoard({ ...board, name, updatedAt: Date.now() })
+    if (board && name && name !== board.name) {
+      saveBoard({ ...board, name })
     }
     setEditingBoardId(null)
   }
@@ -370,7 +373,11 @@ export default function BoardPickerTree({
             <input
               className="board-picker-input"
               value={boardRenameValue}
-              onChange={(e) => setBoardRenameValue(e.target.value)}
+              onChange={(e) => {
+                if (editingBoardId) {
+                  setBoardRenameDraft({ id: editingBoardId, value: e.target.value })
+                }
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') commitBoardRename(board.id)
                 if (e.key === 'Escape') setEditingBoardId(null)
@@ -402,7 +409,7 @@ export default function BoardPickerTree({
   }
 
   function renderFolder(folder: BoardFolder, depth: number) {
-    const isCollapsed = collapsed.has(folder.id)
+    const isCollapsed = collapsed.has(folder.id) && !forceExpandedIds.has(folder.id)
     const isEditing = editingFolderId === folder.id
     const dropKey = `folder:${folder.id}`
     const isDragOver = dragOverTarget === dropKey
@@ -449,7 +456,11 @@ export default function BoardPickerTree({
               <input
                 className="board-picker-input"
                 value={folderRenameValue}
-                onChange={(e) => setFolderRenameValue(e.target.value)}
+                onChange={(e) => {
+                  if (editingFolderId) {
+                    setFolderRenameDraft({ id: editingFolderId, value: e.target.value })
+                  }
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') commitRename(folder.id)
                   if (e.key === 'Escape') setEditingFolderId(null)
