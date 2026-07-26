@@ -82,7 +82,7 @@ function resolvePath(folders: BoardFolder[], path: string): string | null | unde
   return parentId
 }
 
-export default function BoardPickerTree({
+export default function BoardPickerExplorer({
   boards,
   folders,
   onSelectBoard,

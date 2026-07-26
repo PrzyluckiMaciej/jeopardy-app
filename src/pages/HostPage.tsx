@@ -16,7 +16,7 @@ import {
   type NameSession,
 } from '../lib/playerJoin'
 import BoardEditor from '../components/BoardEditor'
-import BoardPickerTree from '../components/BoardPickerTree'
+import BoardPickerExplorer from '../components/BoardPickerExplorer'
 import ConfirmModal from '../components/ConfirmModal'
 import ContextMenu, { type ContextMenuItem } from '../components/ContextMenu'
 import GameBoard from '../components/GameBoard'
@@ -1237,7 +1237,7 @@ export default function HostPage() {
                   )}
                 </div>
                 {pickerGame === null ? (
-                  <BoardPickerTree
+                  <BoardPickerExplorer
                     boards={boardStore.boards}
                     folders={boardStore.folders}
                     onSelectBoard={handleSelectBoard}
