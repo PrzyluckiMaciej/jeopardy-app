@@ -1,12 +1,13 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { Board, Game, GameState, GameSettings, MediaPlaybackState, Player, Question } from '../types'
+import type { Board, BoardFolder, Game, GameState, GameSettings, MediaPlaybackState, Player, Question } from '../types'
 import { initialMediaPlaybackForType, questionMediaAutoplay } from '../types'
 
 // ---- Board editor store (persisted) ----
 interface BoardStore {
   boards: Board[]
   games: Game[]
+  folders: BoardFolder[]
   saveBoard: (board: Board) => void
   deleteBoard: (id: string) => void
   getBoard: (id: string) => Board | undefined
@@ -16,23 +17,46 @@ interface BoardStore {
   addBoardToGame: (gameId: string, boardId: string) => void
   removeBoardFromGame: (gameId: string, boardId: string) => void
   reorderBoardInGame: (gameId: string, fromIndex: number, toIndex: number) => void
+  createFolder: (name: string, parentId?: string | null) => string
+  renameFolder: (id: string, name: string) => void
+  deleteFolder: (id: string) => void
+  moveBoardToFolder: (boardId: string, folderId: string | null) => void
+  moveFolder: (folderId: string, newParentId: string | null) => void
 }
 
-type PersistedBoardStore = Pick<BoardStore, 'boards' | 'games'>
+type PersistedBoardStore = Pick<BoardStore, 'boards' | 'games' | 'folders'>
 type LegacyPersistedBoardStore = PersistedBoardStore & { groups?: Game[] }
+
+function isDescendantFolder(
+  folders: BoardFolder[],
+  folderId: string,
+  potentialAncestorId: string
+): boolean {
+  let current = folders.find((f) => f.id === folderId)
+  while (current?.parentId) {
+    if (current.parentId === potentialAncestorId) return true
+    current = folders.find((f) => f.id === current!.parentId)
+  }
+  return false
+}
 
 function migrateBoardStore(persisted: unknown): PersistedBoardStore {
   if (!persisted || typeof persisted !== 'object') {
-    return { boards: [], games: [] }
+    return { boards: [], games: [], folders: [] }
   }
   const state = persisted as LegacyPersistedBoardStore
   if (state.groups && !state.games) {
     const { groups, ...rest } = state
-    return { ...rest, games: groups }
+    return {
+      boards: rest.boards ?? [],
+      games: groups,
+      folders: rest.folders ?? [],
+    }
   }
   return {
     boards: state.boards ?? [],
     games: state.games ?? [],
+    folders: state.folders ?? [],
   }
 }
 
@@ -41,6 +65,7 @@ export const useBoardStore = create<BoardStore>()(
     (set, get) => ({
       boards: [],
       games: [],
+      folders: [],
       saveBoard: (board) =>
         set((s) => {
           const idx = s.boards.findIndex((b) => b.id === board.id)
@@ -104,11 +129,70 @@ export const useBoardStore = create<BoardStore>()(
             return { ...g, boardIds: ids, updatedAt: Date.now() }
           }),
         })),
+      createFolder: (name, parentId = null) => {
+        const id = crypto.randomUUID()
+        const now = Date.now()
+        set((s) => ({
+          folders: [
+            ...s.folders,
+            { id, name, parentId: parentId ?? null, createdAt: now, updatedAt: now },
+          ],
+        }))
+        return id
+      },
+      renameFolder: (id, name) =>
+        set((s) => ({
+          folders: s.folders.map((f) =>
+            f.id === id ? { ...f, name, updatedAt: Date.now() } : f
+          ),
+        })),
+      deleteFolder: (id) =>
+        set((s) => {
+          const folder = s.folders.find((f) => f.id === id)
+          if (!folder) return s
+          const parentId = folder.parentId
+          return {
+            folders: s.folders
+              .filter((f) => f.id !== id)
+              .map((f) =>
+                f.parentId === id ? { ...f, parentId, updatedAt: Date.now() } : f
+              ),
+            boards: s.boards.map((b) =>
+              b.folderId === id ? { ...b, folderId: parentId, updatedAt: Date.now() } : b
+            ),
+          }
+        }),
+      moveBoardToFolder: (boardId, folderId) =>
+        set((s) => ({
+          boards: s.boards.map((b) =>
+            b.id === boardId
+              ? { ...b, folderId, updatedAt: Date.now() }
+              : b
+          ),
+        })),
+      moveFolder: (folderId, newParentId) =>
+        set((s) => {
+          if (folderId === newParentId) return s
+          if (
+            newParentId !== null &&
+            (newParentId === folderId ||
+              isDescendantFolder(s.folders, newParentId, folderId))
+          ) {
+            return s
+          }
+          return {
+            folders: s.folders.map((f) =>
+              f.id === folderId
+                ? { ...f, parentId: newParentId, updatedAt: Date.now() }
+                : f
+            ),
+          }
+        }),
     }),
     {
       name: 'jeopardy-boards',
       migrate: migrateBoardStore,
-      version: 1,
+      version: 2,
     }
   )
 )

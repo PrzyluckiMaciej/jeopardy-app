@@ -42,6 +42,17 @@ export interface Board {
   categories: Category[]
   pointValues: number[] // e.g. [200, 400, 600, 800, 1000]
   dailyDoubleQuestionId?: string
+  /** Folder containing this board; null/absent = All Boards root */
+  folderId?: string | null
+  createdAt: number
+  updatedAt: number
+}
+
+export interface BoardFolder {
+  id: string
+  name: string
+  /** Parent folder; null = All Boards root */
+  parentId: string | null
   createdAt: number
   updatedAt: number
 }
