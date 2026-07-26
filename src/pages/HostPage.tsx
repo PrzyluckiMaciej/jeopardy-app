@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
-import { Settings, Trash2, Pencil, Check, Copy, FolderOpen, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, RotateCcw, Shuffle, X, Users } from 'lucide-react'
+import { Settings, Trash2, Pencil, Check, Copy, Layers, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, RotateCcw, Shuffle, X, Users } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useGameStore, useBoardStore } from '../store/gameStore'
 import * as net from '../lib/network'
@@ -1158,7 +1158,7 @@ export default function HostPage() {
                         onClick={() => setPickerGame(g.id)}
                       >
                         <span className="flex items-center gap-1">
-                          <FolderOpen size={12} className="flex-shrink-0 opacity-70" />
+                          <Layers size={12} className="flex-shrink-0 opacity-70" />
                           <span className="truncate">{g.name}</span>
                           <span className="text-xs flex-shrink-0 opacity-50">
                             ({boardStore.boards.filter((b) => g.boardIds.includes(b.id)).length})
@@ -1226,7 +1226,7 @@ export default function HostPage() {
                 <div className="board-picker-section-label">Boards</div>
                 {pickerGame === null && (
                   <p className="board-picker-hint">
-                    Right-click empty space or a folder to create items, or a board/folder to edit, duplicate, or delete.
+                    Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, duplicate, or delete.
                   </p>
                 )}
                 {pickerGame === null ? (
@@ -1284,7 +1284,8 @@ export default function HostPage() {
                         >
                           {idx + 1}
                         </span>
-                        <span className="font-condensed font-bold">{b.name}</span>
+                        <LayoutGrid size={14} className="flex-shrink-0 opacity-70" />
+                        <span className="font-condensed font-bold truncate">{b.name}</span>
                       </button>
                       <div className="board-picker-board-row__actions">
                         <button

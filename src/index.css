@@ -1303,6 +1303,7 @@ select:focus-visible {
   flex: 1;
   display: flex;
   align-items: center;
+  gap: 6px;
   padding: 10px 12px;
   border-radius: var(--radius-lg);
   text-align: left;
@@ -1488,18 +1489,66 @@ select:focus-visible {
   flex-shrink: 0;
 }
 
-/* ── Board picker tree / folders ────────────────────────────── */
-.board-picker-tree {
+/* ── Board picker explorer / folders ────────────────────────── */
+.board-picker-path-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-bottom: var(--space-sm);
+}
+.board-picker-path-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--white);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+}
+.board-picker-path-back:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+.board-picker-path-back:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.board-picker-path-input {
+  flex: 1;
+  min-width: 0;
+  height: 1.75rem;
+  padding: 0 10px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--white);
+  background: var(--navy);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  outline: none;
+}
+.board-picker-path-input:focus {
+  border-color: rgba(212, 160, 23, 0.55);
+}
+.board-picker-explorer {
   min-height: 4rem;
   border-radius: var(--radius-lg);
   border: 1px solid transparent;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
-.board-picker-tree--drag-over {
+.board-picker-explorer--drag-over {
   border-color: rgba(212, 160, 23, 0.45);
   background: rgba(212, 160, 23, 0.06);
 }
-.board-picker-tree-row {
+.board-picker-explorer-row {
   margin-bottom: 0;
 }
 .board-picker-folder-row {
@@ -1534,29 +1583,6 @@ select:focus-visible {
   cursor: pointer;
   min-width: 0;
   padding: 2px 0;
-}
-.board-picker-tree-chevron {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.25rem;
-  height: 1.25rem;
-  flex-shrink: 0;
-  background: none;
-  border: none;
-  color: #8899cc;
-  cursor: pointer;
-  border-radius: var(--radius-sm);
-  padding: 0;
-}
-.board-picker-tree-chevron:hover {
-  color: var(--white);
-  background: rgba(255, 255, 255, 0.08);
-}
-.board-picker-tree-children {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
 }
 
 /* ── Context menu ───────────────────────────────────────────── */

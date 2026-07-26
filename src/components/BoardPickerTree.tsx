@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState, type DragEvent, type MouseEvent } from 'react'
-import { Check, ChevronDown, ChevronRight, Folder, FolderOpen } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState, type DragEvent, type MouseEvent } from 'react'
+import { ArrowLeft, Check, Folder, LayoutGrid } from 'lucide-react'
 import type { Board, BoardFolder } from '../types'
 import { useBoardStore } from '../store/gameStore'
 import ContextMenu, { type ContextMenuItem } from './ContextMenu'
@@ -54,17 +54,32 @@ function parseDragPayload(e: DragEvent): DragPayload | null {
   return null
 }
 
-function ancestorFolderIds(
-  folders: BoardFolder[],
-  startFolderId: string | null | undefined,
-): Set<string> {
-  const ids = new Set<string>()
-  let id: string | null = startFolderId ?? null
+function buildPathString(folders: BoardFolder[], folderId: string | null): string {
+  if (!folderId) return '/'
+  const parts: string[] = []
+  let id: string | null = folderId
   while (id) {
-    ids.add(id)
-    id = folders.find((f) => f.id === id)?.parentId ?? null
+    const f = folders.find((x) => x.id === id)
+    if (!f) break
+    parts.unshift(f.name)
+    id = f.parentId
   }
-  return ids
+  return `/${parts.join('/')}`
+}
+
+/** Resolves a slash path to a folder id. `null` = root. `undefined` = invalid. */
+function resolvePath(folders: BoardFolder[], path: string): string | null | undefined {
+  const segments = path.split('/').filter((s) => s.length > 0)
+  if (segments.length === 0) return null
+  let parentId: string | null = null
+  for (const seg of segments) {
+    const match = folders.find(
+      (f) => f.parentId === parentId && f.name.toLowerCase() === seg.toLowerCase(),
+    )
+    if (!match) return undefined
+    parentId = match.id
+  }
+  return parentId
 }
 
 export default function BoardPickerTree({
@@ -88,7 +103,8 @@ export default function BoardPickerTree({
   const createFolder = useBoardStore((s) => s.createFolder)
   const saveBoard = useBoardStore((s) => s.saveBoard)
 
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set())
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
+  const [pathDraft, setPathDraft] = useState('/')
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null)
   const [activeDrag, setActiveDrag] = useState<DragPayload | null>(null)
   const [internalRenameFolderId, setInternalRenameFolderId] = useState<string | null>(null)
@@ -116,12 +132,43 @@ export default function BoardPickerTree({
       ? boardRenameDraft.value
       : (boards.find((b) => b.id === editingBoardId)?.name ?? '')
 
-  // Keep ancestors of a board being renamed expanded (derived, no effect)
-  const forceExpandedIds = useMemo(() => {
-    if (!editingBoardId) return new Set<string>()
-    const board = boards.find((b) => b.id === editingBoardId)
-    return ancestorFolderIds(folders, board?.folderId)
-  }, [editingBoardId, boards, folders])
+  const currentPath = useMemo(
+    () => buildPathString(folders, currentFolderId),
+    [folders, currentFolderId],
+  )
+
+  // Keep path input in sync when navigating (unless user is mid-edit — we sync on navigate only)
+  useEffect(() => {
+    setPathDraft(currentPath)
+  }, [currentPath])
+
+  // If current folder was deleted, go to root
+  useEffect(() => {
+    if (currentFolderId && !folders.some((f) => f.id === currentFolderId)) {
+      setCurrentFolderId(null)
+    }
+  }, [folders, currentFolderId])
+
+  // Navigate to a board/folder being renamed so the inline editor is visible
+  useEffect(() => {
+    if (editingBoardId) {
+      const board = boards.find((b) => b.id === editingBoardId)
+      if (board) {
+        const fid = board.folderId ?? null
+        setCurrentFolderId((cur) => (cur === fid ? cur : fid))
+      }
+    }
+  }, [editingBoardId, boards])
+
+  useEffect(() => {
+    if (editingFolderId) {
+      const folder = folders.find((f) => f.id === editingFolderId)
+      if (folder) {
+        const parent = folder.parentId
+        setCurrentFolderId((cur) => (cur === parent ? cur : parent))
+      }
+    }
+  }, [editingFolderId, folders])
 
   const setEditingFolderId = useCallback(
     (id: string | null, name?: string) => {
@@ -136,7 +183,7 @@ export default function BoardPickerTree({
       if (id && name !== undefined) setFolderRenameDraft({ id, value: name })
       else setFolderRenameDraft(null)
     },
-    [onRenameFolderIdChange, onRenameBoardIdChange]
+    [onRenameFolderIdChange, onRenameBoardIdChange],
   )
 
   const setEditingBoardId = useCallback(
@@ -152,44 +199,42 @@ export default function BoardPickerTree({
       if (id && name !== undefined) setBoardRenameDraft({ id, value: name })
       else setBoardRenameDraft(null)
     },
-    [onRenameBoardIdChange, onRenameFolderIdChange]
+    [onRenameBoardIdChange, onRenameFolderIdChange],
   )
 
-  const childFolders = useMemo(() => {
-    const map = new Map<string | null, BoardFolder[]>()
-    for (const f of folders) {
-      const key = f.parentId
-      const list = map.get(key) ?? []
-      list.push(f)
-      map.set(key, list)
-    }
-    for (const list of map.values()) {
-      list.sort((a, b) => a.name.localeCompare(b.name))
-    }
-    return map
-  }, [folders])
+  const visibleFolders = useMemo(() => {
+    return folders
+      .filter((f) => f.parentId === currentFolderId)
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [folders, currentFolderId])
 
-  const childBoards = useMemo(() => {
-    const map = new Map<string | null, Board[]>()
-    for (const b of boards) {
-      const key = b.folderId ?? null
-      const list = map.get(key) ?? []
-      list.push(b)
-      map.set(key, list)
-    }
-    for (const list of map.values()) {
-      list.sort((a, b) => a.name.localeCompare(b.name))
-    }
-    return map
-  }, [boards])
+  const visibleBoards = useMemo(() => {
+    return boards
+      .filter((b) => (b.folderId ?? null) === currentFolderId)
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [boards, currentFolderId])
 
-  function toggleCollapsed(id: string) {
-    setCollapsed((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+  const parentFolderId = useMemo(() => {
+    if (!currentFolderId) return null
+    return folders.find((f) => f.id === currentFolderId)?.parentId ?? null
+  }, [folders, currentFolderId])
+
+  function navigateTo(folderId: string | null) {
+    setCurrentFolderId(folderId)
+  }
+
+  function goBack() {
+    if (currentFolderId === null) return
+    navigateTo(parentFolderId)
+  }
+
+  function commitPath() {
+    const resolved = resolvePath(folders, pathDraft.trim())
+    if (resolved === undefined) {
+      setPathDraft(currentPath)
+      return
+    }
+    navigateTo(resolved)
   }
 
   function closeMenu() {
@@ -208,13 +253,13 @@ export default function BoardPickerTree({
         {
           id: 'new-board',
           label: 'New Board',
-          onSelect: () => onCreateBoard(null),
+          onSelect: () => onCreateBoard(currentFolderId),
         },
         {
           id: 'new-folder',
           label: 'New Folder',
           onSelect: () => {
-            const id = createFolder('New Folder', null)
+            const id = createFolder('New Folder', currentFolderId)
             setEditingFolderId(id, 'New Folder')
           },
         },
@@ -232,7 +277,10 @@ export default function BoardPickerTree({
         {
           id: 'new-board',
           label: 'New Board',
-          onSelect: () => onCreateBoard(folder.id),
+          onSelect: () => {
+            navigateTo(folder.id)
+            onCreateBoard(folder.id)
+          },
         },
         {
           id: 'rename',
@@ -330,26 +378,27 @@ export default function BoardPickerTree({
     }
   }
 
-  function handleDropOnRoot(e: DragEvent) {
+  function handleDropOnCurrent(e: DragEvent) {
     e.preventDefault()
     const payload = activeDrag ?? parseDragPayload(e)
     clearDrag()
     if (!payload) return
     if (payload.type === 'board') {
-      moveBoardToFolder(payload.id, null)
+      moveBoardToFolder(payload.id, currentFolderId)
     } else {
-      moveFolder(payload.id, null)
+      if (currentFolderId && payload.id === currentFolderId) return
+      if (currentFolderId && isFolderInside(folders, currentFolderId, payload.id)) return
+      moveFolder(payload.id, currentFolderId)
     }
   }
 
-  function renderBoardRow(board: Board, depth: number) {
+  function renderBoardRow(board: Board) {
     const isEditing = editingBoardId === board.id
 
     return (
       <div
         key={board.id}
-        className="board-picker-board-row board-picker-tree-row"
-        style={{ paddingLeft: depth * 16 }}
+        className="board-picker-board-row board-picker-explorer-row"
         draggable={!isEditing}
         onDragStart={(e) => {
           setDragData(e, { type: 'board', id: board.id })
@@ -370,6 +419,7 @@ export default function BoardPickerTree({
       >
         {isEditing ? (
           <div className="flex items-center gap-1 flex-1 min-w-0">
+            <LayoutGrid size={14} className="flex-shrink-0 opacity-70" />
             <input
               className="board-picker-input"
               value={boardRenameValue}
@@ -401,132 +451,140 @@ export default function BoardPickerTree({
             className="board-picker-board-btn"
             onClick={() => onSelectBoard(board)}
           >
-            <span className="font-condensed font-bold">{board.name}</span>
+            <LayoutGrid size={14} className="flex-shrink-0 opacity-70" />
+            <span className="font-condensed font-bold truncate">{board.name}</span>
           </button>
         )}
       </div>
     )
   }
 
-  function renderFolder(folder: BoardFolder, depth: number) {
-    const isCollapsed = collapsed.has(folder.id) && !forceExpandedIds.has(folder.id)
+  function renderFolderRow(folder: BoardFolder) {
     const isEditing = editingFolderId === folder.id
     const dropKey = `folder:${folder.id}`
     const isDragOver = dragOverTarget === dropKey
-    const nestedFolders = childFolders.get(folder.id) ?? []
-    const nestedBoards = childBoards.get(folder.id) ?? []
 
     return (
-      <div key={folder.id} className="board-picker-tree-folder">
-        <div
-          className={`board-picker-folder-row${isDragOver ? ' board-picker-folder-row--drag-over' : ''}`}
-          style={{ paddingLeft: depth * 16 }}
-          draggable={!isEditing}
-          onDragStart={(e) => {
-            setDragData(e, { type: 'folder', id: folder.id })
-          }}
-          onDragEnd={clearDrag}
-          onDragOver={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            if (canDropOnFolder(activeDrag, folder.id)) {
-              e.dataTransfer.dropEffect = 'move'
-              setDragOverTarget(dropKey)
-            } else {
-              e.dataTransfer.dropEffect = 'none'
-            }
-          }}
-          onDragLeave={() => {
-            setDragOverTarget((cur) => (cur === dropKey ? null : cur))
-          }}
-          onDrop={(e) => handleDropOnFolder(e, folder.id)}
-          onContextMenu={(e) => openFolderMenu(e, folder)}
-        >
-          <button
-            type="button"
-            className="board-picker-tree-chevron"
-            onClick={() => toggleCollapsed(folder.id)}
-            aria-label={isCollapsed ? 'Expand folder' : 'Collapse folder'}
-          >
-            {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-          </button>
-          {isEditing ? (
-            <div className="flex items-center gap-1 flex-1 min-w-0">
-              <FolderOpen size={14} className="flex-shrink-0 opacity-70" />
-              <input
-                className="board-picker-input"
-                value={folderRenameValue}
-                onChange={(e) => {
-                  if (editingFolderId) {
-                    setFolderRenameDraft({ id: editingFolderId, value: e.target.value })
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') commitRename(folder.id)
-                  if (e.key === 'Escape') setEditingFolderId(null)
-                }}
-                onBlur={() => commitRename(folder.id)}
-                autoFocus
-                onClick={(e) => e.stopPropagation()}
-              />
-              <button
-                type="button"
-                className="board-picker-save-btn"
-                onClick={() => commitRename(folder.id)}
-                title="Save"
-              >
-                <Check size={14} />
-              </button>
-            </div>
-          ) : (
+      <div
+        key={folder.id}
+        className={`board-picker-folder-row board-picker-explorer-row${isDragOver ? ' board-picker-folder-row--drag-over' : ''}`}
+        draggable={!isEditing}
+        onDragStart={(e) => {
+          setDragData(e, { type: 'folder', id: folder.id })
+        }}
+        onDragEnd={clearDrag}
+        onDragOver={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          if (canDropOnFolder(activeDrag, folder.id)) {
+            e.dataTransfer.dropEffect = 'move'
+            setDragOverTarget(dropKey)
+          } else {
+            e.dataTransfer.dropEffect = 'none'
+          }
+        }}
+        onDragLeave={() => {
+          setDragOverTarget((cur) => (cur === dropKey ? null : cur))
+        }}
+        onDrop={(e) => handleDropOnFolder(e, folder.id)}
+        onContextMenu={(e) => openFolderMenu(e, folder)}
+      >
+        {isEditing ? (
+          <div className="flex items-center gap-1 flex-1 min-w-0">
+            <Folder size={14} className="flex-shrink-0 opacity-70" />
+            <input
+              className="board-picker-input"
+              value={folderRenameValue}
+              onChange={(e) => {
+                if (editingFolderId) {
+                  setFolderRenameDraft({ id: editingFolderId, value: e.target.value })
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitRename(folder.id)
+                if (e.key === 'Escape') setEditingFolderId(null)
+              }}
+              onBlur={() => commitRename(folder.id)}
+              autoFocus
+              onClick={(e) => e.stopPropagation()}
+            />
             <button
               type="button"
-              className="board-picker-folder-row__btn"
-              onClick={() => toggleCollapsed(folder.id)}
+              className="board-picker-save-btn"
+              onClick={() => commitRename(folder.id)}
+              title="Save"
             >
-              {isCollapsed ? (
-                <Folder size={14} className="flex-shrink-0 opacity-70" />
-              ) : (
-                <FolderOpen size={14} className="flex-shrink-0 opacity-70" />
-              )}
-              <span className="truncate">{folder.name}</span>
+              <Check size={14} />
             </button>
-          )}
-        </div>
-        {!isCollapsed && (
-          <div className="board-picker-tree-children">
-            {nestedFolders.map((f) => renderFolder(f, depth + 1))}
-            {nestedBoards.map((b) => renderBoardRow(b, depth + 1))}
           </div>
+        ) : (
+          <button
+            type="button"
+            className="board-picker-folder-row__btn"
+            onClick={() => navigateTo(folder.id)}
+          >
+            <Folder size={14} className="flex-shrink-0 opacity-70" />
+            <span className="truncate">{folder.name}</span>
+          </button>
         )}
       </div>
     )
   }
 
-  const rootFolders = childFolders.get(null) ?? []
-  const rootBoards = childBoards.get(null) ?? []
-  const isEmpty = rootFolders.length === 0 && rootBoards.length === 0
-  const rootDragOver = dragOverTarget === 'root'
+  const isEmpty = visibleFolders.length === 0 && visibleBoards.length === 0
+  const currentDragOver = dragOverTarget === 'current'
+  const atRoot = currentFolderId === null
 
   return (
     <>
+      <div className="board-picker-path-bar">
+        <button
+          type="button"
+          className="board-picker-path-back"
+          onClick={goBack}
+          disabled={atRoot}
+          aria-label="Go to parent folder"
+          title="Back"
+        >
+          <ArrowLeft size={16} />
+        </button>
+        <input
+          className="board-picker-path-input"
+          value={pathDraft}
+          onChange={(e) => setPathDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              commitPath()
+            }
+            if (e.key === 'Escape') {
+              e.preventDefault()
+              setPathDraft(currentPath)
+              ;(e.target as HTMLInputElement).blur()
+            }
+          }}
+          onBlur={() => setPathDraft(currentPath)}
+          aria-label="Folder path"
+          spellCheck={false}
+        />
+      </div>
       <div
-        className={`board-picker-boards__scroll board-picker-tree${rootDragOver ? ' board-picker-tree--drag-over' : ''}`}
+        className={`board-picker-boards__scroll board-picker-explorer${currentDragOver ? ' board-picker-explorer--drag-over' : ''}`}
         onContextMenu={openEmptyMenu}
         onDragOver={(e) => {
           e.preventDefault()
           e.dataTransfer.dropEffect = 'move'
-          setDragOverTarget('root')
+          setDragOverTarget('current')
         }}
         onDragLeave={(e) => {
           if (e.currentTarget === e.target) {
-            setDragOverTarget((cur) => (cur === 'root' ? null : cur))
+            setDragOverTarget((cur) => (cur === 'current' ? null : cur))
           }
         }}
-        onDrop={handleDropOnRoot}
+        onDrop={handleDropOnCurrent}
       >
-        {rootFolders.map((f) => renderFolder(f, 0))}
-        {rootBoards.map((b) => renderBoardRow(b, 0))}
+        {visibleFolders.map((f) => renderFolderRow(f))}
+        {visibleBoards.map((b) => renderBoardRow(b))}
         {isEmpty && <div className="board-picker-empty">No saved boards</div>}
       </div>
       {menu && (
