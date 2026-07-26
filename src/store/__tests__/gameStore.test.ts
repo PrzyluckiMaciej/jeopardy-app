@@ -37,7 +37,7 @@ function makeQuestion(overrides: Partial<Question> = {}): Question {
 
 describe('useBoardStore', () => {
   beforeEach(() => {
-    useBoardStore.setState({ boards: [] })
+    useBoardStore.setState({ boards: [], games: [], folders: [] })
   })
 
   describe('saveBoard', () => {
@@ -85,6 +85,78 @@ describe('useBoardStore', () => {
 
     it('returns undefined when not found', () => {
       expect(useBoardStore.getState().getBoard('missing')).toBeUndefined()
+    })
+  })
+
+  describe('folders', () => {
+    it('creates a folder at root', () => {
+      const id = useBoardStore.getState().createFolder('My Folder')
+      const folders = useBoardStore.getState().folders
+      expect(folders).toHaveLength(1)
+      expect(folders[0].id).toBe(id)
+      expect(folders[0].name).toBe('My Folder')
+      expect(folders[0].parentId).toBeNull()
+    })
+
+    it('creates a nested folder', () => {
+      const parentId = useBoardStore.getState().createFolder('Parent')
+      const childId = useBoardStore.getState().createFolder('Child', parentId)
+      const child = useBoardStore.getState().folders.find((f) => f.id === childId)
+      expect(child?.parentId).toBe(parentId)
+    })
+
+    it('renames a folder', () => {
+      const id = useBoardStore.getState().createFolder('Old')
+      useBoardStore.getState().renameFolder(id, 'New')
+      expect(useBoardStore.getState().folders[0].name).toBe('New')
+    })
+
+    it('deletes a folder and reparents children to its parent', () => {
+      const rootId = useBoardStore.getState().createFolder('Root')
+      const midId = useBoardStore.getState().createFolder('Mid', rootId)
+      const nestedId = useBoardStore.getState().createFolder('Nested', midId)
+      useBoardStore.getState().saveBoard(makeBoard({ id: 'b1', folderId: midId }))
+
+      useBoardStore.getState().deleteFolder(midId)
+
+      expect(useBoardStore.getState().folders.find((f) => f.id === midId)).toBeUndefined()
+      expect(useBoardStore.getState().folders.find((f) => f.id === nestedId)?.parentId).toBe(rootId)
+      expect(useBoardStore.getState().boards.find((b) => b.id === 'b1')?.folderId).toBe(rootId)
+    })
+
+    it('moves a board into a folder', () => {
+      const folderId = useBoardStore.getState().createFolder('F')
+      useBoardStore.getState().saveBoard(makeBoard({ id: 'b1' }))
+      useBoardStore.getState().moveBoardToFolder('b1', folderId)
+      expect(useBoardStore.getState().boards[0].folderId).toBe(folderId)
+    })
+
+    it('moves a board to root', () => {
+      const folderId = useBoardStore.getState().createFolder('F')
+      useBoardStore.getState().saveBoard(makeBoard({ id: 'b1', folderId }))
+      useBoardStore.getState().moveBoardToFolder('b1', null)
+      expect(useBoardStore.getState().boards[0].folderId).toBeNull()
+    })
+
+    it('moves a folder under another folder', () => {
+      const a = useBoardStore.getState().createFolder('A')
+      const b = useBoardStore.getState().createFolder('B')
+      useBoardStore.getState().moveFolder(b, a)
+      expect(useBoardStore.getState().folders.find((f) => f.id === b)?.parentId).toBe(a)
+    })
+
+    it('rejects moving a folder into itself', () => {
+      const a = useBoardStore.getState().createFolder('A')
+      useBoardStore.getState().moveFolder(a, a)
+      expect(useBoardStore.getState().folders.find((f) => f.id === a)?.parentId).toBeNull()
+    })
+
+    it('rejects moving a folder into its descendant', () => {
+      const a = useBoardStore.getState().createFolder('A')
+      const b = useBoardStore.getState().createFolder('B', a)
+      const c = useBoardStore.getState().createFolder('C', b)
+      useBoardStore.getState().moveFolder(a, c)
+      expect(useBoardStore.getState().folders.find((f) => f.id === a)?.parentId).toBeNull()
     })
   })
 })
