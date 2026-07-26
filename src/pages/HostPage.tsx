@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
-import { Settings, Trash2, Pencil, Check, Copy, Layers, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, RotateCcw, Shuffle, X, Users } from 'lucide-react'
+import { Settings, Trash2, Pencil, Check, Copy, Layers, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, RotateCcw, Shuffle, X, Users, CircleHelp } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useGameStore, useBoardStore } from '../store/gameStore'
 import * as net from '../lib/network'
@@ -1223,12 +1223,19 @@ export default function HostPage() {
               <div className="board-picker-divider" />
 
               <div className="board-picker-boards">
-                <div className="board-picker-section-label">Boards</div>
-                {pickerGame === null && (
-                  <p className="board-picker-hint">
-                    Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, duplicate, or delete.
-                  </p>
-                )}
+                <div className="board-picker-section-label board-picker-boards-header">
+                  <span>Boards</span>
+                  {pickerGame === null && (
+                    <span
+                      className="board-picker-help"
+                      data-tooltip="Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, duplicate, or delete."
+                      aria-label="Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, duplicate, or delete."
+                      tabIndex={0}
+                    >
+                      <CircleHelp size={18} aria-hidden />
+                    </span>
+                  )}
+                </div>
                 {pickerGame === null ? (
                   <BoardPickerTree
                     boards={boardStore.boards}
