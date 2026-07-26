@@ -1578,6 +1578,10 @@ select:focus-visible {
   padding: 0;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
 }
+/* Keep drag hit-testing on the button only — child SVG leave/enter flickers the DnD cursor */
+.board-picker-path-back > * {
+  pointer-events: none;
+}
 .board-picker-path-back:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.25);
@@ -1591,7 +1595,7 @@ select:focus-visible {
   border-color: rgba(212, 160, 23, 0.5);
   color: var(--gold);
 }
-.board-picker-path-back--drag-over::after {
+.board-picker-path-back[data-tooltip]::after {
   content: attr(data-tooltip);
   position: absolute;
   top: calc(100% + 6px);
@@ -1613,6 +1617,12 @@ select:focus-visible {
   text-align: left;
   white-space: normal;
   pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+}
+.board-picker-path-back--drag-over[data-tooltip]::after {
+  opacity: 1;
+  visibility: visible;
 }
 .board-picker-path-input {
   flex: 1;

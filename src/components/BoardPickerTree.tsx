@@ -566,27 +566,35 @@ export default function BoardPickerTree({
           aria-label="Go to parent folder"
           title={activeDrag ? undefined : 'Back'}
           data-tooltip={
-            parentDragOver
+            !atRoot && activeDrag
               ? 'This item will be placed in the parent folder'
               : undefined
           }
+          onDragEnter={(e) => {
+            if (atRoot || !canDropOnParent(activeDrag)) return
+            e.preventDefault()
+            e.stopPropagation()
+            setDragOverTarget('parent')
+          }}
           onDragOver={(e) => {
             if (atRoot) return
             e.preventDefault()
             e.stopPropagation()
             if (canDropOnParent(activeDrag)) {
               e.dataTransfer.dropEffect = 'move'
-              setDragOverTarget('parent')
+              if (dragOverTarget !== 'parent') setDragOverTarget('parent')
             } else {
               e.dataTransfer.dropEffect = 'none'
             }
           }}
-          onDragLeave={() => {
+          onDragLeave={(e) => {
+            const related = e.relatedTarget as Node | null
+            if (related && e.currentTarget.contains(related)) return
             setDragOverTarget((cur) => (cur === 'parent' ? null : cur))
           }}
           onDrop={handleDropOnParent}
         >
-          <ArrowLeft size={16} />
+          <ArrowLeft size={16} aria-hidden />
         </button>
         <input
           className="board-picker-path-input"
