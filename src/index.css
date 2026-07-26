@@ -1282,17 +1282,35 @@ select:focus-visible {
   transform: translateY(0);
 }
 .board-picker-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   text-align: left;
   padding: 8px 12px;
   border-radius: var(--radius-lg);
   font-family: 'Barlow Condensed', sans-serif;
   font-weight: 700;
   font-size: 0.9375rem;
+  line-height: 1.2;
   border: 1px solid transparent;
   background: transparent;
   color: var(--white);
   width: 100%;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.12s ease;
+}
+.board-picker-nav-item__text {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3em;
+  min-width: 0;
+}
+.board-picker-nav-item__count {
+  flex-shrink: 0;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  line-height: inherit;
+  opacity: 0.5;
 }
 .board-picker-nav-item:hover {
   background: rgba(255, 255, 255, 0.05);
@@ -1559,6 +1577,18 @@ select:focus-visible {
   gap: 4px;
   overflow: auto;
   padding-right: var(--space-xs);
+}
+.board-picker-system-folders {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.board-picker-system-sep {
+  height: 1px;
+  margin: 8px 4px 6px;
+  background: var(--border-subtle);
+  flex-shrink: 0;
 }
 .board-picker-boards {
   flex: 1;

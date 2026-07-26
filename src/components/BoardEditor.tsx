@@ -17,7 +17,6 @@ import { generateId } from '../lib/utils'
 import { saveMedia, deleteMedia, getMedia, blobToDataUrl } from '../lib/db'
 import { mimeTypeToMediaType, type MediaType } from '../lib/mediaType'
 import CategorySettingsModal from './CategorySettingsModal'
-import ConfirmModal from './ConfirmModal'
 
 interface Props {
   board: Board
@@ -36,7 +35,6 @@ export default function BoardEditor({ board, globalSettings, onChange, onClose, 
   const [draft, setDraft] = useState<Board>(board)
   const [dirty, setDirty] = useState(false)
   const [showExitConfirm, setShowExitConfirm] = useState(false)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null)
   const [panelExiting, setPanelExiting] = useState(false)
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
@@ -310,6 +308,15 @@ export default function BoardEditor({ board, globalSettings, onChange, onClose, 
 
         <div className="board-editor-toolbar__right">
           <button
+            className="btn-ghost text-sm btn-with-icon"
+            style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}
+            onClick={onDelete}
+            title="Move board to trash"
+          >
+            <Trash2 size={16} aria-hidden />
+            <span>Delete</span>
+          </button>
+          <button
             className="btn-gold text-sm btn-with-icon"
             onClick={saveDraft}
             disabled={!dirty}
@@ -317,15 +324,6 @@ export default function BoardEditor({ board, globalSettings, onChange, onClose, 
           >
             <Save size={16} aria-hidden />
             <span>Save</span>
-          </button>
-          <button
-            className="btn-ghost text-sm btn-with-icon"
-            style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}
-            onClick={() => setShowDeleteConfirm(true)}
-            title="Delete board"
-          >
-            <Trash2 size={16} aria-hidden />
-            <span>Delete</span>
           </button>
           <button
             className="btn-ghost text-sm btn-with-icon"
@@ -776,17 +774,6 @@ export default function BoardEditor({ board, globalSettings, onChange, onClose, 
             </div>
           </div>
         </div>
-      )}
-
-      {showDeleteConfirm && (
-        <ConfirmModal
-          title="Delete board?"
-          message={`Permanently delete “${draft.name}”? This cannot be undone.`}
-          confirmLabel="Delete board"
-          danger
-          onConfirm={onDelete}
-          onCancel={() => setShowDeleteConfirm(false)}
-        />
       )}
     </div>
   )

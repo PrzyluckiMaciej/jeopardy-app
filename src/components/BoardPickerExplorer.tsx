@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState, type DragEvent, type MouseEvent } from 'react'
 import { ArrowLeft, Check, Folder, LayoutGrid } from 'lucide-react'
 import type { Board, BoardFolder } from '../types'
-import { useBoardStore } from '../store/gameStore'
+import { isBoardTrashed, isFolderTrashed, useBoardStore } from '../store/gameStore'
 import ContextMenu, { type ContextMenuItem } from './ContextMenu'
 
 const DND_MIME = 'application/x-jeopardy-picker'
@@ -15,9 +15,12 @@ interface RenameDraft {
   value: string
 }
 
+export type BoardPickerExplorerMode = 'library' | 'trash'
+
 interface Props {
   boards: Board[]
   folders: BoardFolder[]
+  mode?: BoardPickerExplorerMode
   onSelectBoard: (board: Board) => void
   onEditBoard: (board: Board) => void
   onDeleteBoard: (board: Board) => void
@@ -25,6 +28,10 @@ interface Props {
   onDuplicateFolder: (folder: BoardFolder) => void
   onRequestDeleteFolder: (folder: BoardFolder) => void
   onCreateBoard: (folderId: string | null) => void
+  onRestoreBoard?: (board: Board) => void
+  onRestoreFolder?: (folder: BoardFolder) => void
+  onPermanentDeleteBoard?: (board: Board) => void
+  onPermanentDeleteFolder?: (folder: BoardFolder) => void
   /** When set, start inline rename for this folder id (e.g. after create). */
   renameFolderId?: string | null
   onRenameFolderIdChange?: (id: string | null) => void
@@ -85,6 +92,7 @@ function resolvePath(folders: BoardFolder[], path: string): string | null | unde
 export default function BoardPickerExplorer({
   boards,
   folders,
+  mode = 'library',
   onSelectBoard,
   onEditBoard,
   onDeleteBoard,
@@ -92,11 +100,16 @@ export default function BoardPickerExplorer({
   onDuplicateFolder,
   onRequestDeleteFolder,
   onCreateBoard,
+  onRestoreBoard,
+  onRestoreFolder,
+  onPermanentDeleteBoard,
+  onPermanentDeleteFolder,
   renameFolderId: controlledRenameFolderId,
   onRenameFolderIdChange,
   renameBoardId: controlledRenameBoardId,
   onRenameBoardIdChange,
 }: Props) {
+  const isTrash = mode === 'trash'
   const moveBoardToFolder = useBoardStore((s) => s.moveBoardToFolder)
   const moveFolder = useBoardStore((s) => s.moveFolder)
   const renameFolder = useBoardStore((s) => s.renameFolder)
@@ -119,6 +132,15 @@ export default function BoardPickerExplorer({
   } | null>(null)
   const [prevRenameNavKey, setPrevRenameNavKey] = useState<string | null>(null)
 
+  const scopedFolders = useMemo(
+    () => folders.filter((f) => (isTrash ? isFolderTrashed(f) : !isFolderTrashed(f))),
+    [folders, isTrash],
+  )
+  const scopedBoards = useMemo(
+    () => boards.filter((b) => (isTrash ? isBoardTrashed(b) : !isBoardTrashed(b))),
+    [boards, isTrash],
+  )
+
   const editingFolderId =
     controlledRenameFolderId !== undefined ? controlledRenameFolderId : internalRenameFolderId
   const editingBoardId =
@@ -127,51 +149,53 @@ export default function BoardPickerExplorer({
   const folderRenameValue =
     folderRenameDraft?.id === editingFolderId
       ? folderRenameDraft.value
-      : (folders.find((f) => f.id === editingFolderId)?.name ?? '')
+      : (scopedFolders.find((f) => f.id === editingFolderId)?.name ?? '')
 
   const boardRenameValue =
     boardRenameDraft?.id === editingBoardId
       ? boardRenameDraft.value
-      : (boards.find((b) => b.id === editingBoardId)?.name ?? '')
+      : (scopedBoards.find((b) => b.id === editingBoardId)?.name ?? '')
 
   const folderRenameConflict = useMemo(() => {
-    if (!editingFolderId) return false
+    if (!editingFolderId || isTrash) return false
     const name = folderRenameValue.trim()
     if (!name) return false
-    const folder = folders.find((f) => f.id === editingFolderId)
+    const folder = scopedFolders.find((f) => f.id === editingFolderId)
     if (!folder) return false
     if (folder.name.trim().toLowerCase() === name.toLowerCase()) return false
-    return folders.some(
+    return scopedFolders.some(
       (f) =>
         f.id !== editingFolderId &&
         f.parentId === folder.parentId &&
         f.name.trim().toLowerCase() === name.toLowerCase(),
     )
-  }, [editingFolderId, folderRenameValue, folders])
+  }, [editingFolderId, folderRenameValue, scopedFolders, isTrash])
 
   // Adjust navigation while rendering when the current folder disappears or a rename starts.
-  if (userFolderId !== null && !folders.some((f) => f.id === userFolderId)) {
+  if (userFolderId !== null && !scopedFolders.some((f) => f.id === userFolderId)) {
     setUserFolderId(null)
   }
 
   const renameNavKey = editingBoardId ?? editingFolderId ?? null
-  if (renameNavKey !== prevRenameNavKey) {
+  if (!isTrash && renameNavKey !== prevRenameNavKey) {
     setPrevRenameNavKey(renameNavKey)
     if (editingBoardId) {
-      const board = boards.find((b) => b.id === editingBoardId)
+      const board = scopedBoards.find((b) => b.id === editingBoardId)
       if (board) setUserFolderId(board.folderId ?? null)
     } else if (editingFolderId) {
-      const folder = folders.find((f) => f.id === editingFolderId)
+      const folder = scopedFolders.find((f) => f.id === editingFolderId)
       if (folder) setUserFolderId(folder.parentId)
     }
   }
 
   const currentFolderId =
-    userFolderId !== null && !folders.some((f) => f.id === userFolderId) ? null : userFolderId
+    userFolderId !== null && !scopedFolders.some((f) => f.id === userFolderId)
+      ? null
+      : userFolderId
 
   const currentPath = useMemo(
-    () => buildPathString(folders, currentFolderId),
-    [folders, currentFolderId],
+    () => buildPathString(scopedFolders, currentFolderId),
+    [scopedFolders, currentFolderId],
   )
   const pathValue = pathEditing ? pathDraft : currentPath
 
@@ -208,21 +232,21 @@ export default function BoardPickerExplorer({
   )
 
   const visibleFolders = useMemo(() => {
-    return folders
+    return scopedFolders
       .filter((f) => f.parentId === currentFolderId)
       .sort((a, b) => a.name.localeCompare(b.name))
-  }, [folders, currentFolderId])
+  }, [scopedFolders, currentFolderId])
 
   const visibleBoards = useMemo(() => {
-    return boards
+    return scopedBoards
       .filter((b) => (b.folderId ?? null) === currentFolderId)
       .sort((a, b) => a.name.localeCompare(b.name))
-  }, [boards, currentFolderId])
+  }, [scopedBoards, currentFolderId])
 
   const parentFolderId = useMemo(() => {
     if (!currentFolderId) return null
-    return folders.find((f) => f.id === currentFolderId)?.parentId ?? null
-  }, [folders, currentFolderId])
+    return scopedFolders.find((f) => f.id === currentFolderId)?.parentId ?? null
+  }, [scopedFolders, currentFolderId])
 
   function navigateTo(folderId: string | null) {
     setUserFolderId(folderId)
@@ -235,7 +259,7 @@ export default function BoardPickerExplorer({
   }
 
   function commitPath() {
-    const resolved = resolvePath(folders, pathValue.trim())
+    const resolved = resolvePath(scopedFolders, pathValue.trim())
     if (resolved === undefined) {
       setPathDraft(currentPath)
       return
@@ -249,6 +273,7 @@ export default function BoardPickerExplorer({
   }
 
   function openEmptyMenu(e: MouseEvent) {
+    if (isTrash) return
     const target = e.target as HTMLElement
     if (target.closest('.board-picker-board-row, .board-picker-folder-row')) return
     e.preventDefault()
@@ -279,6 +304,26 @@ export default function BoardPickerExplorer({
   function openFolderMenu(e: MouseEvent, folder: BoardFolder) {
     e.preventDefault()
     e.stopPropagation()
+    if (isTrash) {
+      setMenu({
+        x: e.clientX,
+        y: e.clientY,
+        items: [
+          {
+            id: 'restore',
+            label: 'Restore',
+            onSelect: () => onRestoreFolder?.(folder),
+          },
+          {
+            id: 'delete-permanent',
+            label: 'Delete permanently',
+            danger: true,
+            onSelect: () => onPermanentDeleteFolder?.(folder),
+          },
+        ],
+      })
+      return
+    }
     setMenu({
       x: e.clientX,
       y: e.clientY,
@@ -314,6 +359,26 @@ export default function BoardPickerExplorer({
   function openBoardMenu(e: MouseEvent, board: Board) {
     e.preventDefault()
     e.stopPropagation()
+    if (isTrash) {
+      setMenu({
+        x: e.clientX,
+        y: e.clientY,
+        items: [
+          {
+            id: 'restore',
+            label: 'Restore',
+            onSelect: () => onRestoreBoard?.(board),
+          },
+          {
+            id: 'delete-permanent',
+            label: 'Delete permanently',
+            danger: true,
+            onSelect: () => onPermanentDeleteBoard?.(board),
+          },
+        ],
+      })
+      return
+    }
     setMenu({
       x: e.clientX,
       y: e.clientY,
@@ -351,7 +416,7 @@ export default function BoardPickerExplorer({
 
   function commitBoardRename(boardId: string) {
     const name = boardRenameValue.trim()
-    const board = boards.find((b) => b.id === boardId)
+    const board = scopedBoards.find((b) => b.id === boardId)
     if (board && name && name !== board.name) {
       saveBoard({ ...board, name })
     }
@@ -372,15 +437,15 @@ export default function BoardPickerExplorer({
   }
 
   function canDropOnFolder(payload: DragPayload | null, targetFolderId: string): boolean {
-    if (!payload) return false
+    if (isTrash || !payload) return false
     if (payload.type === 'board') return true
     if (payload.id === targetFolderId) return false
-    if (isFolderInside(folders, targetFolderId, payload.id)) return false
+    if (isFolderInside(scopedFolders, targetFolderId, payload.id)) return false
     return true
   }
 
   function canDropOnParent(payload: DragPayload | null): boolean {
-    if (!payload || currentFolderId === null) return false
+    if (isTrash || !payload || currentFolderId === null) return false
     if (parentFolderId === null) return true
     return canDropOnFolder(payload, parentFolderId)
   }
@@ -388,6 +453,10 @@ export default function BoardPickerExplorer({
   function handleDropOnFolder(e: DragEvent, targetFolderId: string) {
     e.preventDefault()
     e.stopPropagation()
+    if (isTrash) {
+      clearDrag()
+      return
+    }
     const payload = activeDrag ?? parseDragPayload(e)
     clearDrag()
     if (!payload || !canDropOnFolder(payload, targetFolderId)) return
@@ -401,6 +470,10 @@ export default function BoardPickerExplorer({
   function handleDropOnParent(e: DragEvent) {
     e.preventDefault()
     e.stopPropagation()
+    if (isTrash) {
+      clearDrag()
+      return
+    }
     const payload = activeDrag ?? parseDragPayload(e)
     clearDrag()
     if (!payload || !canDropOnParent(payload)) return
@@ -413,6 +486,10 @@ export default function BoardPickerExplorer({
 
   function handleDropOnCurrent(e: DragEvent) {
     e.preventDefault()
+    if (isTrash) {
+      clearDrag()
+      return
+    }
     const payload = activeDrag ?? parseDragPayload(e)
     clearDrag()
     if (!payload) return
@@ -420,20 +497,21 @@ export default function BoardPickerExplorer({
       moveBoardToFolder(payload.id, currentFolderId)
     } else {
       if (currentFolderId && payload.id === currentFolderId) return
-      if (currentFolderId && isFolderInside(folders, currentFolderId, payload.id)) return
+      if (currentFolderId && isFolderInside(scopedFolders, currentFolderId, payload.id)) return
       moveFolder(payload.id, currentFolderId)
     }
   }
 
   function renderBoardRow(board: Board) {
-    const isEditing = editingBoardId === board.id
+    const isEditing = !isTrash && editingBoardId === board.id
 
     return (
       <div
         key={board.id}
         className="board-picker-board-row board-picker-explorer-row"
-        draggable={!isEditing}
+        draggable={!isTrash && !isEditing}
         onDragStart={(e) => {
+          if (isTrash) return
           setDragData(e, { type: 'board', id: board.id })
         }}
         onDragEnd={clearDrag}
@@ -482,7 +560,9 @@ export default function BoardPickerExplorer({
           <button
             type="button"
             className="board-picker-board-btn"
-            onClick={() => onSelectBoard(board)}
+            onClick={() => {
+              if (!isTrash) onSelectBoard(board)
+            }}
           >
             <LayoutGrid size={14} className="flex-shrink-0 opacity-70" />
             <span className="font-condensed font-bold truncate">{board.name}</span>
@@ -493,20 +573,22 @@ export default function BoardPickerExplorer({
   }
 
   function renderFolderRow(folder: BoardFolder) {
-    const isEditing = editingFolderId === folder.id
+    const isEditing = !isTrash && editingFolderId === folder.id
     const dropKey = `folder:${folder.id}`
-    const isDragOver = dragOverTarget === dropKey
+    const isDragOver = !isTrash && dragOverTarget === dropKey
 
     return (
       <div
         key={folder.id}
         className={`board-picker-folder-row board-picker-explorer-row${isDragOver ? ' board-picker-folder-row--drag-over' : ''}`}
-        draggable={!isEditing}
+        draggable={!isTrash && !isEditing}
         onDragStart={(e) => {
+          if (isTrash) return
           setDragData(e, { type: 'folder', id: folder.id })
         }}
         onDragEnd={clearDrag}
         onDragOver={(e) => {
+          if (isTrash) return
           e.preventDefault()
           e.stopPropagation()
           if (canDropOnFolder(activeDrag, folder.id)) {
@@ -579,8 +661,8 @@ export default function BoardPickerExplorer({
   }
 
   const isEmpty = visibleFolders.length === 0 && visibleBoards.length === 0
-  const currentDragOver = dragOverTarget === 'current'
-  const parentDragOver = dragOverTarget === 'parent'
+  const currentDragOver = !isTrash && dragOverTarget === 'current'
+  const parentDragOver = !isTrash && dragOverTarget === 'parent'
   const atRoot = currentFolderId === null
 
   return (
@@ -594,18 +676,18 @@ export default function BoardPickerExplorer({
           aria-label="Go to parent folder"
           title={activeDrag ? undefined : 'Back'}
           data-tooltip={
-            !atRoot && activeDrag
+            !isTrash && !atRoot && activeDrag
               ? 'This item will be placed in the parent folder'
               : undefined
           }
           onDragEnter={(e) => {
-            if (atRoot || !canDropOnParent(activeDrag)) return
+            if (isTrash || atRoot || !canDropOnParent(activeDrag)) return
             e.preventDefault()
             e.stopPropagation()
             setDragOverTarget('parent')
           }}
           onDragOver={(e) => {
-            if (atRoot) return
+            if (isTrash || atRoot) return
             e.preventDefault()
             e.stopPropagation()
             if (canDropOnParent(activeDrag)) {
@@ -657,6 +739,7 @@ export default function BoardPickerExplorer({
         className={`board-picker-boards__scroll board-picker-explorer${currentDragOver ? ' board-picker-explorer--drag-over' : ''}`}
         onContextMenu={openEmptyMenu}
         onDragOver={(e) => {
+          if (isTrash) return
           e.preventDefault()
           e.dataTransfer.dropEffect = 'move'
           setDragOverTarget('current')
@@ -670,7 +753,11 @@ export default function BoardPickerExplorer({
       >
         {visibleFolders.map((f) => renderFolderRow(f))}
         {visibleBoards.map((b) => renderBoardRow(b))}
-        {isEmpty && <div className="board-picker-empty">No saved boards</div>}
+        {isEmpty && (
+          <div className="board-picker-empty">
+            {isTrash ? 'Trash is empty' : 'No saved boards'}
+          </div>
+        )}
       </div>
       {menu && (
         <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={closeMenu} />

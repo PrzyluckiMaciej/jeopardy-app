@@ -44,6 +44,10 @@ export interface Board {
   dailyDoubleQuestionId?: string
   /** Folder containing this board; null/absent = All Boards root */
   folderId?: string | null
+  /** Set when the board is in the trash */
+  trashedAt?: number | null
+  /** Folder to restore into; null = All Boards root */
+  restoreFolderId?: string | null
   createdAt: number
   updatedAt: number
 }
@@ -53,6 +57,10 @@ export interface BoardFolder {
   name: string
   /** Parent folder; null = All Boards root */
   parentId: string | null
+  /** Set when the folder is in the trash */
+  trashedAt?: number | null
+  /** Parent to restore under; null = All Boards root */
+  restoreParentId?: string | null
   createdAt: number
   updatedAt: number
 }

@@ -168,6 +168,111 @@ describe('useBoardStore', () => {
       expect(state.games[0].boardIds).toEqual(['b3'])
     })
 
+    it('trashes a board and unlinks it from games', () => {
+      useBoardStore.getState().saveBoard(makeBoard({ id: 'b1', folderId: null }))
+      useBoardStore.getState().createGame('G')
+      const gameId = useBoardStore.getState().games[0].id
+      useBoardStore.getState().addBoardToGame(gameId, 'b1')
+
+      useBoardStore.getState().trashBoard('b1')
+
+      const board = useBoardStore.getState().boards.find((b) => b.id === 'b1')
+      expect(board?.trashedAt).toEqual(expect.any(Number))
+      expect(board?.restoreFolderId).toBeNull()
+      expect(useBoardStore.getState().games[0].boardIds).toEqual([])
+    })
+
+    it('restores a board to its previous folder', () => {
+      const folderId = useBoardStore.getState().createFolder('F')
+      useBoardStore.getState().saveBoard(makeBoard({ id: 'b1', folderId }))
+      useBoardStore.getState().trashBoard('b1')
+      useBoardStore.getState().restoreBoard('b1')
+
+      const board = useBoardStore.getState().boards.find((b) => b.id === 'b1')
+      expect(board?.trashedAt).toBeNull()
+      expect(board?.restoreFolderId).toBeNull()
+      expect(board?.folderId).toBe(folderId)
+    })
+
+    it('restores a board to root when previous folder is trashed', () => {
+      const folderId = useBoardStore.getState().createFolder('F')
+      useBoardStore.getState().saveBoard(makeBoard({ id: 'b1', folderId }))
+      useBoardStore.getState().trashBoard('b1')
+      useBoardStore.getState().trashFolder(folderId)
+      useBoardStore.getState().restoreBoard('b1')
+
+      const board = useBoardStore.getState().boards.find((b) => b.id === 'b1')
+      expect(board?.trashedAt).toBeNull()
+      expect(board?.folderId).toBeNull()
+    })
+
+    it('trashes a folder subtree and unlinks boards from games', () => {
+      const rootId = useBoardStore.getState().createFolder('Root')
+      const midId = useBoardStore.getState().createFolder('Mid', rootId)
+      const nestedId = useBoardStore.getState().createFolder('Nested', midId)
+      useBoardStore.getState().saveBoard(makeBoard({ id: 'b1', folderId: midId }))
+      useBoardStore.getState().saveBoard(makeBoard({ id: 'b2', folderId: nestedId }))
+      useBoardStore.getState().saveBoard(makeBoard({ id: 'b3', folderId: rootId }))
+      useBoardStore.getState().createGame('G')
+      const gameId = useBoardStore.getState().games[0].id
+      useBoardStore.getState().addBoardToGame(gameId, 'b1')
+      useBoardStore.getState().addBoardToGame(gameId, 'b3')
+
+      useBoardStore.getState().trashFolder(midId)
+
+      const state = useBoardStore.getState()
+      expect(state.folders.find((f) => f.id === midId)?.trashedAt).toEqual(expect.any(Number))
+      expect(state.folders.find((f) => f.id === nestedId)?.trashedAt).toEqual(expect.any(Number))
+      expect(state.folders.find((f) => f.id === rootId)?.trashedAt).toBeUndefined()
+      expect(state.boards.find((b) => b.id === 'b1')?.trashedAt).toEqual(expect.any(Number))
+      expect(state.boards.find((b) => b.id === 'b2')?.trashedAt).toEqual(expect.any(Number))
+      expect(state.boards.find((b) => b.id === 'b3')?.trashedAt).toBeUndefined()
+      expect(state.games[0].boardIds).toEqual(['b3'])
+    })
+
+    it('restores a folder subtree to its previous parent', () => {
+      const rootId = useBoardStore.getState().createFolder('Root')
+      const midId = useBoardStore.getState().createFolder('Mid', rootId)
+      const nestedId = useBoardStore.getState().createFolder('Nested', midId)
+      useBoardStore.getState().saveBoard(makeBoard({ id: 'b1', folderId: midId }))
+
+      useBoardStore.getState().trashFolder(midId)
+      useBoardStore.getState().restoreFolder(midId)
+
+      const state = useBoardStore.getState()
+      expect(state.folders.find((f) => f.id === midId)?.trashedAt).toBeNull()
+      expect(state.folders.find((f) => f.id === midId)?.parentId).toBe(rootId)
+      expect(state.folders.find((f) => f.id === nestedId)?.trashedAt).toBeNull()
+      expect(state.folders.find((f) => f.id === nestedId)?.parentId).toBe(midId)
+      expect(state.boards.find((b) => b.id === 'b1')?.trashedAt).toBeNull()
+      expect(state.boards.find((b) => b.id === 'b1')?.folderId).toBe(midId)
+    })
+
+    it('restores a folder to root when previous parent is gone', () => {
+      const rootId = useBoardStore.getState().createFolder('Root')
+      const midId = useBoardStore.getState().createFolder('Mid', rootId)
+      useBoardStore.getState().trashFolder(midId)
+      useBoardStore.getState().deleteFolder(rootId)
+      useBoardStore.getState().restoreFolder(midId)
+
+      expect(useBoardStore.getState().folders.find((f) => f.id === midId)?.parentId).toBeNull()
+      expect(useBoardStore.getState().folders.find((f) => f.id === midId)?.trashedAt).toBeNull()
+    })
+
+    it('empties the trash permanently', () => {
+      const folderId = useBoardStore.getState().createFolder('F')
+      useBoardStore.getState().saveBoard(makeBoard({ id: 'b1', folderId }))
+      useBoardStore.getState().saveBoard(makeBoard({ id: 'b2' }))
+      useBoardStore.getState().trashFolder(folderId)
+      useBoardStore.getState().trashBoard('b2')
+
+      useBoardStore.getState().emptyTrash()
+
+      const state = useBoardStore.getState()
+      expect(state.folders).toHaveLength(0)
+      expect(state.boards).toHaveLength(0)
+    })
+
     it('moves a board into a folder', () => {
       const folderId = useBoardStore.getState().createFolder('F')
       useBoardStore.getState().saveBoard(makeBoard({ id: 'b1' }))

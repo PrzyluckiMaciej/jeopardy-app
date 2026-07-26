@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { Settings, Trash2, Pencil, Check, Copy, Layers, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, RotateCcw, Shuffle, X, Users, CircleHelp } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { useGameStore, useBoardStore } from '../store/gameStore'
+import { useGameStore, useBoardStore, isBoardTrashed, isFolderTrashed } from '../store/gameStore'
 import * as net from '../lib/network'
 import type { Board, BoardFolder, Player, NetMessage, Question, GameSettings, PlayerSyncStatus } from '../types'
 import { createDefaultBoard, cellId } from '../lib/utils'
@@ -17,7 +17,6 @@ import {
 } from '../lib/playerJoin'
 import BoardEditor from '../components/BoardEditor'
 import BoardPickerExplorer from '../components/BoardPickerExplorer'
-import ConfirmModal from '../components/ConfirmModal'
 import ContextMenu, { type ContextMenuItem } from '../components/ContextMenu'
 import GameBoard from '../components/GameBoard'
 import QuestionOverlay from '../components/QuestionOverlay'
@@ -26,6 +25,22 @@ import Scoreboard from '../components/Scoreboard'
 import Podium from '../components/Podium'
 
 type Tab = 'board' | 'settings'
+
+/** Collect folder id and all descendant folder ids. */
+function collectFolderSubtree(folders: BoardFolder[], rootId: string): Set<string> {
+  const ids = new Set<string>([rootId])
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const f of folders) {
+      if (!ids.has(f.id) && f.parentId != null && ids.has(f.parentId)) {
+        ids.add(f.id)
+        changed = true
+      }
+    }
+  }
+  return ids
+}
 
 function pickRandom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
@@ -68,8 +83,6 @@ export default function HostPage() {
   const [boardPickerExiting, setBoardPickerExiting] = useState(false)
   const [copyFeedback, setCopyFeedback] = useState<'hidden' | 'visible' | 'hiding'>('hidden')
   const [showDdNoControlAlert, setShowDdNoControlAlert] = useState(false)
-  const [boardPendingDelete, setBoardPendingDelete] = useState<Board | null>(null)
-  const [folderPendingDelete, setFolderPendingDelete] = useState<BoardFolder | null>(null)
   const [renameFolderId, setRenameFolderId] = useState<string | null>(null)
   const [renameBoardId, setRenameBoardId] = useState<string | null>(null)
   const [boardContextMenu, setBoardContextMenu] = useState<{
@@ -77,9 +90,15 @@ export default function HostPage() {
     y: number
     items: ContextMenuItem[]
   } | null>(null)
+  const [trashNavMenu, setTrashNavMenu] = useState<{
+    x: number
+    y: number
+    items: ContextMenuItem[]
+  } | null>(null)
   const [boardTransitionExiting, setBoardTransitionExiting] = useState(false)
 
-  const [pickerGame, setPickerGame] = useState<string | null>(null)
+  /** `'all'` | `'trash'` | game id */
+  const [pickerNav, setPickerNav] = useState<string>('all')
   const [creatingGame, setCreatingGame] = useState(false)
   const [newGameName, setNewGameName] = useState('')
   const [editingGameId, setEditingGameId] = useState<string | null>(null)
@@ -450,7 +469,105 @@ export default function HostPage() {
           id: 'delete',
           label: 'Delete',
           danger: true,
-          onSelect: () => setBoardPendingDelete(board),
+          onSelect: () => handleTrashBoard(board.id),
+        },
+      ],
+    })
+  }
+
+  function clearActiveBoardIfNeeded(boardId: string) {
+    if (activeBoard?.id === boardId) {
+      setActiveBoard(null)
+      setEditing(false)
+      patchState({ board: null, answeredCells: [], phase: 'lobby' })
+      clearMediaSync()
+      net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+    }
+  }
+
+  function clearActiveBoardIfInIds(boardIds: Set<string>) {
+    if (activeBoard && boardIds.has(activeBoard.id)) {
+      setActiveBoard(null)
+      setEditing(false)
+      patchState({ board: null, answeredCells: [], phase: 'lobby' })
+      clearMediaSync()
+      net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+    }
+  }
+
+  function handleTrashBoard(id: string) {
+    boardStore.trashBoard(id)
+    if (renameBoardId === id) setRenameBoardId(null)
+    clearActiveBoardIfNeeded(id)
+  }
+
+  function handleTrashFolder(folder: BoardFolder) {
+    const before = useBoardStore.getState()
+    const folderIds = collectFolderSubtree(before.folders, folder.id)
+    const boardIds = new Set(
+      before.boards
+        .filter((b) => b.folderId != null && folderIds.has(b.folderId))
+        .map((b) => b.id),
+    )
+    boardStore.trashFolder(folder.id)
+    if (renameFolderId === folder.id) setRenameFolderId(null)
+    clearActiveBoardIfInIds(boardIds)
+  }
+
+  function handleRestoreBoard(board: Board) {
+    boardStore.restoreBoard(board.id)
+  }
+
+  function handleRestoreFolder(folder: BoardFolder) {
+    boardStore.restoreFolder(folder.id)
+  }
+
+  function handlePermanentDeleteBoard(board: Board) {
+    boardStore.deleteBoard(board.id)
+    if (renameBoardId === board.id) setRenameBoardId(null)
+    clearActiveBoardIfNeeded(board.id)
+  }
+
+  function handlePermanentDeleteFolder(folder: BoardFolder) {
+    const before = useBoardStore.getState()
+    const folderIds = collectFolderSubtree(before.folders, folder.id)
+    const boardIds = new Set(
+      before.boards
+        .filter((b) => b.folderId != null && folderIds.has(b.folderId))
+        .map((b) => b.id),
+    )
+    boardStore.deleteFolder(folder.id)
+    if (renameFolderId === folder.id) setRenameFolderId(null)
+    clearActiveBoardIfInIds(boardIds)
+  }
+
+  function handleEmptyTrash() {
+    const before = useBoardStore.getState()
+    const trashedBoardIds = new Set(
+      before.boards.filter((b) => isBoardTrashed(b)).map((b) => b.id),
+    )
+    for (const b of before.boards) {
+      if (b.folderId != null) {
+        const folder = before.folders.find((f) => f.id === b.folderId)
+        if (folder && isFolderTrashed(folder)) trashedBoardIds.add(b.id)
+      }
+    }
+    boardStore.emptyTrash()
+    clearActiveBoardIfInIds(trashedBoardIds)
+  }
+
+  function openTrashNavMenu(e: ReactMouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    setTrashNavMenu({
+      x: e.clientX,
+      y: e.clientY,
+      items: [
+        {
+          id: 'empty-trash',
+          label: 'Empty Trash',
+          danger: true,
+          onSelect: () => handleEmptyTrash(),
         },
       ],
     })
@@ -587,21 +704,14 @@ export default function HostPage() {
   }
 
   function handleDeleteBoard(id: string) {
-    boardStore.deleteBoard(id)
-    if (activeBoard?.id === id) {
-      setActiveBoard(null)
-      setEditing(false)
-      patchState({ board: null, answeredCells: [], phase: 'lobby' })
-      clearMediaSync()
-      net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
-    }
+    handleTrashBoard(id)
   }
 
   async function handleDuplicateBoard(board: Board) {
     const copy = await duplicateBoard(board)
     boardStore.saveBoard(copy)
-    if (pickerGame) {
-      boardStore.addBoardToGame(pickerGame, copy.id)
+    if (pickerNav !== 'all' && pickerNav !== 'trash') {
+      boardStore.addBoardToGame(pickerNav, copy.id)
     }
   }
 
@@ -620,7 +730,7 @@ export default function HostPage() {
     boardStore.saveBoard(b)
     setRenameFolderId(null)
     setRenameBoardId(b.id)
-    if (pickerGame !== null) setPickerGame(null)
+    if (pickerNav !== 'all') setPickerNav('all')
   }
 
   function handleBoardChange(b: Board) {
@@ -741,7 +851,7 @@ export default function HostPage() {
   }
 
   function openBoardPicker() {
-    setPickerGame(null)
+    setPickerNav('all')
     setCreatingGame(false)
     setNewGameName('')
     setEditingGameId(null)
@@ -788,7 +898,7 @@ export default function HostPage() {
 
   function handleDeleteGame(id: string) {
     boardStore.deleteGame(id)
-    if (pickerGame === id) setPickerGame(null)
+    if (pickerNav === id) setPickerNav('all')
   }
 
   const board = activeBoard ?? state.board
@@ -796,11 +906,18 @@ export default function HostPage() {
   const inGame = !!state.activeGameId
   const activeGameData = inGame ? boardStore.games.find(g => g.id === state.activeGameId) : null
 
-  const pickerGameData = pickerGame ? boardStore.games.find(g => g.id === pickerGame) : null
+  const pickerIsAll = pickerNav === 'all'
+  const pickerIsTrash = pickerNav === 'trash'
+  const pickerGameId = !pickerIsAll && !pickerIsTrash ? pickerNav : null
+  const libraryBoards = boardStore.boards.filter((b) => !isBoardTrashed(b))
+  const trashBoardCount = boardStore.boards.filter((b) => isBoardTrashed(b)).length
+  const pickerGameData = pickerGameId ? boardStore.games.find(g => g.id === pickerGameId) : null
   const pickerBoardIds = pickerGameData?.boardIds ?? []
-  const pickerBoards = pickerGame
-    ? pickerBoardIds.map(id => boardStore.boards.find(b => b.id === id)).filter((b): b is Board => !!b)
-    : boardStore.boards
+  const pickerBoards = pickerGameId
+    ? pickerBoardIds
+        .map(id => boardStore.boards.find(b => b.id === id))
+        .filter((b): b is Board => !!b && !isBoardTrashed(b))
+    : libraryBoards
 
   return (
     <div className="app-page h-screen flex flex-col overflow-hidden page-fade-in" style={{ background: 'var(--navy)' }}>
@@ -1114,16 +1231,36 @@ export default function HostPage() {
 
             <div className="board-picker-body">
               <div className="board-picker-games">
-                <div className="board-picker-section-label">Games</div>
+                <div className="board-picker-system-folders">
+                  <button
+                    type="button"
+                    className={`board-picker-nav-item flex-shrink-0${pickerIsAll ? ' board-picker-nav-item--active' : ''}`}
+                    onClick={() => setPickerNav('all')}
+                  >
+                    <LayoutGrid size={14} className="flex-shrink-0 opacity-70" aria-hidden />
+                    <span className="board-picker-nav-item__text">
+                      <span className="truncate">All Boards</span>
+                      <span className="board-picker-nav-item__count">({libraryBoards.length})</span>
+                    </span>
+                  </button>
 
-                <button
-                  type="button"
-                  className={`board-picker-nav-item flex-shrink-0${pickerGame === null ? ' board-picker-nav-item--active' : ''}`}
-                  onClick={() => setPickerGame(null)}
-                >
-                  All Boards
-                  <span className="ml-1 text-xs opacity-50">({boardStore.boards.length})</span>
-                </button>
+                  <button
+                    type="button"
+                    className={`board-picker-nav-item flex-shrink-0${pickerIsTrash ? ' board-picker-nav-item--active' : ''}`}
+                    onClick={() => setPickerNav('trash')}
+                    onContextMenu={openTrashNavMenu}
+                  >
+                    <Trash2 size={14} className="flex-shrink-0 opacity-70" aria-hidden />
+                    <span className="board-picker-nav-item__text">
+                      <span className="truncate">Trash</span>
+                      <span className="board-picker-nav-item__count">({trashBoardCount})</span>
+                    </span>
+                  </button>
+                </div>
+
+                <div className="board-picker-system-sep" aria-hidden />
+
+                <div className="board-picker-section-label">Games</div>
 
                 {boardStore.games.map((g) =>
                   editingGameId === g.id ? (
@@ -1150,18 +1287,18 @@ export default function HostPage() {
                   ) : (
                     <div
                       key={g.id}
-                      className={`board-picker-game-row${pickerGame === g.id ? ' board-picker-game-row--active' : ''}`}
+                      className={`board-picker-game-row${pickerGameId === g.id ? ' board-picker-game-row--active' : ''}`}
                     >
                       <button
                         type="button"
                         className="board-picker-game-row__btn truncate"
-                        onClick={() => setPickerGame(g.id)}
+                        onClick={() => setPickerNav(g.id)}
                       >
                         <span className="flex items-center gap-1">
                           <Layers size={12} className="flex-shrink-0 opacity-70" />
                           <span className="truncate">{g.name}</span>
                           <span className="text-xs flex-shrink-0 opacity-50">
-                            ({boardStore.boards.filter((b) => g.boardIds.includes(b.id)).length})
+                            ({boardStore.boards.filter((b) => g.boardIds.includes(b.id) && !isBoardTrashed(b)).length})
                           </span>
                         </span>
                       </button>
@@ -1224,29 +1361,43 @@ export default function HostPage() {
 
               <div className="board-picker-boards">
                 <div className="board-picker-section-label board-picker-boards-header">
-                  <span>Boards</span>
-                  {pickerGame === null && (
+                  <span>{pickerIsTrash ? 'Trash' : 'Boards'}</span>
+                  {(pickerIsAll || pickerIsTrash) && (
                     <span
                       className="board-picker-help"
-                      data-tooltip="Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, duplicate, or delete."
-                      aria-label="Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, duplicate, or delete."
+                      data-tooltip={
+                        pickerIsTrash
+                          ? 'Right-click an item to restore it or delete it permanently. Right-click Trash to empty it.'
+                          : 'Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, duplicate, or delete.'
+                      }
+                      aria-label={
+                        pickerIsTrash
+                          ? 'Right-click an item to restore it or delete it permanently. Right-click Trash to empty it.'
+                          : 'Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, duplicate, or delete.'
+                      }
                       tabIndex={0}
                     >
                       <CircleHelp size={18} aria-hidden />
                     </span>
                   )}
                 </div>
-                {pickerGame === null ? (
+                {pickerIsAll || pickerIsTrash ? (
                   <BoardPickerExplorer
+                    key={pickerIsTrash ? 'trash' : 'library'}
+                    mode={pickerIsTrash ? 'trash' : 'library'}
                     boards={boardStore.boards}
                     folders={boardStore.folders}
                     onSelectBoard={handleSelectBoard}
                     onEditBoard={handleEditBoard}
-                    onDeleteBoard={(b) => setBoardPendingDelete(b)}
+                    onDeleteBoard={(b) => handleTrashBoard(b.id)}
                     onDuplicateBoard={(b) => { void handleDuplicateBoard(b) }}
                     onDuplicateFolder={(f) => { void handleDuplicateFolder(f) }}
-                    onRequestDeleteFolder={(f) => setFolderPendingDelete(f)}
+                    onRequestDeleteFolder={handleTrashFolder}
                     onCreateBoard={handleNewBoard}
+                    onRestoreBoard={handleRestoreBoard}
+                    onRestoreFolder={handleRestoreFolder}
+                    onPermanentDeleteBoard={handlePermanentDeleteBoard}
+                    onPermanentDeleteFolder={handlePermanentDeleteFolder}
                     renameFolderId={renameFolderId}
                     onRenameFolderIdChange={setRenameFolderId}
                     renameBoardId={renameBoardId}
@@ -1265,7 +1416,7 @@ export default function HostPage() {
                             type="button"
                             className="board-picker-reorder-btn"
                             disabled={idx === 0}
-                            onClick={() => boardStore.reorderBoardInGame(pickerGame, idx, idx - 1)}
+                            onClick={() => boardStore.reorderBoardInGame(pickerGameId!, idx, idx - 1)}
                             title="Move up"
                           >
                             <ChevronUp size={12} />
@@ -1274,7 +1425,7 @@ export default function HostPage() {
                             type="button"
                             className="board-picker-reorder-btn"
                             disabled={idx === pickerBoards.length - 1}
-                            onClick={() => boardStore.reorderBoardInGame(pickerGame, idx, idx + 1)}
+                            onClick={() => boardStore.reorderBoardInGame(pickerGameId!, idx, idx + 1)}
                             title="Move down"
                           >
                             <ChevronDown size={12} />
@@ -1299,7 +1450,7 @@ export default function HostPage() {
                           type="button"
                           className="board-picker-remove-btn"
                           title="Remove from game"
-                          onClick={() => boardStore.removeBoardFromGame(pickerGame, b.id)}
+                          onClick={() => boardStore.removeBoardFromGame(pickerGameId!, b.id)}
                         >
                           –
                         </button>
@@ -1314,7 +1465,7 @@ export default function HostPage() {
                   )}
 
                   {(() => {
-                    const unassigned = boardStore.boards.filter(
+                    const unassigned = libraryBoards.filter(
                       (b) => !pickerBoardIds.includes(b.id)
                     )
                     if (unassigned.length === 0) return null
@@ -1327,7 +1478,7 @@ export default function HostPage() {
                             <button
                               type="button"
                               className="board-picker-add-btn"
-                              onClick={() => boardStore.addBoardToGame(pickerGame, b.id)}
+                              onClick={() => boardStore.addBoardToGame(pickerGameId!, b.id)}
                             >
                               + Add
                             </button>
@@ -1339,12 +1490,12 @@ export default function HostPage() {
                 </div>
                 )}
 
-                {pickerGame && pickerBoards.length > 0 && (
+                {pickerGameId && pickerBoards.length > 0 && (
                   <div className="flex gap-2 mt-3 flex-shrink-0">
                     <button
                       type="button"
                       className="btn-gold flex-1 flex items-center justify-center gap-2"
-                      onClick={() => handleSelectGame(pickerGame, pickerBoardIds)}
+                      onClick={() => handleSelectGame(pickerGameId, pickerBoardIds)}
                     >
                       <Play size={16} />
                       Play Game
@@ -1398,42 +1549,21 @@ export default function HostPage() {
         </div>
       )}
 
-      {boardPendingDelete && (
-        <ConfirmModal
-          title="Delete board?"
-          message={`Permanently delete “${boardPendingDelete.name}”? This cannot be undone.`}
-          confirmLabel="Delete board"
-          danger
-          onConfirm={() => {
-            handleDeleteBoard(boardPendingDelete.id)
-            if (renameBoardId === boardPendingDelete.id) setRenameBoardId(null)
-            setBoardPendingDelete(null)
-          }}
-          onCancel={() => setBoardPendingDelete(null)}
-        />
-      )}
-
-      {folderPendingDelete && (
-        <ConfirmModal
-          title="Delete folder?"
-          message={`Remove “${folderPendingDelete.name}”? All boards and folders inside will be deleted as well.`}
-          confirmLabel="Delete folder"
-          danger
-          onConfirm={() => {
-            boardStore.deleteFolder(folderPendingDelete.id)
-            if (renameFolderId === folderPendingDelete.id) setRenameFolderId(null)
-            setFolderPendingDelete(null)
-          }}
-          onCancel={() => setFolderPendingDelete(null)}
-        />
-      )}
-
       {boardContextMenu && (
         <ContextMenu
           x={boardContextMenu.x}
           y={boardContextMenu.y}
           items={boardContextMenu.items}
           onClose={() => setBoardContextMenu(null)}
+        />
+      )}
+
+      {trashNavMenu && (
+        <ContextMenu
+          x={trashNavMenu.x}
+          y={trashNavMenu.y}
+          items={trashNavMenu.items}
+          onClose={() => setTrashNavMenu(null)}
         />
       )}
     </div>
