@@ -365,6 +365,12 @@ export default function BoardPickerTree({
     return true
   }
 
+  function canDropOnParent(payload: DragPayload | null): boolean {
+    if (!payload || currentFolderId === null) return false
+    if (parentFolderId === null) return true
+    return canDropOnFolder(payload, parentFolderId)
+  }
+
   function handleDropOnFolder(e: DragEvent, targetFolderId: string) {
     e.preventDefault()
     e.stopPropagation()
@@ -375,6 +381,19 @@ export default function BoardPickerTree({
       moveBoardToFolder(payload.id, targetFolderId)
     } else {
       moveFolder(payload.id, targetFolderId)
+    }
+  }
+
+  function handleDropOnParent(e: DragEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    const payload = activeDrag ?? parseDragPayload(e)
+    clearDrag()
+    if (!payload || !canDropOnParent(payload)) return
+    if (payload.type === 'board') {
+      moveBoardToFolder(payload.id, parentFolderId)
+    } else {
+      moveFolder(payload.id, parentFolderId)
     }
   }
 
@@ -533,6 +552,7 @@ export default function BoardPickerTree({
 
   const isEmpty = visibleFolders.length === 0 && visibleBoards.length === 0
   const currentDragOver = dragOverTarget === 'current'
+  const parentDragOver = dragOverTarget === 'parent'
   const atRoot = currentFolderId === null
 
   return (
@@ -540,11 +560,31 @@ export default function BoardPickerTree({
       <div className="board-picker-path-bar">
         <button
           type="button"
-          className="board-picker-path-back"
+          className={`board-picker-path-back${parentDragOver ? ' board-picker-path-back--drag-over' : ''}`}
           onClick={goBack}
           disabled={atRoot}
           aria-label="Go to parent folder"
-          title="Back"
+          title={activeDrag ? undefined : 'Back'}
+          data-tooltip={
+            parentDragOver
+              ? 'This item will be placed in the parent folder'
+              : undefined
+          }
+          onDragOver={(e) => {
+            if (atRoot) return
+            e.preventDefault()
+            e.stopPropagation()
+            if (canDropOnParent(activeDrag)) {
+              e.dataTransfer.dropEffect = 'move'
+              setDragOverTarget('parent')
+            } else {
+              e.dataTransfer.dropEffect = 'none'
+            }
+          }}
+          onDragLeave={() => {
+            setDragOverTarget((cur) => (cur === 'parent' ? null : cur))
+          }}
+          onDrop={handleDropOnParent}
         >
           <ArrowLeft size={16} />
         </button>

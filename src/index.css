@@ -1563,6 +1563,7 @@ select:focus-visible {
   margin-bottom: var(--space-sm);
 }
 .board-picker-path-back {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1584,6 +1585,34 @@ select:focus-visible {
 .board-picker-path-back:disabled {
   opacity: 0.35;
   cursor: default;
+}
+.board-picker-path-back--drag-over:not(:disabled) {
+  background: rgba(212, 160, 23, 0.16);
+  border-color: rgba(212, 160, 23, 0.5);
+  color: var(--gold);
+}
+.board-picker-path-back--drag-over::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  width: max-content;
+  max-width: 14rem;
+  padding: 8px 10px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  color: #8899cc;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+  text-align: left;
+  white-space: normal;
+  pointer-events: none;
 }
 .board-picker-path-input {
   flex: 1;
