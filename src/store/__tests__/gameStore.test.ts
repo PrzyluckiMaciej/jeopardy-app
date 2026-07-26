@@ -107,8 +107,51 @@ describe('useBoardStore', () => {
 
     it('renames a folder', () => {
       const id = useBoardStore.getState().createFolder('Old')
-      useBoardStore.getState().renameFolder(id, 'New')
+      expect(useBoardStore.getState().renameFolder(id, 'New')).toBe(true)
       expect(useBoardStore.getState().folders[0].name).toBe('New')
+    })
+
+    it('auto-suffixes duplicate folder names in the same parent', () => {
+      const a = useBoardStore.getState().createFolder('Docs')
+      const b = useBoardStore.getState().createFolder('Docs')
+      const folders = useBoardStore.getState().folders
+      expect(folders.find((f) => f.id === a)?.name).toBe('Docs')
+      expect(folders.find((f) => f.id === b)?.name).toBe('Docs (2)')
+    })
+
+    it('allows the same folder name under different parents', () => {
+      const parentA = useBoardStore.getState().createFolder('A')
+      const parentB = useBoardStore.getState().createFolder('B')
+      useBoardStore.getState().createFolder('Shared', parentA)
+      const id = useBoardStore.getState().createFolder('Shared', parentB)
+      expect(useBoardStore.getState().folders.find((f) => f.id === id)?.name).toBe('Shared')
+    })
+
+    it('rejects renaming to a sibling folder name (case-insensitive)', () => {
+      const a = useBoardStore.getState().createFolder('Alpha')
+      const b = useBoardStore.getState().createFolder('Beta')
+      expect(useBoardStore.getState().renameFolder(b, 'alpha')).toBe(false)
+      expect(useBoardStore.getState().folders.find((f) => f.id === b)?.name).toBe('Beta')
+      expect(useBoardStore.getState().renameFolder(a, 'Alpha')).toBe(true)
+    })
+
+    it('suffixes a moved folder when the destination has the same name', () => {
+      const dest = useBoardStore.getState().createFolder('Dest')
+      useBoardStore.getState().createFolder('Twin', dest)
+      const twin = useBoardStore.getState().createFolder('Twin')
+      useBoardStore.getState().moveFolder(twin, dest)
+      expect(useBoardStore.getState().folders.find((f) => f.id === twin)?.name).toBe('Twin (2)')
+      expect(useBoardStore.getState().folders.find((f) => f.id === twin)?.parentId).toBe(dest)
+    })
+
+    it('uniquifies promoted children when deleting a folder', () => {
+      const root = useBoardStore.getState().createFolder('Root')
+      useBoardStore.getState().createFolder('Clash', root)
+      const mid = useBoardStore.getState().createFolder('Mid', root)
+      const nested = useBoardStore.getState().createFolder('Clash', mid)
+      useBoardStore.getState().deleteFolder(mid)
+      expect(useBoardStore.getState().folders.find((f) => f.id === nested)?.parentId).toBe(root)
+      expect(useBoardStore.getState().folders.find((f) => f.id === nested)?.name).toBe('Clash (2)')
     })
 
     it('deletes a folder and reparents children to its parent', () => {

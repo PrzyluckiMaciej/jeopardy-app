@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
-import { Settings, Trash2, Pencil, Check, Copy, FolderOpen, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, RotateCcw, Shuffle, X, Users } from 'lucide-react'
+import { Settings, Trash2, Pencil, Check, Copy, Layers, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, RotateCcw, Shuffle, X, Users, CircleHelp } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useGameStore, useBoardStore } from '../store/gameStore'
 import * as net from '../lib/network'
@@ -16,7 +16,7 @@ import {
   type NameSession,
 } from '../lib/playerJoin'
 import BoardEditor from '../components/BoardEditor'
-import BoardPickerTree from '../components/BoardPickerTree'
+import BoardPickerExplorer from '../components/BoardPickerExplorer'
 import ConfirmModal from '../components/ConfirmModal'
 import ContextMenu, { type ContextMenuItem } from '../components/ContextMenu'
 import GameBoard from '../components/GameBoard'
@@ -1158,7 +1158,7 @@ export default function HostPage() {
                         onClick={() => setPickerGame(g.id)}
                       >
                         <span className="flex items-center gap-1">
-                          <FolderOpen size={12} className="flex-shrink-0 opacity-70" />
+                          <Layers size={12} className="flex-shrink-0 opacity-70" />
                           <span className="truncate">{g.name}</span>
                           <span className="text-xs flex-shrink-0 opacity-50">
                             ({boardStore.boards.filter((b) => g.boardIds.includes(b.id)).length})
@@ -1223,14 +1223,21 @@ export default function HostPage() {
               <div className="board-picker-divider" />
 
               <div className="board-picker-boards">
-                <div className="board-picker-section-label">Boards</div>
-                {pickerGame === null && (
-                  <p className="board-picker-hint">
-                    Right-click empty space or a folder to create items, or a board/folder to edit, duplicate, or delete.
-                  </p>
-                )}
+                <div className="board-picker-section-label board-picker-boards-header">
+                  <span>Boards</span>
+                  {pickerGame === null && (
+                    <span
+                      className="board-picker-help"
+                      data-tooltip="Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, duplicate, or delete."
+                      aria-label="Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, duplicate, or delete."
+                      tabIndex={0}
+                    >
+                      <CircleHelp size={18} aria-hidden />
+                    </span>
+                  )}
+                </div>
                 {pickerGame === null ? (
-                  <BoardPickerTree
+                  <BoardPickerExplorer
                     boards={boardStore.boards}
                     folders={boardStore.folders}
                     onSelectBoard={handleSelectBoard}
@@ -1284,7 +1291,8 @@ export default function HostPage() {
                         >
                           {idx + 1}
                         </span>
-                        <span className="font-condensed font-bold">{b.name}</span>
+                        <LayoutGrid size={14} className="flex-shrink-0 opacity-70" />
+                        <span className="font-condensed font-bold truncate">{b.name}</span>
                       </button>
                       <div className="board-picker-board-row__actions">
                         <button
