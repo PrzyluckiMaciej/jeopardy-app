@@ -1004,10 +1004,9 @@ export default function HostPage() {
                       <div className="h-full flex flex-col items-center justify-center gap-4">
                         <div className="font-condensed text-lg" style={{ color: '#4a5580' }}>No board loaded</div>
                         <div className="flex gap-3">
-                          <button className="btn-gold" onClick={() => handleNewBoard()}>Create new board</button>
-                          {boardStore.boards.length > 0 && (
-                            <button className="btn-outline" onClick={openBoardPicker}>Load existing board</button>
-                          )}
+                          <button className="btn-gold" onClick={openBoardPicker}>
+                            {boardStore.boards.length > 0 ? 'Load existing board' : 'Open board selection'}
+                          </button>
                         </div>
                       </div>
                     )}
@@ -1332,8 +1331,8 @@ export default function HostPage() {
                 </div>
                 )}
 
-                <div className="flex gap-2 mt-3 flex-shrink-0 flex-wrap">
-                  {pickerGame && pickerBoards.length > 0 && (
+                {pickerGame && pickerBoards.length > 0 && (
+                  <div className="flex gap-2 mt-3 flex-shrink-0">
                     <button
                       type="button"
                       className="btn-gold flex-1 flex items-center justify-center gap-2"
@@ -1342,15 +1341,8 @@ export default function HostPage() {
                       <Play size={16} />
                       Play Game
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    className={`btn-gold${pickerGame && pickerBoards.length > 0 ? '' : ' w-full'}`}
-                    onClick={() => handleNewBoard()}
-                  >
-                    + Create New Board
-                  </button>
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
