@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type DragEvent, type MouseEvent } from 'react'
+import { useCallback, useMemo, useState, type DragEvent, type MouseEvent } from 'react'
 import { ArrowLeft, Check, Folder, LayoutGrid } from 'lucide-react'
 import type { Board, BoardFolder } from '../types'
 import { useBoardStore } from '../store/gameStore'
@@ -103,7 +103,8 @@ export default function BoardPickerTree({
   const createFolder = useBoardStore((s) => s.createFolder)
   const saveBoard = useBoardStore((s) => s.saveBoard)
 
-  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
+  const [userFolderId, setUserFolderId] = useState<string | null>(null)
+  const [pathEditing, setPathEditing] = useState(false)
   const [pathDraft, setPathDraft] = useState('/')
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null)
   const [activeDrag, setActiveDrag] = useState<DragPayload | null>(null)
@@ -116,6 +117,7 @@ export default function BoardPickerTree({
     y: number
     items: ContextMenuItem[]
   } | null>(null)
+  const [prevRenameNavKey, setPrevRenameNavKey] = useState<string | null>(null)
 
   const editingFolderId =
     controlledRenameFolderId !== undefined ? controlledRenameFolderId : internalRenameFolderId
@@ -147,43 +149,31 @@ export default function BoardPickerTree({
     )
   }, [editingFolderId, folderRenameValue, folders])
 
+  // Adjust navigation while rendering when the current folder disappears or a rename starts.
+  if (userFolderId !== null && !folders.some((f) => f.id === userFolderId)) {
+    setUserFolderId(null)
+  }
+
+  const renameNavKey = editingBoardId ?? editingFolderId ?? null
+  if (renameNavKey !== prevRenameNavKey) {
+    setPrevRenameNavKey(renameNavKey)
+    if (editingBoardId) {
+      const board = boards.find((b) => b.id === editingBoardId)
+      if (board) setUserFolderId(board.folderId ?? null)
+    } else if (editingFolderId) {
+      const folder = folders.find((f) => f.id === editingFolderId)
+      if (folder) setUserFolderId(folder.parentId)
+    }
+  }
+
+  const currentFolderId =
+    userFolderId !== null && !folders.some((f) => f.id === userFolderId) ? null : userFolderId
+
   const currentPath = useMemo(
     () => buildPathString(folders, currentFolderId),
     [folders, currentFolderId],
   )
-
-  // Keep path input in sync when navigating (unless user is mid-edit — we sync on navigate only)
-  useEffect(() => {
-    setPathDraft(currentPath)
-  }, [currentPath])
-
-  // If current folder was deleted, go to root
-  useEffect(() => {
-    if (currentFolderId && !folders.some((f) => f.id === currentFolderId)) {
-      setCurrentFolderId(null)
-    }
-  }, [folders, currentFolderId])
-
-  // Navigate to a board/folder being renamed so the inline editor is visible
-  useEffect(() => {
-    if (editingBoardId) {
-      const board = boards.find((b) => b.id === editingBoardId)
-      if (board) {
-        const fid = board.folderId ?? null
-        setCurrentFolderId((cur) => (cur === fid ? cur : fid))
-      }
-    }
-  }, [editingBoardId, boards])
-
-  useEffect(() => {
-    if (editingFolderId) {
-      const folder = folders.find((f) => f.id === editingFolderId)
-      if (folder) {
-        const parent = folder.parentId
-        setCurrentFolderId((cur) => (cur === parent ? cur : parent))
-      }
-    }
-  }, [editingFolderId, folders])
+  const pathValue = pathEditing ? pathDraft : currentPath
 
   const setEditingFolderId = useCallback(
     (id: string | null, name?: string) => {
@@ -235,7 +225,8 @@ export default function BoardPickerTree({
   }, [folders, currentFolderId])
 
   function navigateTo(folderId: string | null) {
-    setCurrentFolderId(folderId)
+    setUserFolderId(folderId)
+    setPathEditing(false)
   }
 
   function goBack() {
@@ -244,12 +235,13 @@ export default function BoardPickerTree({
   }
 
   function commitPath() {
-    const resolved = resolvePath(folders, pathDraft.trim())
+    const resolved = resolvePath(folders, pathValue.trim())
     if (resolved === undefined) {
       setPathDraft(currentPath)
       return
     }
-    navigateTo(resolved)
+    setPathEditing(false)
+    setUserFolderId(resolved)
   }
 
   function closeMenu() {
@@ -634,20 +626,29 @@ export default function BoardPickerTree({
         </button>
         <input
           className="board-picker-path-input"
-          value={pathDraft}
+          value={pathValue}
+          onFocus={() => {
+            setPathDraft(currentPath)
+            setPathEditing(true)
+          }}
           onChange={(e) => setPathDraft(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault()
               commitPath()
+              ;(e.target as HTMLInputElement).blur()
             }
             if (e.key === 'Escape') {
               e.preventDefault()
               setPathDraft(currentPath)
+              setPathEditing(false)
               ;(e.target as HTMLInputElement).blur()
             }
           }}
-          onBlur={() => setPathDraft(currentPath)}
+          onBlur={() => {
+            setPathEditing(false)
+            setPathDraft(currentPath)
+          }}
           aria-label="Folder path"
           spellCheck={false}
         />
