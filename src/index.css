@@ -1502,6 +1502,31 @@ select:focus-visible {
   color: var(--white);
   min-width: 0;
 }
+.board-picker-input--error {
+  border-color: #e07070;
+}
+.board-picker-rename {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 1;
+}
+.board-picker-rename-error {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 1.25rem;
+  right: 0;
+  z-index: 2;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #e07070;
+  line-height: 1.2;
+  pointer-events: none;
+  text-shadow: 0 1px 2px rgba(6, 11, 40, 0.9);
+}
 .board-picker-save-btn {
   background: none;
   border: none;
@@ -1509,6 +1534,10 @@ select:focus-visible {
   color: var(--green);
   padding: 4px;
   border-radius: var(--radius-sm);
+}
+.board-picker-save-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 .board-picker-divider {
   width: 1px;

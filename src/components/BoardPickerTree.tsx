@@ -132,6 +132,21 @@ export default function BoardPickerTree({
       ? boardRenameDraft.value
       : (boards.find((b) => b.id === editingBoardId)?.name ?? '')
 
+  const folderRenameConflict = useMemo(() => {
+    if (!editingFolderId) return false
+    const name = folderRenameValue.trim()
+    if (!name) return false
+    const folder = folders.find((f) => f.id === editingFolderId)
+    if (!folder) return false
+    if (folder.name.trim().toLowerCase() === name.toLowerCase()) return false
+    return folders.some(
+      (f) =>
+        f.id !== editingFolderId &&
+        f.parentId === folder.parentId &&
+        f.name.trim().toLowerCase() === name.toLowerCase(),
+    )
+  }, [editingFolderId, folderRenameValue, folders])
+
   const currentPath = useMemo(
     () => buildPathString(folders, currentFolderId),
     [folders, currentFolderId],
@@ -260,7 +275,9 @@ export default function BoardPickerTree({
           label: 'New Folder',
           onSelect: () => {
             const id = createFolder('New Folder', currentFolderId)
-            setEditingFolderId(id, 'New Folder')
+            const createdName =
+              useBoardStore.getState().folders.find((f) => f.id === id)?.name ?? 'New Folder'
+            setEditingFolderId(id, createdName)
           },
         },
       ],
@@ -331,8 +348,13 @@ export default function BoardPickerTree({
 
   function commitRename(folderId: string) {
     const name = folderRenameValue.trim()
-    if (name) renameFolder(folderId, name)
-    setEditingFolderId(null)
+    if (!name) {
+      setEditingFolderId(null)
+      return
+    }
+    if (renameFolder(folderId, name)) {
+      setEditingFolderId(null)
+    }
   }
 
   function commitBoardRename(boardId: string) {
@@ -509,32 +531,46 @@ export default function BoardPickerTree({
         onContextMenu={(e) => openFolderMenu(e, folder)}
       >
         {isEditing ? (
-          <div className="flex items-center gap-1 flex-1 min-w-0">
-            <Folder size={14} className="flex-shrink-0 opacity-70" />
-            <input
-              className="board-picker-input"
-              value={folderRenameValue}
-              onChange={(e) => {
-                if (editingFolderId) {
-                  setFolderRenameDraft({ id: editingFolderId, value: e.target.value })
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') commitRename(folder.id)
-                if (e.key === 'Escape') setEditingFolderId(null)
-              }}
-              onBlur={() => commitRename(folder.id)}
-              autoFocus
-              onClick={(e) => e.stopPropagation()}
-            />
-            <button
-              type="button"
-              className="board-picker-save-btn"
-              onClick={() => commitRename(folder.id)}
-              title="Save"
-            >
-              <Check size={14} />
-            </button>
+          <div className="board-picker-rename flex-1 min-w-0">
+            <div className="flex items-center gap-1 min-w-0">
+              <Folder size={14} className="flex-shrink-0 opacity-70" />
+              <input
+                className={`board-picker-input${folderRenameConflict ? ' board-picker-input--error' : ''}`}
+                value={folderRenameValue}
+                onChange={(e) => {
+                  if (editingFolderId) {
+                    setFolderRenameDraft({ id: editingFolderId, value: e.target.value })
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitRename(folder.id)
+                  if (e.key === 'Escape') setEditingFolderId(null)
+                }}
+                onBlur={() => commitRename(folder.id)}
+                autoFocus
+                onClick={(e) => e.stopPropagation()}
+                aria-invalid={folderRenameConflict}
+                aria-describedby={folderRenameConflict ? `folder-rename-error-${folder.id}` : undefined}
+              />
+              <button
+                type="button"
+                className="board-picker-save-btn"
+                onClick={() => commitRename(folder.id)}
+                title="Save"
+                disabled={folderRenameConflict}
+              >
+                <Check size={14} />
+              </button>
+            </div>
+            {folderRenameConflict && (
+              <div
+                id={`folder-rename-error-${folder.id}`}
+                className="board-picker-rename-error"
+                role="alert"
+              >
+                Name already taken in this folder
+              </div>
+            )}
           </div>
         ) : (
           <button

@@ -18,7 +18,8 @@ interface BoardStore {
   removeBoardFromGame: (gameId: string, boardId: string) => void
   reorderBoardInGame: (gameId: string, fromIndex: number, toIndex: number) => void
   createFolder: (name: string, parentId?: string | null) => string
-  renameFolder: (id: string, name: string) => void
+  /** Returns false if the name conflicts with a sibling folder. */
+  renameFolder: (id: string, name: string) => boolean
   deleteFolder: (id: string) => void
   moveBoardToFolder: (boardId: string, folderId: string | null) => void
   moveFolder: (folderId: string, newParentId: string | null) => void
@@ -38,6 +39,39 @@ function isDescendantFolder(
     current = folders.find((f) => f.id === current!.parentId)
   }
   return false
+}
+
+/** Case-insensitive sibling name check. Empty names count as taken. */
+function isFolderNameTaken(
+  folders: BoardFolder[],
+  parentId: string | null,
+  name: string,
+  excludeId?: string,
+): boolean {
+  const key = name.trim().toLowerCase()
+  if (!key) return true
+  return folders.some(
+    (f) =>
+      f.id !== excludeId &&
+      f.parentId === parentId &&
+      f.name.trim().toLowerCase() === key,
+  )
+}
+
+/** Returns `desiredName` or `desiredName (2)`, `(3)`, … until unique among siblings. */
+function uniqueFolderName(
+  folders: BoardFolder[],
+  parentId: string | null,
+  desiredName: string,
+  excludeId?: string,
+): string {
+  const base = desiredName.trim() || 'New Folder'
+  if (!isFolderNameTaken(folders, parentId, base, excludeId)) return base
+  let n = 2
+  while (isFolderNameTaken(folders, parentId, `${base} (${n})`, excludeId)) {
+    n += 1
+  }
+  return `${base} (${n})`
 }
 
 function migrateBoardStore(persisted: unknown): PersistedBoardStore {
@@ -132,31 +166,52 @@ export const useBoardStore = create<BoardStore>()(
       createFolder: (name, parentId = null) => {
         const id = crypto.randomUUID()
         const now = Date.now()
-        set((s) => ({
-          folders: [
-            ...s.folders,
-            { id, name, parentId: parentId ?? null, createdAt: now, updatedAt: now },
-          ],
-        }))
+        const parent = parentId ?? null
+        set((s) => {
+          const uniqueName = uniqueFolderName(s.folders, parent, name)
+          return {
+            folders: [
+              ...s.folders,
+              { id, name: uniqueName, parentId: parent, createdAt: now, updatedAt: now },
+            ],
+          }
+        })
         return id
       },
-      renameFolder: (id, name) =>
-        set((s) => ({
-          folders: s.folders.map((f) =>
-            f.id === id ? { ...f, name, updatedAt: Date.now() } : f
-          ),
-        })),
+      renameFolder: (id, name) => {
+        let renamed = false
+        set((s) => {
+          const folder = s.folders.find((f) => f.id === id)
+          if (!folder) return s
+          const trimmed = name.trim()
+          if (!trimmed) return s
+          if (isFolderNameTaken(s.folders, folder.parentId, trimmed, id)) return s
+          renamed = true
+          return {
+            folders: s.folders.map((f) =>
+              f.id === id ? { ...f, name: trimmed, updatedAt: Date.now() } : f
+            ),
+          }
+        })
+        return renamed
+      },
       deleteFolder: (id) =>
         set((s) => {
           const folder = s.folders.find((f) => f.id === id)
           if (!folder) return s
           const parentId = folder.parentId
+          let nextFolders = s.folders.filter((f) => f.id !== id)
+          const toPromote = s.folders.filter((f) => f.parentId === id)
+          for (const child of toPromote) {
+            const uniqueName = uniqueFolderName(nextFolders, parentId, child.name, child.id)
+            nextFolders = nextFolders.map((f) =>
+              f.id === child.id
+                ? { ...f, parentId, name: uniqueName, updatedAt: Date.now() }
+                : f
+            )
+          }
           return {
-            folders: s.folders
-              .filter((f) => f.id !== id)
-              .map((f) =>
-                f.parentId === id ? { ...f, parentId, updatedAt: Date.now() } : f
-              ),
+            folders: nextFolders,
             boards: s.boards.map((b) =>
               b.folderId === id ? { ...b, folderId: parentId, updatedAt: Date.now() } : b
             ),
@@ -180,10 +235,14 @@ export const useBoardStore = create<BoardStore>()(
           ) {
             return s
           }
+          const folder = s.folders.find((f) => f.id === folderId)
+          if (!folder) return s
+          if (folder.parentId === newParentId) return s
+          const uniqueName = uniqueFolderName(s.folders, newParentId, folder.name, folderId)
           return {
             folders: s.folders.map((f) =>
               f.id === folderId
-                ? { ...f, parentId: newParentId, updatedAt: Date.now() }
+                ? { ...f, parentId: newParentId, name: uniqueName, updatedAt: Date.now() }
                 : f
             ),
           }
