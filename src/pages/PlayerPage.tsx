@@ -523,7 +523,12 @@ export default function PlayerPage() {
   const showPlayerActionZone =
     judgeResult != null || canShowBuzzDock || keepSidebarDuringQuestion
   const showDdMobileCompact =
-    isMobileViewport && isDD && (uiPhase === 'dailyDouble' || uiPhase === 'dailyDoubleBet')
+    isMobileViewport && isDD && uiPhase === 'dailyDouble'
+  const showPlayerClueContent =
+    uiPhase === 'question' ||
+    uiPhase === 'buzzing' ||
+    uiPhase === 'revealed' ||
+    uiPhase === 'dailyDoubleBet'
   const showMobilePlayerDock = isMobileViewport && showPlayerActionZone
   const showSidebarPanel =
     !showDdMobileCompact &&
@@ -893,57 +898,21 @@ export default function PlayerPage() {
                 </div>
               )}
 
-              {/* DD wager submitted — waiting for host to reveal clue */}
-              {uiPhase === 'dailyDoubleBet' && (
-                <div className={`daily-double-phase${showDdMobileCompact ? ' daily-double-phase--mobile' : ''}`}>
-                  <div className={`daily-double-title${showDdMobileCompact ? ' daily-double-title--compact' : ''}`}>
-                    DAILY DOUBLE!
-                  </div>
-                  {state.dailyDouble?.wager != null && (
-                    <div className="font-condensed text-center" style={{ color: 'var(--gold-bright)', fontSize: showDdMobileCompact ? '1.125rem' : '1.5rem' }}>
+              {/* Clue/media (question phases + DD after wager — independent reveals) */}
+              {showPlayerClueContent && (
+                <>
+                  {uiPhase === 'dailyDoubleBet' && state.dailyDouble?.wager != null && isMobileViewport && (
+                    <div
+                      className="font-condensed text-center mb-3"
+                      style={{ color: 'var(--gold-bright)', fontSize: '1.125rem' }}
+                    >
                       {isDDPlayer ? 'Wager submitted' : `${ddPlayerInfo?.name} wagered`}:{' '}
                       <span className="font-display">${state.dailyDouble.wager}</span>
                     </div>
                   )}
-
-                  {displayMedia && displayMediaRevealed && (
-                    <QuestionMediaPlayer
-                      media={displayMedia}
-                      role="player"
-                      playback={state.mediaPlayback}
-                      mountKey={mediaRevealKey}
-                      mediaActive={displayMediaRevealed}
-                      loading={mediaLoading}
-                      className="question-overlay-media clue-reveal"
-                    />
-                  )}
-
-                  {!displayMedia && mediaLoading && displayMediaRevealed && (
-                    <QuestionMediaPlayer
-                      media={{ type: 'audio', dataUrl: '' }}
-                      role="player"
-                      playback={null}
-                      mountKey={mediaRevealKey}
-                      mediaActive={false}
-                      loading={true}
-                      className="question-overlay-media clue-reveal"
-                    />
-                  )}
-
-                  {!displayClueRevealed && (
-                    <div className="font-condensed text-sm animate-pulse text-center" style={{ color: '#4a5580' }}>
-                      Waiting for host to reveal the clue…
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Clue (shown in question/buzzing/revealed phases) */}
-              {(uiPhase === 'question' || uiPhase === 'buzzing' || uiPhase === 'revealed') && (
-                <>
                   {!displayClueRevealed && !displayMediaRevealed && (
                     <div className="question-overlay-waiting font-condensed text-sm animate-pulse">
-                      Waiting for host to reveal the clue…
+                      Waiting for host…
                     </div>
                   )}
                   <QuestionOverlayText
@@ -1022,7 +991,7 @@ export default function PlayerPage() {
                   )
                 )}
 
-                {/* DD: bet phase — wager confirmed, waiting for host to reveal clue */}
+                {/* DD: bet phase — wager confirmed; host may reveal clue and/or media independently */}
                 {isDD && uiPhase === 'dailyDoubleBet' && (
                   <div className="w-full flex flex-col gap-2 items-center">
                     {isDDPlayer ? (
@@ -1034,9 +1003,11 @@ export default function PlayerPage() {
                         {ddPlayerInfo?.name} wagered <span className="font-display">${state.dailyDouble?.wager}</span>
                       </div>
                     )}
-                    <div className="font-condensed text-sm text-center" style={{ color: '#4a5580' }}>
-                      Waiting for host to reveal the clue…
-                    </div>
+                    {!displayClueRevealed && !displayMediaRevealed && (
+                      <div className="font-condensed text-sm text-center" style={{ color: '#4a5580' }}>
+                        Waiting for host…
+                      </div>
+                    )}
                   </div>
                 )}
 
