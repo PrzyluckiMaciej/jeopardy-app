@@ -24,6 +24,19 @@ export function formatScore(score: number): string {
   return `$${score.toLocaleString()}`
 }
 
+/** Formats board created/modified timestamps for the picker; missing/invalid → '-'. */
+export function formatBoardTimestamp(ms: number | null | undefined): string {
+  if (ms == null || !Number.isFinite(ms)) return '-'
+  const date = new Date(ms)
+  if (Number.isNaN(date.getTime())) return '-'
+  const dd = String(date.getDate()).padStart(2, '0')
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const yyyy = String(date.getFullYear())
+  const hh = String(date.getHours()).padStart(2, '0')
+  const min = String(date.getMinutes()).padStart(2, '0')
+  return `${dd}.${mm}.${yyyy} ${hh}:${min}`
+}
+
 export function cellId(categoryId: string, questionId: string): string {
   return `${categoryId}-${questionId}`
 }

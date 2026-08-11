@@ -1743,23 +1743,119 @@ select:focus-visible {
   border-radius: var(--radius-lg);
   border: 1px solid transparent;
   transition: border-color 0.15s ease, background 0.15s ease;
+  min-width: 0;
+  overflow-x: auto;
 }
 .board-picker-explorer--drag-over {
   border-color: rgba(212, 160, 23, 0.45);
   background: rgba(212, 160, 23, 0.06);
 }
+.board-picker-explorer-header,
+.board-picker-explorer-row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) 10.5rem 10.5rem;
+  align-items: center;
+  column-gap: 10px;
+  min-width: 30rem;
+}
+.board-picker-explorer-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 4px 8px 6px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--navy-mid);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8899cc;
+}
+.board-picker-explorer-header__name,
+.board-picker-explorer-header__date {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+}
+.board-picker-explorer-header__name:hover,
+.board-picker-explorer-header__date:hover,
+.board-picker-explorer-header__sort--active {
+  color: var(--white);
+}
+.board-picker-explorer-header__sort-icon {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
 .board-picker-explorer-row {
   margin-bottom: 0;
 }
-.board-picker-folder-row {
+.board-picker-board-row.board-picker-explorer-row {
+  padding: 6px 8px;
+  gap: 0;
+  column-gap: 10px;
+  border-radius: var(--radius-lg);
+  border: 1px solid transparent;
+  cursor: grab;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.board-picker-board-row.board-picker-explorer-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.board-picker-explorer-row__name {
+  min-width: 0;
   display: flex;
   align-items: center;
-  gap: 4px;
+}
+.board-picker-explorer-row__name .board-picker-board-btn {
+  width: 100%;
+  padding: 2px 0;
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  font-weight: 700;
+}
+.board-picker-explorer-row__name .board-picker-board-btn:hover {
+  background: none;
+  border: none;
+  box-shadow: none;
+}
+.board-picker-explorer-row__date {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  color: #8899cc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  user-select: none;
+}
+.board-picker-folder-row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) 10.5rem 10.5rem;
+  align-items: center;
+  column-gap: 10px;
   padding: 6px 8px;
   border-radius: var(--radius-lg);
   border: 1px solid transparent;
   cursor: grab;
   transition: background 0.15s ease, border-color 0.15s ease;
+  min-width: 30rem;
 }
 .board-picker-folder-row:hover {
   background: rgba(255, 255, 255, 0.04);
@@ -1782,7 +1878,43 @@ select:focus-visible {
   color: var(--white);
   cursor: pointer;
   min-width: 0;
+  width: 100%;
   padding: 2px 0;
+}
+
+/* Transparent, content-sized drag preview (boards) */
+.board-picker-drag-ghost {
+  position: absolute;
+  top: -9999px;
+  left: -9999px;
+  display: inline-flex;
+  width: max-content;
+  max-width: 16rem;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  pointer-events: none;
+  color: var(--white);
+}
+.board-picker-drag-ghost,
+.board-picker-drag-ghost * {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  border-radius: 0 !important;
+}
+.board-picker-drag-ghost .board-picker-board-btn,
+.board-picker-drag-ghost .board-picker-folder-row__btn {
+  width: auto;
+  max-width: 16rem;
+  padding: 2px 0;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 0.9375rem;
+  color: var(--white);
 }
 
 /* ── Add to game dropdown ───────────────────────────────────── */

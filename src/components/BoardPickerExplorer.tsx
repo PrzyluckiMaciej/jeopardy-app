@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useState, type DragEvent, type MouseEvent } from 'react'
-import { ArrowLeft, Check, Folder, LayoutGrid } from 'lucide-react'
+import { useCallback, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react'
+import { ArrowLeft, Check, ChevronDown, ChevronUp, Folder, LayoutGrid } from 'lucide-react'
 import type { Board, BoardFolder } from '../types'
 import { collectFolderSubtree } from '../lib/folderSubtree'
+import { formatBoardTimestamp } from '../lib/utils'
 import { isBoardTrashed, isFolderTrashed, useBoardStore } from '../store/gameStore'
 import ContextMenu, { type ContextMenuItem } from './ContextMenu'
 
@@ -10,6 +11,9 @@ const DND_MIME = 'application/x-jeopardy-picker'
 type DragPayload =
   | { type: 'board'; id: string }
   | { type: 'folder'; id: string }
+
+type SortKey = 'name' | 'createdAt' | 'updatedAt'
+type SortDir = 'asc' | 'desc'
 
 interface RenameDraft {
   id: string
@@ -91,6 +95,31 @@ function resolvePath(folders: BoardFolder[], path: string): string | null | unde
   return parentId
 }
 
+function compareOptionalTime(a: number | null | undefined, b: number | null | undefined, dir: SortDir): number {
+  const aMissing = a == null || !Number.isFinite(a)
+  const bMissing = b == null || !Number.isFinite(b)
+  if (aMissing && bMissing) return 0
+  if (aMissing) return 1
+  if (bMissing) return -1
+  const cmp = a - b
+  return dir === 'asc' ? cmp : -cmp
+}
+
+function compareBySortKey(
+  a: { name: string; createdAt?: number; updatedAt?: number },
+  b: { name: string; createdAt?: number; updatedAt?: number },
+  key: SortKey,
+  dir: SortDir,
+): number {
+  if (key === 'name') {
+    const cmp = a.name.localeCompare(b.name)
+    return dir === 'asc' ? cmp : -cmp
+  }
+  const cmp = compareOptionalTime(a[key], b[key], dir)
+  if (cmp !== 0) return cmp
+  return a.name.localeCompare(b.name)
+}
+
 export default function BoardPickerExplorer({
   boards,
   folders,
@@ -134,6 +163,9 @@ export default function BoardPickerExplorer({
     items: ContextMenuItem[]
   } | null>(null)
   const [prevRenameNavKey, setPrevRenameNavKey] = useState<string | null>(null)
+  const [sortKey, setSortKey] = useState<SortKey>('createdAt')
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const dragGhostRef = useRef<HTMLElement | null>(null)
 
   const scopedFolders = useMemo(
     () => folders.filter((f) => (isTrash ? isFolderTrashed(f) : !isFolderTrashed(f))),
@@ -234,18 +266,45 @@ export default function BoardPickerExplorer({
     [onRenameBoardIdChange, onRenameFolderIdChange],
   )
 
-  const visibleFolders = useMemo(() => {
-    return scopedFolders
+  const visibleEntries = useMemo(() => {
+    type Entry =
+      | { kind: 'folder'; item: BoardFolder }
+      | { kind: 'board'; item: Board }
+    const folders: Entry[] = scopedFolders
       .filter((f) => f.parentId === currentFolderId)
-      .sort((a, b) => a.name.localeCompare(b.name))
-  }, [scopedFolders, currentFolderId])
-
-  const visibleBoards = useMemo(() => {
-    return scopedBoards
+      .map((item) => ({ kind: 'folder', item }))
+    const boards: Entry[] = scopedBoards
       .filter((b) => (b.folderId ?? null) === currentFolderId)
-      .sort((a, b) => a.name.localeCompare(b.name))
-  }, [scopedBoards, currentFolderId])
+      .map((item) => ({ kind: 'board', item }))
+    return [...folders, ...boards].sort((a, b) =>
+      compareBySortKey(a.item, b.item, sortKey, sortDir),
+    )
+  }, [scopedFolders, scopedBoards, currentFolderId, sortKey, sortDir])
 
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortKey(key)
+      setSortDir('asc')
+    }
+  }
+
+  function renderSortHeader(key: SortKey, label: string, className: string) {
+    const active = sortKey === key
+    const Icon = sortDir === 'asc' ? ChevronUp : ChevronDown
+    return (
+      <button
+        type="button"
+        className={`${className}${active ? ' board-picker-explorer-header__sort--active' : ''}`}
+        onClick={() => toggleSort(key)}
+        aria-label={`Sort by ${label}${active ? `, currently ${sortDir === 'asc' ? 'ascending' : 'descending'}` : ''}`}
+      >
+        <span>{label}</span>
+        {active && <Icon size={12} className="board-picker-explorer-header__sort-icon" aria-hidden />}
+      </button>
+    )
+  }
   const parentFolderId = useMemo(() => {
     if (!currentFolderId) return null
     return scopedFolders.find((f) => f.id === currentFolderId)?.parentId ?? null
@@ -442,20 +501,53 @@ export default function BoardPickerExplorer({
     const name = boardRenameValue.trim()
     const board = scopedBoards.find((b) => b.id === boardId)
     if (board && name && name !== board.name) {
-      saveBoard({ ...board, name })
+      saveBoard({ ...board, name, updatedAt: Date.now() })
     }
     setEditingBoardId(null)
   }
 
-  function setDragData(e: DragEvent, payload: DragPayload) {
+  function renderDateColumns(createdAt?: number, updatedAt?: number) {
+    return (
+      <>
+        <span className="board-picker-explorer-row__date">{formatBoardTimestamp(createdAt)}</span>
+        <span className="board-picker-explorer-row__date">{formatBoardTimestamp(updatedAt)}</span>
+      </>
+    )
+  }
+
+  function clearDragGhost() {
+    dragGhostRef.current?.remove()
+    dragGhostRef.current = null
+  }
+
+  function setDragData(e: DragEvent, payload: DragPayload, dragImageEl?: HTMLElement | null) {
     const json = JSON.stringify(payload)
     e.dataTransfer.setData(DND_MIME, json)
     e.dataTransfer.setData('text/plain', json)
     e.dataTransfer.effectAllowed = 'move'
+    clearDragGhost()
+    if (dragImageEl) {
+      const contentEl =
+        dragImageEl.querySelector('.board-picker-board-btn, .board-picker-folder-row__btn') ??
+        dragImageEl
+      const source = contentEl instanceof HTMLElement ? contentEl : dragImageEl
+      const ghost = document.createElement('div')
+      ghost.className = 'board-picker-drag-ghost'
+      ghost.appendChild(source.cloneNode(true))
+      document.body.appendChild(ghost)
+      dragGhostRef.current = ghost
+      const rect = source.getBoundingClientRect()
+      e.dataTransfer.setDragImage(
+        ghost,
+        Math.min(Math.max(e.clientX - rect.left, 0), rect.width),
+        Math.min(Math.max(e.clientY - rect.top, 0), rect.height),
+      )
+    }
     setActiveDrag(payload)
   }
 
   function clearDrag() {
+    clearDragGhost()
     setActiveDrag(null)
     setDragOverTarget(null)
   }
@@ -536,7 +628,12 @@ export default function BoardPickerExplorer({
         draggable={!isTrash && !isEditing}
         onDragStart={(e) => {
           if (isTrash) return
-          setDragData(e, { type: 'board', id: board.id })
+          const nameEl = e.currentTarget.querySelector('.board-picker-explorer-row__name')
+          setDragData(
+            e,
+            { type: 'board', id: board.id },
+            nameEl instanceof HTMLElement ? nameEl : null,
+          )
         }}
         onDragEnd={clearDrag}
         onDragOver={(e) => {
@@ -552,46 +649,49 @@ export default function BoardPickerExplorer({
           openBoardMenu(e, board)
         }}
       >
-        {isEditing ? (
-          <div className="flex items-center gap-1 flex-1 min-w-0">
-            <LayoutGrid size={14} className="flex-shrink-0 opacity-70" />
-            <input
-              className="board-picker-input"
-              value={boardRenameValue}
-              onChange={(e) => {
-                if (editingBoardId) {
-                  setBoardRenameDraft({ id: editingBoardId, value: e.target.value })
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') commitBoardRename(board.id)
-                if (e.key === 'Escape') setEditingBoardId(null)
-              }}
-              onBlur={() => commitBoardRename(board.id)}
-              autoFocus
-              onClick={(e) => e.stopPropagation()}
-            />
+        <div className="board-picker-explorer-row__name">
+          {isEditing ? (
+            <div className="flex items-center gap-1 flex-1 min-w-0">
+              <LayoutGrid size={14} className="flex-shrink-0 opacity-70" />
+              <input
+                className="board-picker-input"
+                value={boardRenameValue}
+                onChange={(e) => {
+                  if (editingBoardId) {
+                    setBoardRenameDraft({ id: editingBoardId, value: e.target.value })
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitBoardRename(board.id)
+                  if (e.key === 'Escape') setEditingBoardId(null)
+                }}
+                onBlur={() => commitBoardRename(board.id)}
+                autoFocus
+                onClick={(e) => e.stopPropagation()}
+              />
+              <button
+                type="button"
+                className="board-picker-save-btn"
+                onClick={() => commitBoardRename(board.id)}
+                title="Save"
+              >
+                <Check size={14} />
+              </button>
+            </div>
+          ) : (
             <button
               type="button"
-              className="board-picker-save-btn"
-              onClick={() => commitBoardRename(board.id)}
-              title="Save"
+              className="board-picker-board-btn"
+              onClick={() => {
+                if (!isTrash) onSelectBoard(board)
+              }}
             >
-              <Check size={14} />
+              <LayoutGrid size={14} className="flex-shrink-0 opacity-70" />
+              <span className="font-condensed font-bold truncate">{board.name}</span>
             </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            className="board-picker-board-btn"
-            onClick={() => {
-              if (!isTrash) onSelectBoard(board)
-            }}
-          >
-            <LayoutGrid size={14} className="flex-shrink-0 opacity-70" />
-            <span className="font-condensed font-bold truncate">{board.name}</span>
-          </button>
-        )}
+          )}
+        </div>
+        {renderDateColumns(board.createdAt, board.updatedAt)}
       </div>
     )
   }
@@ -608,7 +708,12 @@ export default function BoardPickerExplorer({
         draggable={!isTrash && !isEditing}
         onDragStart={(e) => {
           if (isTrash) return
-          setDragData(e, { type: 'folder', id: folder.id })
+          const nameEl = e.currentTarget.querySelector('.board-picker-explorer-row__name')
+          setDragData(
+            e,
+            { type: 'folder', id: folder.id },
+            nameEl instanceof HTMLElement ? nameEl : null,
+          )
         }}
         onDragEnd={clearDrag}
         onDragOver={(e) => {
@@ -628,63 +733,66 @@ export default function BoardPickerExplorer({
         onDrop={(e) => handleDropOnFolder(e, folder.id)}
         onContextMenu={(e) => openFolderMenu(e, folder)}
       >
-        {isEditing ? (
-          <div className="board-picker-rename flex-1 min-w-0">
-            <div className="flex items-center gap-1 min-w-0">
-              <Folder size={14} className="flex-shrink-0 opacity-70" />
-              <input
-                className={`board-picker-input${folderRenameConflict ? ' board-picker-input--error' : ''}`}
-                value={folderRenameValue}
-                onChange={(e) => {
-                  if (editingFolderId) {
-                    setFolderRenameDraft({ id: editingFolderId, value: e.target.value })
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') commitRename(folder.id)
-                  if (e.key === 'Escape') setEditingFolderId(null)
-                }}
-                onBlur={() => commitRename(folder.id)}
-                autoFocus
-                onClick={(e) => e.stopPropagation()}
-                aria-invalid={folderRenameConflict}
-                aria-describedby={folderRenameConflict ? `folder-rename-error-${folder.id}` : undefined}
-              />
-              <button
-                type="button"
-                className="board-picker-save-btn"
-                onClick={() => commitRename(folder.id)}
-                title="Save"
-                disabled={folderRenameConflict}
-              >
-                <Check size={14} />
-              </button>
-            </div>
-            {folderRenameConflict && (
-              <div
-                id={`folder-rename-error-${folder.id}`}
-                className="board-picker-rename-error"
-                role="alert"
-              >
-                Name already taken in this folder
+        <div className="board-picker-explorer-row__name">
+          {isEditing ? (
+            <div className="board-picker-rename flex-1 min-w-0">
+              <div className="flex items-center gap-1 min-w-0">
+                <Folder size={14} className="flex-shrink-0 opacity-70" />
+                <input
+                  className={`board-picker-input${folderRenameConflict ? ' board-picker-input--error' : ''}`}
+                  value={folderRenameValue}
+                  onChange={(e) => {
+                    if (editingFolderId) {
+                      setFolderRenameDraft({ id: editingFolderId, value: e.target.value })
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commitRename(folder.id)
+                    if (e.key === 'Escape') setEditingFolderId(null)
+                  }}
+                  onBlur={() => commitRename(folder.id)}
+                  autoFocus
+                  onClick={(e) => e.stopPropagation()}
+                  aria-invalid={folderRenameConflict}
+                  aria-describedby={folderRenameConflict ? `folder-rename-error-${folder.id}` : undefined}
+                />
+                <button
+                  type="button"
+                  className="board-picker-save-btn"
+                  onClick={() => commitRename(folder.id)}
+                  title="Save"
+                  disabled={folderRenameConflict}
+                >
+                  <Check size={14} />
+                </button>
               </div>
-            )}
-          </div>
-        ) : (
-          <button
-            type="button"
-            className="board-picker-folder-row__btn"
-            onClick={() => navigateTo(folder.id)}
-          >
-            <Folder size={14} className="flex-shrink-0 opacity-70" />
-            <span className="truncate">{folder.name}</span>
-          </button>
-        )}
+              {folderRenameConflict && (
+                <div
+                  id={`folder-rename-error-${folder.id}`}
+                  className="board-picker-rename-error"
+                  role="alert"
+                >
+                  Name already taken in this folder
+                </div>
+              )}
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="board-picker-folder-row__btn"
+              onClick={() => navigateTo(folder.id)}
+            >
+              <Folder size={14} className="flex-shrink-0 opacity-70" />
+              <span className="truncate">{folder.name}</span>
+            </button>
+          )}
+        </div>
+        {renderDateColumns(folder.createdAt, folder.updatedAt)}
       </div>
     )
   }
 
-  const isEmpty = visibleFolders.length === 0 && visibleBoards.length === 0
+  const isEmpty = visibleEntries.length === 0
   const currentDragOver = !isTrash && dragOverTarget === 'current'
   const parentDragOver = !isTrash && dragOverTarget === 'parent'
   const atRoot = currentFolderId === null
@@ -775,8 +883,16 @@ export default function BoardPickerExplorer({
         }}
         onDrop={handleDropOnCurrent}
       >
-        {visibleFolders.map((f) => renderFolderRow(f))}
-        {visibleBoards.map((b) => renderBoardRow(b))}
+        {!isEmpty && (
+          <div className="board-picker-explorer-header">
+            {renderSortHeader('name', 'Name', 'board-picker-explorer-header__name')}
+            {renderSortHeader('createdAt', 'Created at', 'board-picker-explorer-header__date')}
+            {renderSortHeader('updatedAt', 'Last modified at', 'board-picker-explorer-header__date')}
+          </div>
+        )}
+        {visibleEntries.map((entry) =>
+          entry.kind === 'folder' ? renderFolderRow(entry.item) : renderBoardRow(entry.item),
+        )}
         {isEmpty && (
           <div className="board-picker-empty">
             {isTrash ? 'Trash is empty' : 'No saved boards'}
