@@ -288,29 +288,13 @@ export default function QuestionOverlay({ state, settings }: Props) {
               </div>
             )}
 
-            {isDD && phase === 'dailyDoubleBet' && dailyDouble.wager != null && (
+            {isDD && ddPlayer && dailyDouble.wager != null &&
+              (phase === 'dailyDoubleBet' || phase === 'question' || phase === 'revealed' || phase === 'buzzing') && (
               <>
                 <div className="font-condensed text-sm text-gold-bright">
-                  {ddPlayer?.name} wagered <span className="font-display text-lg">${dailyDouble.wager}</span>
+                  {ddPlayer.name} wagered <span className="font-display text-lg">${dailyDouble.wager}</span>
                 </div>
-                <button type="button" className="btn-gold w-full py-3" onClick={handleRevealDailyDoubleClue}>
-                  Reveal clue
-                </button>
-                {activeMedia && !mediaRevealed && (
-                  <button type="button" className="btn-outline w-full btn-with-icon justify-center" onClick={handleRevealMedia}>
-                    <Eye size={16} aria-hidden />
-                    <span>Reveal media</span>
-                  </button>
-                )}
-              </>
-            )}
-
-            {isDD && (phase === 'question' || phase === 'revealed') && ddPlayer && (
-              <div className="flex flex-col gap-2">
-                <div className="font-condensed text-sm text-gold-bright">
-                  {ddPlayer.name} wagered <span className="font-display">${dailyDouble.wager}</span>
-                </div>
-                {phase === 'question' && (
+                {(phase === 'dailyDoubleBet' || phase === 'question') && (
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -332,7 +316,18 @@ export default function QuestionOverlay({ state, settings }: Props) {
                     </button>
                   </div>
                 )}
-              </div>
+                {phase === 'dailyDoubleBet' && hasClue && (
+                  <button type="button" className="btn-gold w-full py-3" onClick={handleRevealDailyDoubleClue}>
+                    Reveal clue
+                  </button>
+                )}
+                {phase === 'dailyDoubleBet' && activeMedia && !mediaRevealed && (
+                  <button type="button" className="btn-outline w-full btn-with-icon justify-center" onClick={handleRevealMedia}>
+                    <Eye size={16} aria-hidden />
+                    <span>Reveal media</span>
+                  </button>
+                )}
+              </>
             )}
 
             {!isDD && phase === 'question' && (
