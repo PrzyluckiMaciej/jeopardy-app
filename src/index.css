@@ -1255,6 +1255,8 @@ select:focus-visible {
   flex-shrink: 0;
 }
 .board-picker-boards-header {
+  position: relative;
+  z-index: 2; /* above sticky explorer header so help tooltip isn't sliced */
   display: flex;
   align-items: center;
   justify-content: space-between;
