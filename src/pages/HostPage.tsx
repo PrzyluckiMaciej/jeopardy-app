@@ -17,6 +17,7 @@ import {
   type NameSession,
 } from '../lib/playerJoin'
 import AddToGameModal from '../components/AddToGameModal'
+import ConfirmModal from '../components/ConfirmModal'
 import BoardEditor from '../components/BoardEditor'
 import BoardPickerExplorer from '../components/BoardPickerExplorer'
 import ContextMenu, { type ContextMenuItem } from '../components/ContextMenu'
@@ -95,6 +96,7 @@ export default function HostPage() {
   const [mobilePlayersOpen, setMobilePlayersOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [mobileNavExiting, setMobileNavExiting] = useState(false)
+  const [showExitConfirm, setShowExitConfirm] = useState(false)
 
   const peerToClient = useRef(new Map<string, string>())
   const nameSessions = useRef(new Map<string, NameSession>())
@@ -839,7 +841,12 @@ export default function HostPage() {
   }
 
   function handleExitRoom() {
-    if (!window.confirm('Exit the room? All players will be disconnected.')) return
+    if (mobileNavOpen) closeMobileNav()
+    setShowExitConfirm(true)
+  }
+
+  function confirmExitRoom() {
+    setShowExitConfirm(false)
     net.leaveRoom()
     store.reset()
     navigate('/')
@@ -1678,6 +1685,17 @@ export default function HostPage() {
           onConfirm={handleAddToGameConfirm}
           onCreateAndConfirm={handleAddToGameCreateAndConfirm}
           onCancel={() => setAddToGameTarget(null)}
+        />
+      )}
+
+      {showExitConfirm && (
+        <ConfirmModal
+          title="Exit room?"
+          message="All players will be disconnected."
+          confirmLabel="Exit"
+          danger
+          onConfirm={confirmExitRoom}
+          onCancel={() => setShowExitConfirm(false)}
         />
       )}
     </div>

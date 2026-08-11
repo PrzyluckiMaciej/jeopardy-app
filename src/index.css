@@ -1917,6 +1917,22 @@ select:focus-visible {
   color: var(--white);
 }
 
+/* ── Confirm modal ──────────────────────────────────────────── */
+.confirm-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(6, 11, 40, 0.85);
+}
+.confirm-modal-overlay--exit {
+  animation: overlayFadeOut 0.18s ease-in forwards;
+  pointer-events: none;
+}
+
 /* ── Add to game dropdown ───────────────────────────────────── */
 .add-to-game-modal-overlay {
   position: fixed;

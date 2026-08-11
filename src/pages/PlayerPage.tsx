@@ -10,6 +10,7 @@ import { generateId, formatScore } from '../lib/utils'
 import { getCategoryGameplaySettings } from '../lib/settings'
 import { logEvent } from '../lib/logger'
 import { setCachedMedia, resolveActiveMedia, clearCache } from '../lib/mediaCache'
+import ConfirmModal from '../components/ConfirmModal'
 import GameBoard from '../components/GameBoard'
 import Scoreboard from '../components/Scoreboard'
 import Podium from '../components/Podium'
@@ -40,6 +41,7 @@ export default function PlayerPage() {
   const [buzzQueuePopupOpen, setBuzzQueuePopupOpen] = useState(false)
   const [buzzQueuePopupActive, setBuzzQueuePopupActive] = useState(false)
   const [mobilePlayersOpen, setMobilePlayersOpen] = useState(false)
+  const [showExitConfirm, setShowExitConfirm] = useState(false)
   const [isMobileViewport, setIsMobileViewport] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches,
   )
@@ -442,6 +444,11 @@ export default function PlayerPage() {
   }
 
   function handleExitRoom() {
+    setShowExitConfirm(true)
+  }
+
+  function confirmExitRoom() {
+    setShowExitConfirm(false)
     net.leaveRoom()
     logEvent({ role: 'player', roomCode: roomCode ?? '', actor: playerName, event: 'Left room voluntarily' })
     useGameStore.getState().leaveRoom()
@@ -1089,6 +1096,17 @@ export default function PlayerPage() {
             <PlayerActionZone {...playerActionZoneProps} />
           )}
         </div>
+      )}
+
+      {showExitConfirm && (
+        <ConfirmModal
+          title="Exit room?"
+          message="Leave this game and return to the home screen?"
+          confirmLabel="Exit"
+          danger
+          onConfirm={confirmExitRoom}
+          onCancel={() => setShowExitConfirm(false)}
+        />
       )}
     </div>
   )
