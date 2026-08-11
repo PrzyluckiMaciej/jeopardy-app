@@ -59,19 +59,19 @@ interface BoardStore {
   moveFolder: (folderId: string, newParentId: string | null) => void
 }
 
-export function isBoardTrashed(board: Board): boolean {
+export function isBoardTrashed(board: { trashedAt?: number | null }): boolean {
   return board.trashedAt != null
 }
 
-export function isFolderTrashed(folder: BoardFolder): boolean {
+export function isFolderTrashed(folder: FolderLike): boolean {
   return folder.trashedAt != null
 }
 
-export function isGameTrashed(game: Game): boolean {
+export function isGameTrashed(game: { trashedAt?: number | null }): boolean {
   return game.trashedAt != null
 }
 
-export function isGameFolderTrashed(folder: GameFolder): boolean {
+export function isGameFolderTrashed(folder: FolderLike): boolean {
   return folder.trashedAt != null
 }
 
