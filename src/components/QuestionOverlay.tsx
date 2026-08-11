@@ -21,6 +21,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
   const roomCode = useGameStore(s => s.roomCode) ?? ''
 
   const [ddExiting, setDdExiting] = useState(false)
+  const [ddSplashDone, setDdSplashDone] = useState(false)
   const [overlayExiting, setOverlayExiting] = useState(false)
   const pendingOverlayAction = useRef<(() => void) | null>(null)
   const pendingDdAction = useRef<(() => void) | null>(null)
@@ -30,7 +31,15 @@ export default function QuestionOverlay({ state, settings }: Props) {
 
   useEffect(() => {
     const prev = prevPhaseRef.current
-    if (phase === 'question' && prev !== 'question' && prev !== 'buzzing' && prev !== 'revealed') {
+    // Skip remount when leaving DD phases — host already previewed the content
+    if (
+      phase === 'question' &&
+      prev !== 'question' &&
+      prev !== 'buzzing' &&
+      prev !== 'revealed' &&
+      prev !== 'dailyDouble' &&
+      prev !== 'dailyDoubleBet'
+    ) {
       setClueRevealKey((k) => k + 1)
     }
     if (phase === 'revealed' && prev !== 'revealed') {
@@ -49,7 +58,6 @@ export default function QuestionOverlay({ state, settings }: Props) {
   const hasMedia = !!question.mediaId || !!activeMedia
   const autoBuzzOnClue = gameplay.autoBuzzQueue && hasClue
   const autoBuzzOnMedia = gameplay.autoBuzzQueueOnMedia && hasMedia
-  const autoBuzzPending = autoBuzzOnClue || autoBuzzOnMedia
   const autoBuzzHint = autoBuzzOnClue && autoBuzzOnMedia
     ? 'Buzz queue opens automatically on clue or media reveal'
     : autoBuzzOnClue
@@ -101,14 +109,21 @@ export default function QuestionOverlay({ state, settings }: Props) {
     })
   }
 
+  function doRevealDailyDoubleClue() {
+    const revealMedia = gameplay.autoRevealMedia
+    store.revealDailyDoubleClue(revealMedia)
+    const { mediaRevealed: revealed } = useGameStore.getState().state
+    net.broadcast({ type: 'DAILY_DOUBLE_REVEAL_CLUE', mediaRevealed: revealed })
+  }
+
   function handleRevealDailyDoubleClue() {
-    pendingDdAction.current = () => {
-      const revealMedia = gameplay.autoRevealMedia
-      store.revealDailyDoubleClue(revealMedia)
-      const { mediaRevealed } = useGameStore.getState().state
-      net.broadcast({ type: 'DAILY_DOUBLE_REVEAL_CLUE', mediaRevealed })
+    // Splash still on screen — finish fade-out, then reveal to players
+    if (!ddSplashDone) {
+      pendingDdAction.current = doRevealDailyDoubleClue
+      setDdExiting(true)
+      return
     }
-    setDdExiting(true)
+    doRevealDailyDoubleClue()
   }
 
   function handleRevealClue() {
@@ -132,6 +147,13 @@ export default function QuestionOverlay({ state, settings }: Props) {
   }
 
   function handleReveal() {
+    // Daily Double: revealing the answer before judging counts as incorrect
+    if (isDD && dailyDouble.wager != null && dailyDouble.playerId && phase !== 'revealed') {
+      handleJudge(dailyDouble.playerId, false)
+      store.revealAnswer()
+      net.broadcast({ type: 'REVEAL_ANSWER' })
+      return
+    }
     store.revealAnswer()
     net.broadcast({ type: 'REVEAL_ANSWER' })
   }
@@ -154,7 +176,13 @@ export default function QuestionOverlay({ state, settings }: Props) {
   }
 
   const categoryName = category?.name ?? ''
-  const showClue = phase === 'question' || phase === 'buzzing' || phase === 'revealed'
+  const isDdPhase = phase === 'dailyDouble' || phase === 'dailyDoubleBet'
+  const showDdTitle = isDdPhase && (!ddSplashDone || ddExiting)
+  const showClue =
+    phase === 'question' ||
+    phase === 'buzzing' ||
+    phase === 'revealed' ||
+    (isDdPhase && ddSplashDone)
 
   return (
     <div
@@ -198,12 +226,18 @@ export default function QuestionOverlay({ state, settings }: Props) {
 
       <div className="question-overlay-layout">
         <div className={`question-overlay-main ${overlayExiting ? 'card-flip-exit' : 'card-flip'}`}>
-          {(phase === 'dailyDouble' || phase === 'dailyDoubleBet') && (
+          {showDdTitle && (
             <div
               className={`daily-double-title${ddExiting ? ' daily-double-title--exit' : ''}`}
               onAnimationEnd={(e) => {
+                // Entry finished → fade title out, then show host content
+                if (e.animationName === 'ddReveal' && !ddExiting) {
+                  setDdExiting(true)
+                  return
+                }
                 if (ddExiting && e.animationName === 'ddRevealFadeOut') {
                   setDdExiting(false)
+                  setDdSplashDone(true)
                   if (pendingDdAction.current) {
                     pendingDdAction.current()
                     pendingDdAction.current = null
@@ -217,6 +251,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
 
           {showClue && (
             <QuestionOverlayText
+              className={isDdPhase ? 'dd-host-content-enter' : undefined}
               contentKey={`clue-${clueRevealKey}`}
               clue={question.question}
               answer={question.answer || '—'}
@@ -253,52 +288,49 @@ export default function QuestionOverlay({ state, settings }: Props) {
               </div>
             )}
 
-            {isDD && phase === 'dailyDoubleBet' && dailyDouble.wager != null && (
+            {isDD && ddPlayer && dailyDouble.wager != null &&
+              (phase === 'dailyDoubleBet' || phase === 'question' || phase === 'revealed' || phase === 'buzzing') && (
               <>
                 <div className="font-condensed text-sm text-gold-bright">
-                  {ddPlayer?.name} wagered <span className="font-display text-lg">${dailyDouble.wager}</span>
+                  {ddPlayer.name} wagered <span className="font-display text-lg">${dailyDouble.wager}</span>
                 </div>
-                {activeMedia && !mediaRevealed && (
+                {(phase === 'dailyDoubleBet' || phase === 'question') && (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="w-8 h-8 rounded flex items-center justify-center judge-btn--accept"
+                      onClick={() => handleJudge(ddPlayer.id, true)}
+                      title="Accept answer"
+                      aria-label="Accept answer"
+                    >
+                      <Check size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      className="w-8 h-8 rounded flex items-center justify-center judge-btn--decline"
+                      onClick={() => handleJudge(ddPlayer.id, false)}
+                      title="Decline answer"
+                      aria-label="Decline answer"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                )}
+                {phase === 'dailyDoubleBet' && hasClue && (
+                  <button type="button" className="btn-gold w-full py-3" onClick={handleRevealDailyDoubleClue}>
+                    Reveal clue
+                  </button>
+                )}
+                {phase === 'dailyDoubleBet' && activeMedia && !mediaRevealed && (
                   <button type="button" className="btn-outline w-full btn-with-icon justify-center" onClick={handleRevealMedia}>
                     <Eye size={16} aria-hidden />
                     <span>Reveal media</span>
                   </button>
                 )}
-                <button type="button" className="btn-gold w-full py-3" onClick={handleRevealDailyDoubleClue}>
-                  Reveal clue
-                </button>
               </>
             )}
 
-            {isDD && phase === 'question' && ddPlayer && (
-              <div className="flex flex-col gap-2">
-                <div className="font-condensed text-sm text-gold-bright">
-                  {ddPlayer.name} wagered <span className="font-display">${dailyDouble.wager}</span>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className="w-8 h-8 rounded flex items-center justify-center judge-btn--accept"
-                    onClick={() => handleJudge(ddPlayer.id, true)}
-                    title="Accept answer"
-                    aria-label="Accept answer"
-                  >
-                    <Check size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    className="w-8 h-8 rounded flex items-center justify-center judge-btn--decline"
-                    onClick={() => handleJudge(ddPlayer.id, false)}
-                    title="Decline answer"
-                    aria-label="Decline answer"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {!isDD && phase === 'question' && (clueRevealed || !hasClue) && !autoBuzzPending && (
+            {!isDD && phase === 'question' && (
               <button
                 type="button"
                 className="btn-gold w-full py-3 btn-with-icon justify-center"
@@ -326,7 +358,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
               </div>
             )}
 
-            {showClue && hasClue && !clueRevealed && (
+            {showClue && !isDdPhase && hasClue && !clueRevealed && (
               <button
                 type="button"
                 className="btn-outline w-full btn-with-icon justify-center"
@@ -338,7 +370,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
               </button>
             )}
 
-            {showClue && activeMedia && !mediaRevealed && (
+            {showClue && !isDdPhase && activeMedia && !mediaRevealed && (
               <button
                 type="button"
                 className="btn-outline w-full btn-with-icon justify-center"
@@ -350,7 +382,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
               </button>
             )}
 
-            {phase !== 'revealed' && phase !== 'dailyDouble' && phase !== 'dailyDoubleBet' && (
+            {phase !== 'revealed' && phase !== 'dailyDouble' && (
               <button
                 type="button"
                 className="btn-outline w-full btn-with-icon justify-center"

@@ -480,6 +480,14 @@ select:focus-visible {
   animation: ddRevealFadeOut 0.3s ease-in forwards !important;
 }
 
+@keyframes ddHostContentEnter {
+  0%   { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.dd-host-content-enter {
+  animation: ddHostContentEnter 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
 /* Card flip exit (complements existing flipIn) */
 @keyframes flipOut {
   from { transform: rotateY(0deg)   scale(1);    opacity: 1; }
