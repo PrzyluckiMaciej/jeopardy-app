@@ -120,6 +120,10 @@ function compareBySortKey(
   return a.name.localeCompare(b.name)
 }
 
+function stampBoardUpdatedAt(board: Board): Board {
+  return { ...board, updatedAt: Date.now() }
+}
+
 export default function BoardPickerExplorer({
   boards,
   folders,
@@ -501,7 +505,7 @@ export default function BoardPickerExplorer({
     const name = boardRenameValue.trim()
     const board = scopedBoards.find((b) => b.id === boardId)
     if (board && name && name !== board.name) {
-      saveBoard({ ...board, name, updatedAt: Date.now() })
+      saveBoard(stampBoardUpdatedAt({ ...board, name }))
     }
     setEditingBoardId(null)
   }
