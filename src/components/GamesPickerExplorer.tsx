@@ -1,22 +1,19 @@
-import { useCallback, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react'
-import { ArrowLeft, Check, ChevronDown, ChevronUp, Folder, Layers, LayoutGrid } from 'lucide-react'
-import type { Board, BoardFolder, Game, GameFolder } from '../types'
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react'
+import { ArrowLeft, Check, ChevronDown, ChevronUp, Folder, Layers } from 'lucide-react'
+import type { Game, GameFolder } from '../types'
 import { buildPathString, isFolderInside, resolvePath } from '../lib/folderPath'
-import { collectFolderSubtree } from '../lib/folderSubtree'
 import { formatBoardTimestamp } from '../lib/utils'
 import {
-  isBoardTrashed,
-  isFolderTrashed,
   isGameFolderTrashed,
   isGameTrashed,
   useBoardStore,
 } from '../store/gameStore'
 import ContextMenu, { type ContextMenuItem } from './ContextMenu'
 
-const DND_MIME = 'application/x-jeopardy-picker'
+const DND_MIME = 'application/x-jeopardy-games-picker'
 
 type DragPayload =
-  | { type: 'board'; id: string }
+  | { type: 'game'; id: string }
   | { type: 'folder'; id: string }
 
 type SortKey = 'name' | 'createdAt' | 'updatedAt'
@@ -27,37 +24,21 @@ interface RenameDraft {
   value: string
 }
 
-export type BoardPickerExplorerMode = 'library' | 'trash'
-
 interface Props {
-  boards: Board[]
-  folders: BoardFolder[]
-  /** Shown in trash mode alongside boards/folders. */
-  games?: Game[]
-  gameFolders?: GameFolder[]
-  mode?: BoardPickerExplorerMode
-  onSelectBoard: (board: Board) => void
-  onEditBoard: (board: Board) => void
-  onDeleteBoard: (board: Board) => void
-  onDuplicateBoard: (board: Board) => void
-  onDuplicateFolder: (folder: BoardFolder) => void
-  onRequestDeleteFolder: (folder: BoardFolder) => void
-  onCreateBoard: (folderId: string | null) => void
-  onRequestAddToGame: (boardIds: string[], label: string) => void
-  onRestoreBoard?: (board: Board) => void
-  onRestoreFolder?: (folder: BoardFolder) => void
-  onPermanentDeleteBoard?: (board: Board) => void
-  onPermanentDeleteFolder?: (folder: BoardFolder) => void
-  onRestoreGame?: (game: Game) => void
-  onRestoreGameFolder?: (folder: GameFolder) => void
-  onPermanentDeleteGame?: (game: Game) => void
-  onPermanentDeleteGameFolder?: (folder: GameFolder) => void
+  games: Game[]
+  folders: GameFolder[]
+  onSelectGame: (game: Game) => void
+  onDeleteGame: (game: Game) => void
+  onDuplicateFolder: (folder: GameFolder) => void
+  onRequestDeleteFolder: (folder: GameFolder) => void
   /** When set, start inline rename for this folder id (e.g. after create). */
   renameFolderId?: string | null
   onRenameFolderIdChange?: (id: string | null) => void
-  /** When set, start inline rename for this board id (e.g. after create). */
-  renameBoardId?: string | null
-  onRenameBoardIdChange?: (id: string | null) => void
+  /** When set, start inline rename for this game id (e.g. after create). */
+  renameGameId?: string | null
+  onRenameGameIdChange?: (id: string | null) => void
+  /** Folder to show when the explorer mounts / when this value changes. */
+  initialFolderId?: string | null
 }
 
 function parseDragPayload(e: DragEvent): DragPayload | null {
@@ -65,7 +46,7 @@ function parseDragPayload(e: DragEvent): DragPayload | null {
     const raw = e.dataTransfer.getData(DND_MIME) || e.dataTransfer.getData('text/plain')
     if (!raw) return null
     const data = JSON.parse(raw) as DragPayload
-    if (data?.type === 'board' || data?.type === 'folder') return data
+    if (data?.type === 'game' || data?.type === 'folder') return data
   } catch {
     /* ignore */
   }
@@ -97,53 +78,35 @@ function compareBySortKey(
   return a.name.localeCompare(b.name)
 }
 
-function stampBoardUpdatedAt(board: Board): Board {
-  return { ...board, updatedAt: Date.now() }
-}
-
-export default function BoardPickerExplorer({
-  boards,
+export default function GamesPickerExplorer({
+  games,
   folders,
-  games = [],
-  gameFolders = [],
-  mode = 'library',
-  onSelectBoard,
-  onEditBoard,
-  onDeleteBoard,
-  onDuplicateBoard,
+  onSelectGame,
+  onDeleteGame,
   onDuplicateFolder,
   onRequestDeleteFolder,
-  onCreateBoard,
-  onRequestAddToGame,
-  onRestoreBoard,
-  onRestoreFolder,
-  onPermanentDeleteBoard,
-  onPermanentDeleteFolder,
-  onRestoreGame,
-  onRestoreGameFolder,
-  onPermanentDeleteGame,
-  onPermanentDeleteGameFolder,
   renameFolderId: controlledRenameFolderId,
   onRenameFolderIdChange,
-  renameBoardId: controlledRenameBoardId,
-  onRenameBoardIdChange,
+  renameGameId: controlledRenameGameId,
+  onRenameGameIdChange,
+  initialFolderId = null,
 }: Props) {
-  const isTrash = mode === 'trash'
-  const moveBoardToFolder = useBoardStore((s) => s.moveBoardToFolder)
-  const moveFolder = useBoardStore((s) => s.moveFolder)
-  const renameFolder = useBoardStore((s) => s.renameFolder)
-  const createFolder = useBoardStore((s) => s.createFolder)
-  const saveBoard = useBoardStore((s) => s.saveBoard)
+  const moveGameToFolder = useBoardStore((s) => s.moveGameToFolder)
+  const moveGameFolder = useBoardStore((s) => s.moveGameFolder)
+  const renameGameFolder = useBoardStore((s) => s.renameGameFolder)
+  const createGameFolder = useBoardStore((s) => s.createGameFolder)
+  const createGame = useBoardStore((s) => s.createGame)
+  const renameGame = useBoardStore((s) => s.renameGame)
 
-  const [userFolderId, setUserFolderId] = useState<string | null>(null)
+  const [userFolderId, setUserFolderId] = useState<string | null>(initialFolderId)
   const [pathEditing, setPathEditing] = useState(false)
   const [pathDraft, setPathDraft] = useState('/')
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null)
   const [activeDrag, setActiveDrag] = useState<DragPayload | null>(null)
   const [internalRenameFolderId, setInternalRenameFolderId] = useState<string | null>(null)
-  const [internalRenameBoardId, setInternalRenameBoardId] = useState<string | null>(null)
+  const [internalRenameGameId, setInternalRenameGameId] = useState<string | null>(null)
   const [folderRenameDraft, setFolderRenameDraft] = useState<RenameDraft | null>(null)
-  const [boardRenameDraft, setBoardRenameDraft] = useState<RenameDraft | null>(null)
+  const [gameRenameDraft, setGameRenameDraft] = useState<RenameDraft | null>(null)
   const [menu, setMenu] = useState<{
     x: number
     y: number
@@ -153,44 +116,41 @@ export default function BoardPickerExplorer({
   const [sortKey, setSortKey] = useState<SortKey>('createdAt')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const dragGhostRef = useRef<HTMLElement | null>(null)
+  const prevInitialFolderId = useRef(initialFolderId)
+
+  useEffect(() => {
+    if (prevInitialFolderId.current !== initialFolderId) {
+      prevInitialFolderId.current = initialFolderId
+      setUserFolderId(initialFolderId)
+    }
+  }, [initialFolderId])
 
   const scopedFolders = useMemo(
-    () => folders.filter((f) => (isTrash ? isFolderTrashed(f) : !isFolderTrashed(f))),
-    [folders, isTrash],
-  )
-  const scopedBoards = useMemo(
-    () => boards.filter((b) => (isTrash ? isBoardTrashed(b) : !isBoardTrashed(b))),
-    [boards, isTrash],
-  )
-  const scopedGameFolders = useMemo(
-    () =>
-      isTrash
-        ? gameFolders.filter((f) => isGameFolderTrashed(f))
-        : [],
-    [gameFolders, isTrash],
+    () => folders.filter((f) => !isGameFolderTrashed(f)),
+    [folders],
   )
   const scopedGames = useMemo(
-    () => (isTrash ? games.filter((g) => isGameTrashed(g)) : []),
-    [games, isTrash],
+    () => games.filter((g) => !isGameTrashed(g)),
+    [games],
   )
 
   const editingFolderId =
     controlledRenameFolderId !== undefined ? controlledRenameFolderId : internalRenameFolderId
-  const editingBoardId =
-    controlledRenameBoardId !== undefined ? controlledRenameBoardId : internalRenameBoardId
+  const editingGameId =
+    controlledRenameGameId !== undefined ? controlledRenameGameId : internalRenameGameId
 
   const folderRenameValue =
     folderRenameDraft?.id === editingFolderId
       ? folderRenameDraft.value
       : (scopedFolders.find((f) => f.id === editingFolderId)?.name ?? '')
 
-  const boardRenameValue =
-    boardRenameDraft?.id === editingBoardId
-      ? boardRenameDraft.value
-      : (scopedBoards.find((b) => b.id === editingBoardId)?.name ?? '')
+  const gameRenameValue =
+    gameRenameDraft?.id === editingGameId
+      ? gameRenameDraft.value
+      : (scopedGames.find((g) => g.id === editingGameId)?.name ?? '')
 
   const folderRenameConflict = useMemo(() => {
-    if (!editingFolderId || isTrash) return false
+    if (!editingFolderId) return false
     const name = folderRenameValue.trim()
     if (!name) return false
     const folder = scopedFolders.find((f) => f.id === editingFolderId)
@@ -202,53 +162,40 @@ export default function BoardPickerExplorer({
         f.parentId === folder.parentId &&
         f.name.trim().toLowerCase() === name.toLowerCase(),
     )
-  }, [editingFolderId, folderRenameValue, scopedFolders, isTrash])
+  }, [editingFolderId, folderRenameValue, scopedFolders])
 
-  // Adjust navigation while rendering when the current folder disappears or a rename starts.
-  const folderExistsInBoardTree =
-    userFolderId !== null && scopedFolders.some((f) => f.id === userFolderId)
-  const folderExistsInGameTree =
-    userFolderId !== null && scopedGameFolders.some((f) => f.id === userFolderId)
-  if (
-    userFolderId !== null &&
-    !folderExistsInBoardTree &&
-    !(isTrash && folderExistsInGameTree)
-  ) {
+  if (userFolderId !== null && !scopedFolders.some((f) => f.id === userFolderId)) {
     setUserFolderId(null)
   }
 
-  const renameNavKey = editingBoardId ?? editingFolderId ?? null
-  if (!isTrash && renameNavKey !== prevRenameNavKey) {
+  const renameNavKey = editingGameId ?? editingFolderId ?? null
+  if (renameNavKey !== prevRenameNavKey) {
     setPrevRenameNavKey(renameNavKey)
-    if (editingBoardId) {
-      const board = scopedBoards.find((b) => b.id === editingBoardId)
-      if (board) setUserFolderId(board.folderId ?? null)
+    if (editingGameId) {
+      const game = scopedGames.find((g) => g.id === editingGameId)
+      if (game) setUserFolderId(game.folderId ?? null)
     } else if (editingFolderId) {
       const folder = scopedFolders.find((f) => f.id === editingFolderId)
       if (folder) setUserFolderId(folder.parentId)
     }
   }
 
-  const inGameFolderTree = isTrash && folderExistsInGameTree
-  const pathFolders = inGameFolderTree ? scopedGameFolders : scopedFolders
-
   const currentFolderId =
-    userFolderId !== null &&
-    !pathFolders.some((f) => f.id === userFolderId)
+    userFolderId !== null && !scopedFolders.some((f) => f.id === userFolderId)
       ? null
       : userFolderId
 
   const currentPath = useMemo(
-    () => buildPathString(pathFolders, currentFolderId),
-    [pathFolders, currentFolderId],
+    () => buildPathString(scopedFolders, currentFolderId),
+    [scopedFolders, currentFolderId],
   )
   const pathValue = pathEditing ? pathDraft : currentPath
 
   const setEditingFolderId = useCallback(
     (id: string | null, name?: string) => {
-      if (onRenameBoardIdChange) onRenameBoardIdChange(null)
-      else setInternalRenameBoardId(null)
-      setBoardRenameDraft(null)
+      if (onRenameGameIdChange) onRenameGameIdChange(null)
+      else setInternalRenameGameId(null)
+      setGameRenameDraft(null)
       if (onRenameFolderIdChange) {
         onRenameFolderIdChange(id)
       } else {
@@ -257,77 +204,39 @@ export default function BoardPickerExplorer({
       if (id && name !== undefined) setFolderRenameDraft({ id, value: name })
       else setFolderRenameDraft(null)
     },
-    [onRenameFolderIdChange, onRenameBoardIdChange],
+    [onRenameFolderIdChange, onRenameGameIdChange],
   )
 
-  const setEditingBoardId = useCallback(
+  const setEditingGameId = useCallback(
     (id: string | null, name?: string) => {
       if (onRenameFolderIdChange) onRenameFolderIdChange(null)
       else setInternalRenameFolderId(null)
       setFolderRenameDraft(null)
-      if (onRenameBoardIdChange) {
-        onRenameBoardIdChange(id)
+      if (onRenameGameIdChange) {
+        onRenameGameIdChange(id)
       } else {
-        setInternalRenameBoardId(id)
+        setInternalRenameGameId(id)
       }
-      if (id && name !== undefined) setBoardRenameDraft({ id, value: name })
-      else setBoardRenameDraft(null)
+      if (id && name !== undefined) setGameRenameDraft({ id, value: name })
+      else setGameRenameDraft(null)
     },
-    [onRenameBoardIdChange, onRenameFolderIdChange],
+    [onRenameGameIdChange, onRenameFolderIdChange],
   )
 
   const visibleEntries = useMemo(() => {
     type Entry =
-      | { kind: 'folder'; item: BoardFolder }
-      | { kind: 'board'; item: Board }
-      | { kind: 'gameFolder'; item: GameFolder }
+      | { kind: 'folder'; item: GameFolder }
       | { kind: 'game'; item: Game }
-
-    if (isTrash && inGameFolderTree) {
-      const gFolders: Entry[] = scopedGameFolders
-        .filter((f) => f.parentId === currentFolderId)
-        .map((item) => ({ kind: 'gameFolder', item }))
-      const gameItems: Entry[] = scopedGames
-        .filter((g) => (g.folderId ?? null) === currentFolderId)
-        .map((item) => ({ kind: 'game', item }))
-      return [...gFolders, ...gameItems].sort((a, b) =>
-        compareBySortKey(a.item, b.item, sortKey, sortDir),
-      )
-    }
-
     const folderEntries: Entry[] = scopedFolders
       .filter((f) => f.parentId === currentFolderId)
       .map((item) => ({ kind: 'folder', item }))
-    const boardEntries: Entry[] = scopedBoards
-      .filter((b) => (b.folderId ?? null) === currentFolderId)
-      .map((item) => ({ kind: 'board', item }))
-
-    if (isTrash && currentFolderId === null) {
-      const gFolders: Entry[] = scopedGameFolders
-        .filter((f) => f.parentId === null)
-        .map((item) => ({ kind: 'gameFolder', item }))
-      const gameItems: Entry[] = scopedGames
-        .filter((g) => (g.folderId ?? null) === null)
-        .map((item) => ({ kind: 'game', item }))
-      return [...folderEntries, ...gFolders, ...boardEntries, ...gameItems].sort((a, b) =>
-        compareBySortKey(a.item, b.item, sortKey, sortDir),
-      )
-    }
-
-    return [...folderEntries, ...boardEntries].sort((a, b) =>
+    const gameEntries: Entry[] = scopedGames
+      .filter((g) => (g.folderId ?? null) === currentFolderId)
+      .map((item) => ({ kind: 'game', item }))
+    return [...folderEntries, ...gameEntries].sort((a, b) =>
       compareBySortKey(a.item, b.item, sortKey, sortDir),
     )
-  }, [
-    scopedFolders,
-    scopedBoards,
-    scopedGameFolders,
-    scopedGames,
-    currentFolderId,
-    sortKey,
-    sortDir,
-    isTrash,
-    inGameFolderTree,
-  ])
+  }, [scopedFolders, scopedGames, currentFolderId, sortKey, sortDir])
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -353,10 +262,11 @@ export default function BoardPickerExplorer({
       </button>
     )
   }
+
   const parentFolderId = useMemo(() => {
     if (!currentFolderId) return null
-    return pathFolders.find((f) => f.id === currentFolderId)?.parentId ?? null
-  }, [pathFolders, currentFolderId])
+    return scopedFolders.find((f) => f.id === currentFolderId)?.parentId ?? null
+  }, [scopedFolders, currentFolderId])
 
   function navigateTo(folderId: string | null) {
     setUserFolderId(folderId)
@@ -369,7 +279,7 @@ export default function BoardPickerExplorer({
   }
 
   function commitPath() {
-    const resolved = resolvePath(pathFolders, pathValue.trim())
+    const resolved = resolvePath(scopedFolders, pathValue.trim())
     if (resolved === undefined) {
       setPathDraft(currentPath)
       return
@@ -383,7 +293,6 @@ export default function BoardPickerExplorer({
   }
 
   function openEmptyMenu(e: MouseEvent) {
-    if (isTrash) return
     const target = e.target as HTMLElement
     if (target.closest('.board-picker-board-row, .board-picker-folder-row')) return
     e.preventDefault()
@@ -393,17 +302,22 @@ export default function BoardPickerExplorer({
       y: e.clientY,
       items: [
         {
-          id: 'new-board',
-          label: 'New Board',
-          onSelect: () => onCreateBoard(currentFolderId),
+          id: 'new-game',
+          label: 'New Game',
+          onSelect: () => {
+            const id = createGame('New Game', currentFolderId)
+            const createdName =
+              useBoardStore.getState().games.find((g) => g.id === id)?.name ?? 'New Game'
+            setEditingGameId(id, createdName)
+          },
         },
         {
           id: 'new-folder',
           label: 'New Folder',
           onSelect: () => {
-            const id = createFolder('New Folder', currentFolderId)
+            const id = createGameFolder('New Folder', currentFolderId)
             const createdName =
-              useBoardStore.getState().folders.find((f) => f.id === id)?.name ?? 'New Folder'
+              useBoardStore.getState().gameFolders.find((f) => f.id === id)?.name ?? 'New Folder'
             setEditingFolderId(id, createdName)
           },
         },
@@ -411,39 +325,22 @@ export default function BoardPickerExplorer({
     })
   }
 
-  function openFolderMenu(e: MouseEvent, folder: BoardFolder) {
+  function openFolderMenu(e: MouseEvent, folder: GameFolder) {
     e.preventDefault()
     e.stopPropagation()
-    if (isTrash) {
-      setMenu({
-        x: e.clientX,
-        y: e.clientY,
-        items: [
-          {
-            id: 'restore',
-            label: 'Restore',
-            onSelect: () => onRestoreFolder?.(folder),
-          },
-          {
-            id: 'delete-permanent',
-            label: 'Delete permanently',
-            danger: true,
-            onSelect: () => onPermanentDeleteFolder?.(folder),
-          },
-        ],
-      })
-      return
-    }
     setMenu({
       x: e.clientX,
       y: e.clientY,
       items: [
         {
-          id: 'new-board',
-          label: 'New Board',
+          id: 'new-game',
+          label: 'New Game',
           onSelect: () => {
             navigateTo(folder.id)
-            onCreateBoard(folder.id)
+            const id = createGame('New Game', folder.id)
+            const createdName =
+              useBoardStore.getState().games.find((g) => g.id === id)?.name ?? 'New Game'
+            setEditingGameId(id, createdName)
           },
         },
         {
@@ -457,100 +354,10 @@ export default function BoardPickerExplorer({
           onSelect: () => onDuplicateFolder(folder),
         },
         {
-          id: 'add-to-game',
-          label: 'Add to game',
-          onSelect: () => {
-            const folderIds = collectFolderSubtree(folders, folder.id)
-            const boardIds = boards
-              .filter((b) => b.folderId != null && folderIds.has(b.folderId) && !isBoardTrashed(b))
-              .map((b) => b.id)
-            const count = boardIds.length
-            const label =
-              count === 1
-                ? `1 board from ${folder.name}`
-                : `${count} boards from ${folder.name}`
-            onRequestAddToGame(boardIds, label)
-          },
-        },
-        {
           id: 'delete',
           label: 'Delete',
           danger: true,
           onSelect: () => onRequestDeleteFolder(folder),
-        },
-      ],
-    })
-  }
-
-  function openBoardMenu(e: MouseEvent, board: Board) {
-    e.preventDefault()
-    e.stopPropagation()
-    if (isTrash) {
-      setMenu({
-        x: e.clientX,
-        y: e.clientY,
-        items: [
-          {
-            id: 'restore',
-            label: 'Restore',
-            onSelect: () => onRestoreBoard?.(board),
-          },
-          {
-            id: 'delete-permanent',
-            label: 'Delete permanently',
-            danger: true,
-            onSelect: () => onPermanentDeleteBoard?.(board),
-          },
-        ],
-      })
-      return
-    }
-    setMenu({
-      x: e.clientX,
-      y: e.clientY,
-      items: [
-        {
-          id: 'edit',
-          label: 'Edit',
-          onSelect: () => onEditBoard(board),
-        },
-        {
-          id: 'duplicate',
-          label: 'Duplicate',
-          onSelect: () => onDuplicateBoard(board),
-        },
-        {
-          id: 'add-to-game',
-          label: 'Add to game',
-          onSelect: () => onRequestAddToGame([board.id], board.name),
-        },
-        {
-          id: 'delete',
-          label: 'Delete',
-          danger: true,
-          onSelect: () => onDeleteBoard(board),
-        },
-      ],
-    })
-  }
-
-  function openGameFolderMenu(e: MouseEvent, folder: GameFolder) {
-    e.preventDefault()
-    e.stopPropagation()
-    setMenu({
-      x: e.clientX,
-      y: e.clientY,
-      items: [
-        {
-          id: 'restore',
-          label: 'Restore',
-          onSelect: () => onRestoreGameFolder?.(folder),
-        },
-        {
-          id: 'delete-permanent',
-          label: 'Delete permanently',
-          danger: true,
-          onSelect: () => onPermanentDeleteGameFolder?.(folder),
         },
       ],
     })
@@ -564,15 +371,15 @@ export default function BoardPickerExplorer({
       y: e.clientY,
       items: [
         {
-          id: 'restore',
-          label: 'Restore',
-          onSelect: () => onRestoreGame?.(game),
+          id: 'rename',
+          label: 'Rename',
+          onSelect: () => setEditingGameId(game.id, game.name),
         },
         {
-          id: 'delete-permanent',
-          label: 'Delete permanently',
+          id: 'delete',
+          label: 'Delete',
           danger: true,
-          onSelect: () => onPermanentDeleteGame?.(game),
+          onSelect: () => onDeleteGame(game),
         },
       ],
     })
@@ -584,18 +391,18 @@ export default function BoardPickerExplorer({
       setEditingFolderId(null)
       return
     }
-    if (renameFolder(folderId, name)) {
+    if (renameGameFolder(folderId, name)) {
       setEditingFolderId(null)
     }
   }
 
-  function commitBoardRename(boardId: string) {
-    const name = boardRenameValue.trim()
-    const board = scopedBoards.find((b) => b.id === boardId)
-    if (board && name && name !== board.name) {
-      saveBoard(stampBoardUpdatedAt({ ...board, name }))
+  function commitGameRename(gameId: string) {
+    const name = gameRenameValue.trim()
+    const game = scopedGames.find((g) => g.id === gameId)
+    if (game && name && name !== game.name) {
+      renameGame(gameId, name)
     }
-    setEditingBoardId(null)
+    setEditingGameId(null)
   }
 
   function renderDateColumns(createdAt?: number, updatedAt?: number) {
@@ -645,15 +452,15 @@ export default function BoardPickerExplorer({
   }
 
   function canDropOnFolder(payload: DragPayload | null, targetFolderId: string): boolean {
-    if (isTrash || !payload) return false
-    if (payload.type === 'board') return true
+    if (!payload) return false
+    if (payload.type === 'game') return true
     if (payload.id === targetFolderId) return false
     if (isFolderInside(scopedFolders, targetFolderId, payload.id)) return false
     return true
   }
 
   function canDropOnParent(payload: DragPayload | null): boolean {
-    if (isTrash || !payload || currentFolderId === null) return false
+    if (!payload || currentFolderId === null) return false
     if (parentFolderId === null) return true
     return canDropOnFolder(payload, parentFolderId)
   }
@@ -661,69 +468,56 @@ export default function BoardPickerExplorer({
   function handleDropOnFolder(e: DragEvent, targetFolderId: string) {
     e.preventDefault()
     e.stopPropagation()
-    if (isTrash) {
-      clearDrag()
-      return
-    }
     const payload = activeDrag ?? parseDragPayload(e)
     clearDrag()
     if (!payload || !canDropOnFolder(payload, targetFolderId)) return
-    if (payload.type === 'board') {
-      moveBoardToFolder(payload.id, targetFolderId)
+    if (payload.type === 'game') {
+      moveGameToFolder(payload.id, targetFolderId)
     } else {
-      moveFolder(payload.id, targetFolderId)
+      moveGameFolder(payload.id, targetFolderId)
     }
   }
 
   function handleDropOnParent(e: DragEvent) {
     e.preventDefault()
     e.stopPropagation()
-    if (isTrash) {
-      clearDrag()
-      return
-    }
     const payload = activeDrag ?? parseDragPayload(e)
     clearDrag()
     if (!payload || !canDropOnParent(payload)) return
-    if (payload.type === 'board') {
-      moveBoardToFolder(payload.id, parentFolderId)
+    if (payload.type === 'game') {
+      moveGameToFolder(payload.id, parentFolderId)
     } else {
-      moveFolder(payload.id, parentFolderId)
+      moveGameFolder(payload.id, parentFolderId)
     }
   }
 
   function handleDropOnCurrent(e: DragEvent) {
     e.preventDefault()
-    if (isTrash) {
-      clearDrag()
-      return
-    }
     const payload = activeDrag ?? parseDragPayload(e)
     clearDrag()
     if (!payload) return
-    if (payload.type === 'board') {
-      moveBoardToFolder(payload.id, currentFolderId)
+    if (payload.type === 'game') {
+      moveGameToFolder(payload.id, currentFolderId)
     } else {
       if (currentFolderId && payload.id === currentFolderId) return
       if (currentFolderId && isFolderInside(scopedFolders, currentFolderId, payload.id)) return
-      moveFolder(payload.id, currentFolderId)
+      moveGameFolder(payload.id, currentFolderId)
     }
   }
 
-  function renderBoardRow(board: Board) {
-    const isEditing = !isTrash && editingBoardId === board.id
+  function renderGameRow(game: Game) {
+    const isEditing = editingGameId === game.id
 
     return (
       <div
-        key={board.id}
+        key={game.id}
         className="board-picker-board-row board-picker-explorer-row"
-        draggable={!isTrash && !isEditing}
+        draggable={!isEditing}
         onDragStart={(e) => {
-          if (isTrash) return
           const nameEl = e.currentTarget.querySelector('.board-picker-explorer-row__name')
           setDragData(
             e,
-            { type: 'board', id: board.id },
+            { type: 'game', id: game.id },
             nameEl instanceof HTMLElement ? nameEl : null,
           )
         }}
@@ -738,33 +532,33 @@ export default function BoardPickerExplorer({
         }}
         onContextMenu={(e) => {
           if (isEditing) return
-          openBoardMenu(e, board)
+          openGameMenu(e, game)
         }}
       >
         <div className="board-picker-explorer-row__name">
           {isEditing ? (
             <div className="flex items-center gap-1 flex-1 min-w-0">
-              <LayoutGrid size={14} className="flex-shrink-0 opacity-70" />
+              <Layers size={14} className="flex-shrink-0 opacity-70" />
               <input
                 className="board-picker-input"
-                value={boardRenameValue}
+                value={gameRenameValue}
                 onChange={(e) => {
-                  if (editingBoardId) {
-                    setBoardRenameDraft({ id: editingBoardId, value: e.target.value })
+                  if (editingGameId) {
+                    setGameRenameDraft({ id: editingGameId, value: e.target.value })
                   }
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') commitBoardRename(board.id)
-                  if (e.key === 'Escape') setEditingBoardId(null)
+                  if (e.key === 'Enter') commitGameRename(game.id)
+                  if (e.key === 'Escape') setEditingGameId(null)
                 }}
-                onBlur={() => commitBoardRename(board.id)}
+                onBlur={() => commitGameRename(game.id)}
                 autoFocus
                 onClick={(e) => e.stopPropagation()}
               />
               <button
                 type="button"
                 className="board-picker-save-btn"
-                onClick={() => commitBoardRename(board.id)}
+                onClick={() => commitGameRename(game.id)}
                 title="Save"
               >
                 <Check size={14} />
@@ -774,32 +568,29 @@ export default function BoardPickerExplorer({
             <button
               type="button"
               className="board-picker-board-btn"
-              onClick={() => {
-                if (!isTrash) onSelectBoard(board)
-              }}
+              onClick={() => onSelectGame(game)}
             >
-              <LayoutGrid size={14} className="flex-shrink-0 opacity-70" />
-              <span className="font-condensed font-bold truncate">{board.name}</span>
+              <Layers size={14} className="flex-shrink-0 opacity-70" />
+              <span className="font-condensed font-bold truncate">{game.name}</span>
             </button>
           )}
         </div>
-        {renderDateColumns(board.createdAt, board.updatedAt)}
+        {renderDateColumns(game.createdAt, game.updatedAt)}
       </div>
     )
   }
 
-  function renderFolderRow(folder: BoardFolder) {
-    const isEditing = !isTrash && editingFolderId === folder.id
+  function renderFolderRow(folder: GameFolder) {
+    const isEditing = editingFolderId === folder.id
     const dropKey = `folder:${folder.id}`
-    const isDragOver = !isTrash && dragOverTarget === dropKey
+    const isDragOver = dragOverTarget === dropKey
 
     return (
       <div
         key={folder.id}
         className={`board-picker-folder-row board-picker-explorer-row${isDragOver ? ' board-picker-folder-row--drag-over' : ''}`}
-        draggable={!isTrash && !isEditing}
+        draggable={!isEditing}
         onDragStart={(e) => {
-          if (isTrash) return
           const nameEl = e.currentTarget.querySelector('.board-picker-explorer-row__name')
           setDragData(
             e,
@@ -809,7 +600,6 @@ export default function BoardPickerExplorer({
         }}
         onDragEnd={clearDrag}
         onDragOver={(e) => {
-          if (isTrash) return
           e.preventDefault()
           e.stopPropagation()
           if (canDropOnFolder(activeDrag, folder.id)) {
@@ -846,7 +636,7 @@ export default function BoardPickerExplorer({
                   autoFocus
                   onClick={(e) => e.stopPropagation()}
                   aria-invalid={folderRenameConflict}
-                  aria-describedby={folderRenameConflict ? `folder-rename-error-${folder.id}` : undefined}
+                  aria-describedby={folderRenameConflict ? `game-folder-rename-error-${folder.id}` : undefined}
                 />
                 <button
                   type="button"
@@ -860,7 +650,7 @@ export default function BoardPickerExplorer({
               </div>
               {folderRenameConflict && (
                 <div
-                  id={`folder-rename-error-${folder.id}`}
+                  id={`game-folder-rename-error-${folder.id}`}
                   className="board-picker-rename-error"
                   role="alert"
                 >
@@ -884,49 +674,9 @@ export default function BoardPickerExplorer({
     )
   }
 
-  function renderGameRow(game: Game) {
-    return (
-      <div
-        key={`game-${game.id}`}
-        className="board-picker-board-row board-picker-explorer-row"
-        onContextMenu={(e) => openGameMenu(e, game)}
-      >
-        <div className="board-picker-explorer-row__name">
-          <button type="button" className="board-picker-board-btn" disabled>
-            <Layers size={14} className="flex-shrink-0 opacity-70" />
-            <span className="font-condensed font-bold truncate">{game.name}</span>
-          </button>
-        </div>
-        {renderDateColumns(game.createdAt, game.updatedAt)}
-      </div>
-    )
-  }
-
-  function renderGameFolderRow(folder: GameFolder) {
-    return (
-      <div
-        key={`game-folder-${folder.id}`}
-        className="board-picker-folder-row board-picker-explorer-row"
-        onContextMenu={(e) => openGameFolderMenu(e, folder)}
-      >
-        <div className="board-picker-explorer-row__name">
-          <button
-            type="button"
-            className="board-picker-folder-row__btn"
-            onClick={() => navigateTo(folder.id)}
-          >
-            <Folder size={14} className="flex-shrink-0 opacity-70" />
-            <span className="truncate">{folder.name}</span>
-          </button>
-        </div>
-        {renderDateColumns(folder.createdAt, folder.updatedAt)}
-      </div>
-    )
-  }
-
   const isEmpty = visibleEntries.length === 0
-  const currentDragOver = !isTrash && dragOverTarget === 'current'
-  const parentDragOver = !isTrash && dragOverTarget === 'parent'
+  const currentDragOver = dragOverTarget === 'current'
+  const parentDragOver = dragOverTarget === 'parent'
   const atRoot = currentFolderId === null
 
   return (
@@ -940,18 +690,18 @@ export default function BoardPickerExplorer({
           aria-label="Go to parent folder"
           title={activeDrag ? undefined : 'Back'}
           data-tooltip={
-            !isTrash && !atRoot && activeDrag
+            !atRoot && activeDrag
               ? 'This item will be placed in the parent folder'
               : undefined
           }
           onDragEnter={(e) => {
-            if (isTrash || atRoot || !canDropOnParent(activeDrag)) return
+            if (atRoot || !canDropOnParent(activeDrag)) return
             e.preventDefault()
             e.stopPropagation()
             setDragOverTarget('parent')
           }}
           onDragOver={(e) => {
-            if (isTrash || atRoot) return
+            if (atRoot) return
             e.preventDefault()
             e.stopPropagation()
             if (canDropOnParent(activeDrag)) {
@@ -1003,7 +753,6 @@ export default function BoardPickerExplorer({
         className={`board-picker-boards__scroll board-picker-explorer${currentDragOver ? ' board-picker-explorer--drag-over' : ''}`}
         onContextMenu={openEmptyMenu}
         onDragOver={(e) => {
-          if (isTrash) return
           e.preventDefault()
           e.dataTransfer.dropEffect = 'move'
           setDragOverTarget('current')
@@ -1022,15 +771,12 @@ export default function BoardPickerExplorer({
             {renderSortHeader('updatedAt', 'Last modified at', 'board-picker-explorer-header__date')}
           </div>
         )}
-        {visibleEntries.map((entry) => {
-          if (entry.kind === 'folder') return renderFolderRow(entry.item)
-          if (entry.kind === 'board') return renderBoardRow(entry.item)
-          if (entry.kind === 'gameFolder') return renderGameFolderRow(entry.item)
-          return renderGameRow(entry.item)
-        })}
+        {visibleEntries.map((entry) =>
+          entry.kind === 'folder' ? renderFolderRow(entry.item) : renderGameRow(entry.item),
+        )}
         {isEmpty && (
           <div className="board-picker-empty">
-            {isTrash ? 'Trash is empty' : 'No saved boards'}
+            No saved games
           </div>
         )}
       </div>

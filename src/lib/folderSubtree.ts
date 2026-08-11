@@ -1,7 +1,8 @@
-import type { BoardFolder } from '../types'
-
 /** Collect folder id and all descendant folder ids. */
-export function collectFolderSubtree(folders: BoardFolder[], rootId: string): Set<string> {
+export function collectFolderSubtree(
+  folders: { id: string; parentId: string | null }[],
+  rootId: string,
+): Set<string> {
   const ids = new Set<string>([rootId])
   let changed = true
   while (changed) {

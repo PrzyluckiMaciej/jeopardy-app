@@ -1,13 +1,26 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { Board, BoardFolder, Game, GameState, GameSettings, MediaPlaybackState, Player, Question } from '../types'
+import type {
+  Board,
+  BoardFolder,
+  Game,
+  GameFolder,
+  GameState,
+  GameSettings,
+  MediaPlaybackState,
+  Player,
+  Question,
+} from '../types'
 import { initialMediaPlaybackForType, questionMediaAutoplay } from '../types'
+
+type FolderLike = { id: string; name: string; parentId: string | null; trashedAt?: number | null }
 
 // ---- Board editor store (persisted) ----
 interface BoardStore {
   boards: Board[]
   games: Game[]
   folders: BoardFolder[]
+  gameFolders: GameFolder[]
   saveBoard: (board: Board) => void
   /** Soft-delete: move board to trash and unlink from games. */
   trashBoard: (id: string) => void
@@ -18,45 +31,68 @@ interface BoardStore {
   /** Permanently remove a board. */
   deleteBoard: (id: string) => void
   getBoard: (id: string) => Board | undefined
-  createGame: (name: string) => string
+  createGame: (name: string, folderId?: string | null) => string
   renameGame: (id: string, name: string) => void
+  /** Soft-delete: move game to trash. */
+  trashGame: (id: string) => void
+  restoreGame: (id: string) => void
+  /** Permanently remove a game. */
   deleteGame: (id: string) => void
   addBoardToGame: (gameId: string, boardId: string) => void
   removeBoardFromGame: (gameId: string, boardId: string) => void
   reorderBoardInGame: (gameId: string, fromIndex: number, toIndex: number) => void
+  moveGameToFolder: (gameId: string, folderId: string | null) => void
   createFolder: (name: string, parentId?: string | null) => string
   /** Returns false if the name conflicts with a sibling folder. */
   renameFolder: (id: string, name: string) => boolean
   /** Permanently remove a folder and its subtree. */
   deleteFolder: (id: string) => void
-  /** Permanently remove all trashed boards and folders. */
+  createGameFolder: (name: string, parentId?: string | null) => string
+  renameGameFolder: (id: string, name: string) => boolean
+  trashGameFolder: (id: string) => void
+  restoreGameFolder: (id: string) => void
+  deleteGameFolder: (id: string) => void
+  moveGameFolder: (folderId: string, newParentId: string | null) => void
+  /** Permanently remove all trashed boards, folders, games, and game folders. */
   emptyTrash: () => void
   moveBoardToFolder: (boardId: string, folderId: string | null) => void
   moveFolder: (folderId: string, newParentId: string | null) => void
 }
 
-export function isBoardTrashed(board: Board): boolean {
+export function isBoardTrashed(board: { trashedAt?: number | null }): boolean {
   return board.trashedAt != null
 }
 
-export function isFolderTrashed(folder: BoardFolder): boolean {
+export function isFolderTrashed(folder: FolderLike): boolean {
+  return folder.trashedAt != null
+}
+
+export function isGameTrashed(game: { trashedAt?: number | null }): boolean {
+  return game.trashedAt != null
+}
+
+export function isGameFolderTrashed(folder: FolderLike): boolean {
   return folder.trashedAt != null
 }
 
 /** True when the restore target exists and is not trashed. */
-function canRestoreToFolder(folders: BoardFolder[], folderId: string | null | undefined): boolean {
+function canRestoreToFolder(
+  folders: FolderLike[],
+  folderId: string | null | undefined,
+  isTrashed: (f: FolderLike) => boolean,
+): boolean {
   if (folderId == null) return true
   const folder = folders.find((f) => f.id === folderId)
-  return folder != null && !isFolderTrashed(folder)
+  return folder != null && !isTrashed(folder)
 }
 
-type PersistedBoardStore = Pick<BoardStore, 'boards' | 'games' | 'folders'>
+type PersistedBoardStore = Pick<BoardStore, 'boards' | 'games' | 'folders' | 'gameFolders'>
 type LegacyPersistedBoardStore = PersistedBoardStore & { groups?: Game[] }
 
 function isDescendantFolder(
-  folders: BoardFolder[],
+  folders: { id: string; parentId: string | null }[],
   folderId: string,
-  potentialAncestorId: string
+  potentialAncestorId: string,
 ): boolean {
   let current = folders.find((f) => f.id === folderId)
   while (current?.parentId) {
@@ -68,9 +104,10 @@ function isDescendantFolder(
 
 /** Case-insensitive sibling name check. Empty names count as taken. Ignores trashed folders. */
 function isFolderNameTaken(
-  folders: BoardFolder[],
+  folders: FolderLike[],
   parentId: string | null,
   name: string,
+  isTrashed: (f: FolderLike) => boolean,
   excludeId?: string,
 ): boolean {
   const key = name.trim().toLowerCase()
@@ -78,7 +115,7 @@ function isFolderNameTaken(
   return folders.some(
     (f) =>
       f.id !== excludeId &&
-      !isFolderTrashed(f) &&
+      !isTrashed(f) &&
       f.parentId === parentId &&
       f.name.trim().toLowerCase() === key,
   )
@@ -86,15 +123,16 @@ function isFolderNameTaken(
 
 /** Returns `desiredName` or `desiredName (2)`, `(3)`, … until unique among siblings. */
 function uniqueFolderName(
-  folders: BoardFolder[],
+  folders: FolderLike[],
   parentId: string | null,
   desiredName: string,
+  isTrashed: (f: FolderLike) => boolean,
   excludeId?: string,
 ): string {
   const base = desiredName.trim() || 'New Folder'
-  if (!isFolderNameTaken(folders, parentId, base, excludeId)) return base
+  if (!isFolderNameTaken(folders, parentId, base, isTrashed, excludeId)) return base
   let n = 2
-  while (isFolderNameTaken(folders, parentId, `${base} (${n})`, excludeId)) {
+  while (isFolderNameTaken(folders, parentId, `${base} (${n})`, isTrashed, excludeId)) {
     n += 1
   }
   return `${base} (${n})`
@@ -102,21 +140,22 @@ function uniqueFolderName(
 
 function migrateBoardStore(persisted: unknown): PersistedBoardStore {
   if (!persisted || typeof persisted !== 'object') {
-    return { boards: [], games: [], folders: [] }
+    return { boards: [], games: [], folders: [], gameFolders: [] }
   }
   const state = persisted as LegacyPersistedBoardStore
+  let games = state.games ?? []
   if (state.groups && !state.games) {
-    const { groups, ...rest } = state
-    return {
-      boards: rest.boards ?? [],
-      games: groups,
-      folders: rest.folders ?? [],
-    }
+    games = state.groups
   }
+  games = games.map((g) => ({
+    ...g,
+    folderId: g.folderId ?? null,
+  }))
   return {
     boards: state.boards ?? [],
-    games: state.games ?? [],
+    games,
     folders: state.folders ?? [],
+    gameFolders: state.gameFolders ?? [],
   }
 }
 
@@ -126,6 +165,7 @@ export const useBoardStore = create<BoardStore>()(
       boards: [],
       games: [],
       folders: [],
+      gameFolders: [],
       saveBoard: (board) =>
         set((s) => {
           const idx = s.boards.findIndex((b) => b.id === board.id)
@@ -207,10 +247,9 @@ export const useBoardStore = create<BoardStore>()(
           const board = s.boards.find((b) => b.id === id)
           if (!board || !isBoardTrashed(board)) return s
           const now = Date.now()
-          const target =
-            canRestoreToFolder(s.folders, board.restoreFolderId)
-              ? (board.restoreFolderId ?? null)
-              : null
+          const target = canRestoreToFolder(s.folders, board.restoreFolderId, isFolderTrashed)
+            ? (board.restoreFolderId ?? null)
+            : null
           return {
             boards: s.boards.map((b) =>
               b.id === id
@@ -235,10 +274,16 @@ export const useBoardStore = create<BoardStore>()(
               .filter((f) => f.id === id || isDescendantFolder(s.folders, f.id, id))
               .map((f) => f.id),
           )
-          const targetParent = canRestoreToFolder(s.folders, folder.restoreParentId)
+          const targetParent = canRestoreToFolder(s.folders, folder.restoreParentId, isFolderTrashed)
             ? (folder.restoreParentId ?? null)
             : null
-          const uniqueName = uniqueFolderName(s.folders, targetParent, folder.name, id)
+          const uniqueName = uniqueFolderName(
+            s.folders,
+            targetParent,
+            folder.name,
+            isFolderTrashed,
+            id,
+          )
           // Only clear trash on the restored folder + descendants that are still trashed.
           // Reattach the root folder to its restore parent; descendants keep their parentIds.
           return {
@@ -287,13 +332,20 @@ export const useBoardStore = create<BoardStore>()(
           })),
         })),
       getBoard: (id) => get().boards.find((b) => b.id === id),
-      createGame: (name) => {
+      createGame: (name, folderId = null) => {
         const id = crypto.randomUUID()
         const now = Date.now()
         set((s) => ({
           games: [
             ...s.games,
-            { id, name, boardIds: [], createdAt: now, updatedAt: now },
+            {
+              id,
+              name,
+              boardIds: [],
+              folderId: folderId ?? null,
+              createdAt: now,
+              updatedAt: now,
+            },
           ],
         }))
         return id
@@ -301,9 +353,54 @@ export const useBoardStore = create<BoardStore>()(
       renameGame: (id, name) =>
         set((s) => ({
           games: s.games.map((g) =>
-            g.id === id ? { ...g, name, updatedAt: Date.now() } : g
+            g.id === id ? { ...g, name, updatedAt: Date.now() } : g,
           ),
         })),
+      trashGame: (id) =>
+        set((s) => {
+          const game = s.games.find((g) => g.id === id)
+          if (!game || isGameTrashed(game)) return s
+          const now = Date.now()
+          return {
+            games: s.games.map((g) =>
+              g.id === id
+                ? {
+                    ...g,
+                    folderId: null,
+                    trashedAt: now,
+                    restoreFolderId: g.folderId ?? null,
+                    updatedAt: now,
+                  }
+                : g,
+            ),
+          }
+        }),
+      restoreGame: (id) =>
+        set((s) => {
+          const game = s.games.find((g) => g.id === id)
+          if (!game || !isGameTrashed(game)) return s
+          const now = Date.now()
+          const target = canRestoreToFolder(
+            s.gameFolders,
+            game.restoreFolderId,
+            isGameFolderTrashed,
+          )
+            ? (game.restoreFolderId ?? null)
+            : null
+          return {
+            games: s.games.map((g) =>
+              g.id === id
+                ? {
+                    ...g,
+                    folderId: target,
+                    trashedAt: null,
+                    restoreFolderId: null,
+                    updatedAt: now,
+                  }
+                : g,
+            ),
+          }
+        }),
       deleteGame: (id) =>
         set((s) => ({ games: s.games.filter((g) => g.id !== id) })),
       addBoardToGame: (gameId, boardId) =>
@@ -311,15 +408,19 @@ export const useBoardStore = create<BoardStore>()(
           games: s.games.map((g) =>
             g.id === gameId && !g.boardIds.includes(boardId)
               ? { ...g, boardIds: [...g.boardIds, boardId], updatedAt: Date.now() }
-              : g
+              : g,
           ),
         })),
       removeBoardFromGame: (gameId, boardId) =>
         set((s) => ({
           games: s.games.map((g) =>
             g.id === gameId
-              ? { ...g, boardIds: g.boardIds.filter((id) => id !== boardId), updatedAt: Date.now() }
-              : g
+              ? {
+                  ...g,
+                  boardIds: g.boardIds.filter((id) => id !== boardId),
+                  updatedAt: Date.now(),
+                }
+              : g,
           ),
         })),
       reorderBoardInGame: (gameId, fromIndex, toIndex) =>
@@ -332,12 +433,18 @@ export const useBoardStore = create<BoardStore>()(
             return { ...g, boardIds: ids, updatedAt: Date.now() }
           }),
         })),
+      moveGameToFolder: (gameId, folderId) =>
+        set((s) => ({
+          games: s.games.map((g) =>
+            g.id === gameId ? { ...g, folderId, updatedAt: Date.now() } : g,
+          ),
+        })),
       createFolder: (name, parentId = null) => {
         const id = crypto.randomUUID()
         const now = Date.now()
         const parent = parentId ?? null
         set((s) => {
-          const uniqueName = uniqueFolderName(s.folders, parent, name)
+          const uniqueName = uniqueFolderName(s.folders, parent, name, isFolderTrashed)
           return {
             folders: [
               ...s.folders,
@@ -354,11 +461,13 @@ export const useBoardStore = create<BoardStore>()(
           if (!folder) return s
           const trimmed = name.trim()
           if (!trimmed) return s
-          if (isFolderNameTaken(s.folders, folder.parentId, trimmed, id)) return s
+          if (isFolderNameTaken(s.folders, folder.parentId, trimmed, isFolderTrashed, id)) {
+            return s
+          }
           renamed = true
           return {
             folders: s.folders.map((f) =>
-              f.id === id ? { ...f, name: trimmed, updatedAt: Date.now() } : f
+              f.id === id ? { ...f, name: trimmed, updatedAt: Date.now() } : f,
             ),
           }
         })
@@ -386,6 +495,187 @@ export const useBoardStore = create<BoardStore>()(
             })),
           }
         }),
+      createGameFolder: (name, parentId = null) => {
+        const id = crypto.randomUUID()
+        const now = Date.now()
+        const parent = parentId ?? null
+        set((s) => {
+          const uniqueName = uniqueFolderName(s.gameFolders, parent, name, isGameFolderTrashed)
+          return {
+            gameFolders: [
+              ...s.gameFolders,
+              { id, name: uniqueName, parentId: parent, createdAt: now, updatedAt: now },
+            ],
+          }
+        })
+        return id
+      },
+      renameGameFolder: (id, name) => {
+        let renamed = false
+        set((s) => {
+          const folder = s.gameFolders.find((f) => f.id === id)
+          if (!folder) return s
+          const trimmed = name.trim()
+          if (!trimmed) return s
+          if (
+            isFolderNameTaken(s.gameFolders, folder.parentId, trimmed, isGameFolderTrashed, id)
+          ) {
+            return s
+          }
+          renamed = true
+          return {
+            gameFolders: s.gameFolders.map((f) =>
+              f.id === id ? { ...f, name: trimmed, updatedAt: Date.now() } : f,
+            ),
+          }
+        })
+        return renamed
+      },
+      trashGameFolder: (id) =>
+        set((s) => {
+          const folder = s.gameFolders.find((f) => f.id === id)
+          if (!folder || isGameFolderTrashed(folder)) return s
+          const now = Date.now()
+          const folderIdsToTrash = new Set(
+            s.gameFolders
+              .filter((f) => f.id === id || isDescendantFolder(s.gameFolders, f.id, id))
+              .map((f) => f.id),
+          )
+          const gameIdsToTrash = new Set(
+            s.games
+              .filter((g) => g.folderId != null && folderIdsToTrash.has(g.folderId))
+              .map((g) => g.id),
+          )
+          return {
+            gameFolders: s.gameFolders.map((f) => {
+              if (!folderIdsToTrash.has(f.id) || isGameFolderTrashed(f)) return f
+              return {
+                ...f,
+                parentId: f.id === id ? null : f.parentId,
+                trashedAt: now,
+                restoreParentId: f.parentId,
+                updatedAt: now,
+              }
+            }),
+            games: s.games.map((g) =>
+              gameIdsToTrash.has(g.id) && !isGameTrashed(g)
+                ? {
+                    ...g,
+                    trashedAt: now,
+                    restoreFolderId: g.folderId ?? null,
+                    updatedAt: now,
+                  }
+                : g,
+            ),
+          }
+        }),
+      restoreGameFolder: (id) =>
+        set((s) => {
+          const folder = s.gameFolders.find((f) => f.id === id)
+          if (!folder || !isGameFolderTrashed(folder)) return s
+          const now = Date.now()
+          const subtreeIds = new Set(
+            s.gameFolders
+              .filter((f) => f.id === id || isDescendantFolder(s.gameFolders, f.id, id))
+              .map((f) => f.id),
+          )
+          const targetParent = canRestoreToFolder(
+            s.gameFolders,
+            folder.restoreParentId,
+            isGameFolderTrashed,
+          )
+            ? (folder.restoreParentId ?? null)
+            : null
+          const uniqueName = uniqueFolderName(
+            s.gameFolders,
+            targetParent,
+            folder.name,
+            isGameFolderTrashed,
+            id,
+          )
+          return {
+            gameFolders: s.gameFolders.map((f) => {
+              if (!subtreeIds.has(f.id) || !isGameFolderTrashed(f)) return f
+              if (f.id === id) {
+                return {
+                  ...f,
+                  parentId: targetParent,
+                  name: uniqueName,
+                  trashedAt: null,
+                  restoreParentId: null,
+                  updatedAt: now,
+                }
+              }
+              return {
+                ...f,
+                trashedAt: null,
+                restoreParentId: null,
+                updatedAt: now,
+              }
+            }),
+            games: s.games.map((g) => {
+              if (
+                !isGameTrashed(g) ||
+                g.folderId == null ||
+                !subtreeIds.has(g.folderId)
+              ) {
+                return g
+              }
+              return {
+                ...g,
+                trashedAt: null,
+                restoreFolderId: null,
+                updatedAt: now,
+              }
+            }),
+          }
+        }),
+      deleteGameFolder: (id) =>
+        set((s) => {
+          if (!s.gameFolders.some((f) => f.id === id)) return s
+          const folderIdsToDelete = new Set(
+            s.gameFolders
+              .filter((f) => f.id === id || isDescendantFolder(s.gameFolders, f.id, id))
+              .map((f) => f.id),
+          )
+          const gameIdsToDelete = new Set(
+            s.games
+              .filter((g) => g.folderId != null && folderIdsToDelete.has(g.folderId))
+              .map((g) => g.id),
+          )
+          return {
+            gameFolders: s.gameFolders.filter((f) => !folderIdsToDelete.has(f.id)),
+            games: s.games.filter((g) => !gameIdsToDelete.has(g.id)),
+          }
+        }),
+      moveGameFolder: (folderId, newParentId) =>
+        set((s) => {
+          if (folderId === newParentId) return s
+          if (
+            newParentId !== null &&
+            (newParentId === folderId ||
+              isDescendantFolder(s.gameFolders, newParentId, folderId))
+          ) {
+            return s
+          }
+          const folder = s.gameFolders.find((f) => f.id === folderId)
+          if (!folder) return s
+          if (folder.parentId === newParentId) return s
+          const uniqueName = uniqueFolderName(
+            s.gameFolders,
+            newParentId,
+            folder.name,
+            isGameFolderTrashed,
+            folderId,
+          )
+          return {
+            gameFolders: s.gameFolders.map((f) =>
+              f.id === folderId
+                ? { ...f, parentId: newParentId, name: uniqueName, updatedAt: Date.now() }
+                : f,
+            ),
+          }
+        }),
       emptyTrash: () =>
         set((s) => {
           const trashedFolderIds = new Set(
@@ -393,6 +683,12 @@ export const useBoardStore = create<BoardStore>()(
           )
           const trashedBoardIds = new Set(
             s.boards.filter((b) => isBoardTrashed(b)).map((b) => b.id),
+          )
+          const trashedGameFolderIds = new Set(
+            s.gameFolders.filter((f) => isGameFolderTrashed(f)).map((f) => f.id),
+          )
+          const trashedGameIds = new Set(
+            s.games.filter((g) => isGameTrashed(g)).map((g) => g.id),
           )
           // Also remove boards whose folder was trashed but board flag was missing
           for (const b of s.boards) {
@@ -414,22 +710,45 @@ export const useBoardStore = create<BoardStore>()(
               trashedBoardIds.add(b.id)
             }
           }
-          if (trashedFolderIds.size === 0 && trashedBoardIds.size === 0) return s
+          for (const f of s.gameFolders) {
+            if (
+              !trashedGameFolderIds.has(f.id) &&
+              [...trashedGameFolderIds].some((tid) =>
+                isDescendantFolder(s.gameFolders, f.id, tid),
+              )
+            ) {
+              trashedGameFolderIds.add(f.id)
+            }
+          }
+          for (const g of s.games) {
+            if (g.folderId != null && trashedGameFolderIds.has(g.folderId)) {
+              trashedGameIds.add(g.id)
+            }
+          }
+          if (
+            trashedFolderIds.size === 0 &&
+            trashedBoardIds.size === 0 &&
+            trashedGameFolderIds.size === 0 &&
+            trashedGameIds.size === 0
+          ) {
+            return s
+          }
           return {
             folders: s.folders.filter((f) => !trashedFolderIds.has(f.id)),
             boards: s.boards.filter((b) => !trashedBoardIds.has(b.id)),
-            games: s.games.map((g) => ({
-              ...g,
-              boardIds: g.boardIds.filter((bid) => !trashedBoardIds.has(bid)),
-            })),
+            gameFolders: s.gameFolders.filter((f) => !trashedGameFolderIds.has(f.id)),
+            games: s.games
+              .filter((g) => !trashedGameIds.has(g.id))
+              .map((g) => ({
+                ...g,
+                boardIds: g.boardIds.filter((bid) => !trashedBoardIds.has(bid)),
+              })),
           }
         }),
       moveBoardToFolder: (boardId, folderId) =>
         set((s) => ({
           boards: s.boards.map((b) =>
-            b.id === boardId
-              ? { ...b, folderId, updatedAt: Date.now() }
-              : b
+            b.id === boardId ? { ...b, folderId, updatedAt: Date.now() } : b,
           ),
         })),
       moveFolder: (folderId, newParentId) =>
@@ -445,12 +764,18 @@ export const useBoardStore = create<BoardStore>()(
           const folder = s.folders.find((f) => f.id === folderId)
           if (!folder) return s
           if (folder.parentId === newParentId) return s
-          const uniqueName = uniqueFolderName(s.folders, newParentId, folder.name, folderId)
+          const uniqueName = uniqueFolderName(
+            s.folders,
+            newParentId,
+            folder.name,
+            isFolderTrashed,
+            folderId,
+          )
           return {
             folders: s.folders.map((f) =>
               f.id === folderId
                 ? { ...f, parentId: newParentId, name: uniqueName, updatedAt: Date.now() }
-                : f
+                : f,
             ),
           }
         }),
@@ -458,9 +783,9 @@ export const useBoardStore = create<BoardStore>()(
     {
       name: 'jeopardy-boards',
       migrate: migrateBoardStore,
-      version: 2,
-    }
-  )
+      version: 3,
+    },
+  ),
 )
 
 // ---- Live game store (session-persisted: roomCode, isHost, myPlayerId only) ----
