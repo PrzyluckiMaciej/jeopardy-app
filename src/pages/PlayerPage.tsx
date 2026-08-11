@@ -535,7 +535,11 @@ export default function PlayerPage() {
     !showDdMobileCompact &&
     !isMobileViewport &&
     (uiPhase === 'dailyDouble' ||
-      (isDD && (uiPhase === 'dailyDoubleBet' || uiPhase === 'question' || uiPhase === 'revealed')) ||
+      (isDD &&
+        (uiPhase === 'dailyDoubleBet' ||
+          uiPhase === 'question' ||
+          uiPhase === 'revealed' ||
+          uiPhase === 'buzzing')) ||
       keepSidebarDuringQuestion)
   const showBuzzQueuePanel = !isDD && state.buzzQueue.length > 0
   const showBuzzQueueInSidebar = showBuzzQueuePanel && !isMobileViewport
@@ -601,7 +605,8 @@ export default function PlayerPage() {
 
   const reservePlayerBuzzSpace =
     showMobilePlayerDock ||
-    (!isDD && ['question', 'buzzing', 'revealed'].includes(uiPhase))
+    (!isDD && ['question', 'buzzing', 'revealed'].includes(uiPhase)) ||
+    (isDD && judgeResult != null)
 
   const maxDdWager = (() => {
     const maxPV = Math.max(...(state.board?.pointValues ?? [0]))
@@ -1012,8 +1017,10 @@ export default function PlayerPage() {
                   </div>
                 )}
 
-                {/* DD: question/revealed — waiting for host to judge */}
-                {isDD && (uiPhase === 'question' || uiPhase === 'revealed') && !judgeResult && (
+                {/* DD: question/revealed/buzzing — waiting for host to judge (or show result in action zone) */}
+                {isDD &&
+                  (uiPhase === 'question' || uiPhase === 'revealed' || uiPhase === 'buzzing') &&
+                  !judgeResult && (
                   <div className="w-full flex flex-col gap-2 items-center">
                     {state.dailyDouble?.wager != null && (
                       <div className="font-condensed text-sm" style={{ color: 'var(--gold-bright)' }}>
@@ -1023,6 +1030,13 @@ export default function PlayerPage() {
                     <div className="font-condensed text-sm text-center" style={{ color: '#4a5580' }}>
                       Waiting for host to judge…
                     </div>
+                  </div>
+                )}
+
+                {/* DD: keep wager visible alongside Correct/Wrong result */}
+                {isDD && judgeResult && state.dailyDouble?.wager != null && (
+                  <div className="font-condensed text-sm text-center" style={{ color: 'var(--gold-bright)' }}>
+                    {isDDPlayer ? 'Your' : `${ddPlayerInfo?.name}'s`} wager: <span className="font-display text-lg">${state.dailyDouble.wager}</span>
                   </div>
                 )}
 
