@@ -30,13 +30,6 @@ export default function QuestionOverlay({ state, settings }: Props) {
   const [answerRevealKey, setAnswerRevealKey] = useState(0)
 
   useEffect(() => {
-    if (phase === 'dailyDouble') {
-      setDdSplashDone(false)
-      setDdExiting(false)
-    }
-  }, [phase])
-
-  useEffect(() => {
     const prev = prevPhaseRef.current
     // Skip remount when leaving DD phases — host already previewed the content
     if (
