@@ -8,6 +8,7 @@ import { createDefaultBoard, cellId } from '../lib/utils'
 import { getCategoryGameplaySettings } from '../lib/settings'
 import { duplicateBoard } from '../lib/duplicateBoard'
 import { duplicateFolder } from '../lib/duplicateFolder'
+import { collectFolderSubtree } from '../lib/folderSubtree'
 import { getMedia, blobToDataUrl } from '../lib/db'
 import { logEvent } from '../lib/logger'
 import {
@@ -15,6 +16,7 @@ import {
   normalizePlayerName,
   type NameSession,
 } from '../lib/playerJoin'
+import AddToGameModal from '../components/AddToGameModal'
 import BoardEditor from '../components/BoardEditor'
 import BoardPickerExplorer from '../components/BoardPickerExplorer'
 import ContextMenu, { type ContextMenuItem } from '../components/ContextMenu'
@@ -25,22 +27,6 @@ import Scoreboard from '../components/Scoreboard'
 import Podium from '../components/Podium'
 
 type Tab = 'board' | 'settings'
-
-/** Collect folder id and all descendant folder ids. */
-function collectFolderSubtree(folders: BoardFolder[], rootId: string): Set<string> {
-  const ids = new Set<string>([rootId])
-  let changed = true
-  while (changed) {
-    changed = false
-    for (const f of folders) {
-      if (!ids.has(f.id) && f.parentId != null && ids.has(f.parentId)) {
-        ids.add(f.id)
-        changed = true
-      }
-    }
-  }
-  return ids
-}
 
 function pickRandom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
@@ -103,6 +89,10 @@ export default function HostPage() {
   const [newGameName, setNewGameName] = useState('')
   const [editingGameId, setEditingGameId] = useState<string | null>(null)
   const [editingGameName, setEditingGameName] = useState('')
+  const [addToGameTarget, setAddToGameTarget] = useState<{
+    boardIds: string[]
+    label: string
+  } | null>(null)
   const [activeEmojis, setActiveEmojis] = useState<Record<string, { emoji: string; seq: number }>>({})
   const [mobilePlayersOpen, setMobilePlayersOpen] = useState(false)
 
@@ -464,6 +454,11 @@ export default function HostPage() {
           id: 'duplicate',
           label: 'Duplicate',
           onSelect: () => { void handleDuplicateBoard(board) },
+        },
+        {
+          id: 'add-to-game',
+          label: 'Add to game',
+          onSelect: () => setAddToGameTarget({ boardIds: [board.id], label: board.name }),
         },
         {
           id: 'delete',
@@ -887,6 +882,29 @@ export default function HostPage() {
     boardStore.createGame(name)
     setNewGameName('')
     setCreatingGame(false)
+  }
+
+  function handleRequestAddToGame(boardIds: string[], label: string) {
+    setAddToGameTarget({ boardIds, label })
+  }
+
+  function addBoardsToGame(gameId: string, boardIds: string[]) {
+    for (const id of boardIds) {
+      boardStore.addBoardToGame(gameId, id)
+    }
+  }
+
+  function handleAddToGameConfirm(gameId: string) {
+    if (!addToGameTarget) return
+    addBoardsToGame(gameId, addToGameTarget.boardIds)
+    setAddToGameTarget(null)
+  }
+
+  function handleAddToGameCreateAndConfirm(name: string) {
+    if (!addToGameTarget) return
+    const gameId = boardStore.createGame(name)
+    addBoardsToGame(gameId, addToGameTarget.boardIds)
+    setAddToGameTarget(null)
   }
 
   function commitGameRename(id: string) {
@@ -1394,6 +1412,7 @@ export default function HostPage() {
                     onDuplicateFolder={(f) => { void handleDuplicateFolder(f) }}
                     onRequestDeleteFolder={handleTrashFolder}
                     onCreateBoard={handleNewBoard}
+                    onRequestAddToGame={handleRequestAddToGame}
                     onRestoreBoard={handleRestoreBoard}
                     onRestoreFolder={handleRestoreFolder}
                     onPermanentDeleteBoard={handlePermanentDeleteBoard}
@@ -1564,6 +1583,17 @@ export default function HostPage() {
           y={trashNavMenu.y}
           items={trashNavMenu.items}
           onClose={() => setTrashNavMenu(null)}
+        />
+      )}
+
+      {addToGameTarget && (
+        <AddToGameModal
+          boardIds={addToGameTarget.boardIds}
+          label={addToGameTarget.label}
+          games={boardStore.games.map((g) => ({ id: g.id, name: g.name }))}
+          onConfirm={handleAddToGameConfirm}
+          onCreateAndConfirm={handleAddToGameCreateAndConfirm}
+          onCancel={() => setAddToGameTarget(null)}
         />
       )}
     </div>

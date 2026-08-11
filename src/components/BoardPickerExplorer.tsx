@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState, type DragEvent, type MouseEvent } from 'react'
 import { ArrowLeft, Check, Folder, LayoutGrid } from 'lucide-react'
 import type { Board, BoardFolder } from '../types'
+import { collectFolderSubtree } from '../lib/folderSubtree'
 import { isBoardTrashed, isFolderTrashed, useBoardStore } from '../store/gameStore'
 import ContextMenu, { type ContextMenuItem } from './ContextMenu'
 
@@ -28,6 +29,7 @@ interface Props {
   onDuplicateFolder: (folder: BoardFolder) => void
   onRequestDeleteFolder: (folder: BoardFolder) => void
   onCreateBoard: (folderId: string | null) => void
+  onRequestAddToGame: (boardIds: string[], label: string) => void
   onRestoreBoard?: (board: Board) => void
   onRestoreFolder?: (folder: BoardFolder) => void
   onPermanentDeleteBoard?: (board: Board) => void
@@ -100,6 +102,7 @@ export default function BoardPickerExplorer({
   onDuplicateFolder,
   onRequestDeleteFolder,
   onCreateBoard,
+  onRequestAddToGame,
   onRestoreBoard,
   onRestoreFolder,
   onPermanentDeleteBoard,
@@ -347,6 +350,22 @@ export default function BoardPickerExplorer({
           onSelect: () => onDuplicateFolder(folder),
         },
         {
+          id: 'add-to-game',
+          label: 'Add to game',
+          onSelect: () => {
+            const folderIds = collectFolderSubtree(folders, folder.id)
+            const boardIds = boards
+              .filter((b) => b.folderId != null && folderIds.has(b.folderId) && !isBoardTrashed(b))
+              .map((b) => b.id)
+            const count = boardIds.length
+            const label =
+              count === 1
+                ? `1 board from ${folder.name}`
+                : `${count} boards from ${folder.name}`
+            onRequestAddToGame(boardIds, label)
+          },
+        },
+        {
           id: 'delete',
           label: 'Delete',
           danger: true,
@@ -392,6 +411,11 @@ export default function BoardPickerExplorer({
           id: 'duplicate',
           label: 'Duplicate',
           onSelect: () => onDuplicateBoard(board),
+        },
+        {
+          id: 'add-to-game',
+          label: 'Add to game',
+          onSelect: () => onRequestAddToGame([board.id], board.name),
         },
         {
           id: 'delete',

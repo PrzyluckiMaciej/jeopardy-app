@@ -18,7 +18,7 @@ interface BoardStore {
   /** Permanently remove a board. */
   deleteBoard: (id: string) => void
   getBoard: (id: string) => Board | undefined
-  createGame: (name: string) => void
+  createGame: (name: string) => string
   renameGame: (id: string, name: string) => void
   deleteGame: (id: string) => void
   addBoardToGame: (gameId: string, boardId: string) => void
@@ -287,16 +287,17 @@ export const useBoardStore = create<BoardStore>()(
           })),
         })),
       getBoard: (id) => get().boards.find((b) => b.id === id),
-      createGame: (name) =>
-        set((s) => {
-          const now = Date.now()
-          return {
-            games: [
-              ...s.games,
-              { id: crypto.randomUUID(), name, boardIds: [], createdAt: now, updatedAt: now },
-            ],
-          }
-        }),
+      createGame: (name) => {
+        const id = crypto.randomUUID()
+        const now = Date.now()
+        set((s) => ({
+          games: [
+            ...s.games,
+            { id, name, boardIds: [], createdAt: now, updatedAt: now },
+          ],
+        }))
+        return id
+      },
       renameGame: (id, name) =>
         set((s) => ({
           games: s.games.map((g) =>
