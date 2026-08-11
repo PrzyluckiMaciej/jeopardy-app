@@ -534,7 +534,7 @@ export default function PlayerPage() {
     !showDdMobileCompact &&
     !isMobileViewport &&
     (uiPhase === 'dailyDouble' ||
-      (isDD && (uiPhase === 'dailyDoubleBet' || uiPhase === 'question')) ||
+      (isDD && (uiPhase === 'dailyDoubleBet' || uiPhase === 'question' || uiPhase === 'revealed')) ||
       keepSidebarDuringQuestion)
   const showBuzzQueuePanel = !isDD && state.buzzQueue.length > 0
   const showBuzzQueueInSidebar = showBuzzQueuePanel && !isMobileViewport
@@ -1011,8 +1011,8 @@ export default function PlayerPage() {
                   </div>
                 )}
 
-                {/* DD: question phase — waiting for host to judge */}
-                {isDD && uiPhase === 'question' && !judgeResult && (
+                {/* DD: question/revealed — waiting for host to judge */}
+                {isDD && (uiPhase === 'question' || uiPhase === 'revealed') && !judgeResult && (
                   <div className="w-full flex flex-col gap-2 items-center">
                     {state.dailyDouble?.wager != null && (
                       <div className="font-condensed text-sm" style={{ color: 'var(--gold-bright)' }}>

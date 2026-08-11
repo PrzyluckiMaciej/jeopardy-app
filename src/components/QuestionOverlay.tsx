@@ -58,7 +58,6 @@ export default function QuestionOverlay({ state, settings }: Props) {
   const hasMedia = !!question.mediaId || !!activeMedia
   const autoBuzzOnClue = gameplay.autoBuzzQueue && hasClue
   const autoBuzzOnMedia = gameplay.autoBuzzQueueOnMedia && hasMedia
-  const autoBuzzPending = autoBuzzOnClue || autoBuzzOnMedia
   const autoBuzzHint = autoBuzzOnClue && autoBuzzOnMedia
     ? 'Buzz queue opens automatically on clue or media reveal'
     : autoBuzzOnClue
@@ -118,13 +117,13 @@ export default function QuestionOverlay({ state, settings }: Props) {
   }
 
   function handleRevealDailyDoubleClue() {
-    // Title already dismissed after splash — reveal to players immediately
-    if (ddSplashDone) {
-      doRevealDailyDoubleClue()
+    // Splash still on screen — finish fade-out, then reveal to players
+    if (!ddSplashDone) {
+      pendingDdAction.current = doRevealDailyDoubleClue
+      setDdExiting(true)
       return
     }
-    pendingDdAction.current = doRevealDailyDoubleClue
-    setDdExiting(true)
+    doRevealDailyDoubleClue()
   }
 
   function handleRevealClue() {
@@ -224,12 +223,14 @@ export default function QuestionOverlay({ state, settings }: Props) {
             <div
               className={`daily-double-title${ddExiting ? ' daily-double-title--exit' : ''}`}
               onAnimationEnd={(e) => {
+                // Entry finished → fade title out, then show host content
                 if (e.animationName === 'ddReveal' && !ddExiting) {
-                  setDdSplashDone(true)
+                  setDdExiting(true)
                   return
                 }
                 if (ddExiting && e.animationName === 'ddRevealFadeOut') {
                   setDdExiting(false)
+                  setDdSplashDone(true)
                   if (pendingDdAction.current) {
                     pendingDdAction.current()
                     pendingDdAction.current = null
@@ -242,28 +243,30 @@ export default function QuestionOverlay({ state, settings }: Props) {
           )}
 
           {showClue && (
-            <QuestionOverlayText
-              contentKey={`clue-${clueRevealKey}`}
-              clue={question.question}
-              answer={question.answer || '—'}
-              clueRevealed={clueRevealed}
-              answerRevealed={phase === 'revealed'}
-              answerKey={phase === 'revealed' ? `answer-${answerRevealKey}` : 'answer-pending'}
-              answerClassName={phase === 'revealed' ? 'answer-reveal' : ''}
-              hasMediaSlot={!!activeMedia}
-              media={
-                activeMedia ? (
-                  <QuestionMediaPlayer
-                    media={activeMedia}
-                    role="host"
-                    playback={mediaPlayback}
-                    mountKey={clueRevealKey}
-                    mediaActive={mediaRevealed && !overlayExiting}
-                    className={`question-overlay-media${mediaRevealed ? '' : ' question-overlay-media--pending'}`}
-                  />
-                ) : undefined
-              }
-            />
+            <div className={isDdPhase ? 'dd-host-content-enter' : undefined}>
+              <QuestionOverlayText
+                contentKey={`clue-${clueRevealKey}`}
+                clue={question.question}
+                answer={question.answer || '—'}
+                clueRevealed={clueRevealed}
+                answerRevealed={phase === 'revealed'}
+                answerKey={phase === 'revealed' ? `answer-${answerRevealKey}` : 'answer-pending'}
+                answerClassName={phase === 'revealed' ? 'answer-reveal' : ''}
+                hasMediaSlot={!!activeMedia}
+                media={
+                  activeMedia ? (
+                    <QuestionMediaPlayer
+                      media={activeMedia}
+                      role="host"
+                      playback={mediaPlayback}
+                      mountKey={clueRevealKey}
+                      mediaActive={mediaRevealed && !overlayExiting}
+                      className={`question-overlay-media${mediaRevealed ? '' : ' question-overlay-media--pending'}`}
+                    />
+                  ) : undefined
+                }
+              />
+            </div>
           )}
         </div>
 
@@ -284,19 +287,19 @@ export default function QuestionOverlay({ state, settings }: Props) {
                 <div className="font-condensed text-sm text-gold-bright">
                   {ddPlayer?.name} wagered <span className="font-display text-lg">${dailyDouble.wager}</span>
                 </div>
+                <button type="button" className="btn-gold w-full py-3" onClick={handleRevealDailyDoubleClue}>
+                  Reveal clue
+                </button>
                 {activeMedia && !mediaRevealed && (
                   <button type="button" className="btn-outline w-full btn-with-icon justify-center" onClick={handleRevealMedia}>
                     <Eye size={16} aria-hidden />
                     <span>Reveal media</span>
                   </button>
                 )}
-                <button type="button" className="btn-gold w-full py-3" onClick={handleRevealDailyDoubleClue}>
-                  Reveal clue
-                </button>
               </>
             )}
 
-            {isDD && phase === 'question' && ddPlayer && (
+            {isDD && (phase === 'question' || phase === 'revealed') && ddPlayer && (
               <div className="flex flex-col gap-2">
                 <div className="font-condensed text-sm text-gold-bright">
                   {ddPlayer.name} wagered <span className="font-display">${dailyDouble.wager}</span>
@@ -324,7 +327,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
               </div>
             )}
 
-            {!isDD && phase === 'question' && (clueRevealed || !hasClue) && !autoBuzzPending && (
+            {!isDD && phase === 'question' && (
               <button
                 type="button"
                 className="btn-gold w-full py-3 btn-with-icon justify-center"
@@ -376,7 +379,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
               </button>
             )}
 
-            {phase !== 'revealed' && !isDdPhase && (
+            {phase !== 'revealed' && phase !== 'dailyDouble' && (
               <button
                 type="button"
                 className="btn-outline w-full btn-with-icon justify-center"
