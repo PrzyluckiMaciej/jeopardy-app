@@ -1738,6 +1738,15 @@ select:focus-visible {
 .board-picker-path-input:focus {
   border-color: rgba(212, 160, 23, 0.55);
 }
+.board-picker-path-input--readonly {
+  display: flex;
+  align-items: center;
+  cursor: default;
+  user-select: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .board-picker-explorer {
   min-height: 4rem;
   border-radius: var(--radius-lg);

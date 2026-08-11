@@ -67,10 +67,29 @@ export interface BoardFolder {
   updatedAt: number
 }
 
+export interface GameFolder {
+  id: string
+  name: string
+  /** Parent folder; null = Games root */
+  parentId: string | null
+  /** Set when the folder is in the trash */
+  trashedAt?: number | null
+  /** Parent to restore under; null = Games root */
+  restoreParentId?: string | null
+  createdAt: number
+  updatedAt: number
+}
+
 export interface Game {
   id: string
   name: string
   boardIds: string[]
+  /** Folder containing this game; null/absent = Games root */
+  folderId?: string | null
+  /** Set when the game is in the trash */
+  trashedAt?: number | null
+  /** Folder to restore into; null = Games root */
+  restoreFolderId?: string | null
   createdAt: number
   updatedAt: number
 }

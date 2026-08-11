@@ -1,13 +1,20 @@
 import { useEffect, useRef, useState, type AnimationEvent as ReactAnimationEvent, type MouseEvent as ReactMouseEvent } from 'react'
-import { Settings, Trash2, Pencil, Check, Copy, Layers, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, RotateCcw, Shuffle, X, Users, CircleHelp, Menu } from 'lucide-react'
+import { Settings, Trash2, Copy, Layers, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, RotateCcw, Shuffle, X, Users, CircleHelp, Menu, ArrowLeft, Pencil } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { useGameStore, useBoardStore, isBoardTrashed, isFolderTrashed } from '../store/gameStore'
+import {
+  useGameStore,
+  useBoardStore,
+  isBoardTrashed,
+  isFolderTrashed,
+  isGameTrashed,
+} from '../store/gameStore'
 import * as net from '../lib/network'
-import type { Board, BoardFolder, Player, NetMessage, Question, GameSettings, PlayerSyncStatus } from '../types'
+import type { Board, BoardFolder, Game, GameFolder, Player, NetMessage, Question, GameSettings, PlayerSyncStatus } from '../types'
 import { createDefaultBoard, cellId } from '../lib/utils'
 import { getCategoryGameplaySettings } from '../lib/settings'
 import { duplicateBoard } from '../lib/duplicateBoard'
 import { duplicateFolder } from '../lib/duplicateFolder'
+import { duplicateGameFolder } from '../lib/duplicateGameFolder'
 import { collectFolderSubtree } from '../lib/folderSubtree'
 import { getMedia, blobToDataUrl } from '../lib/db'
 import { logEvent } from '../lib/logger'
@@ -20,6 +27,7 @@ import AddToGameModal from '../components/AddToGameModal'
 import ConfirmModal from '../components/ConfirmModal'
 import BoardEditor from '../components/BoardEditor'
 import BoardPickerExplorer from '../components/BoardPickerExplorer'
+import GamesPickerExplorer from '../components/GamesPickerExplorer'
 import ContextMenu, { type ContextMenuItem } from '../components/ContextMenu'
 import GameBoard from '../components/GameBoard'
 import QuestionOverlay from '../components/QuestionOverlay'
@@ -82,12 +90,16 @@ export default function HostPage() {
   } | null>(null)
   const [boardTransitionExiting, setBoardTransitionExiting] = useState(false)
 
-  /** `'all'` | `'trash'` | game id */
+  /** `'all'` | `'games'` | `'trash'` | game id */
   const [pickerNav, setPickerNav] = useState<string>('all')
-  const [creatingGame, setCreatingGame] = useState(false)
-  const [newGameName, setNewGameName] = useState('')
-  const [editingGameId, setEditingGameId] = useState<string | null>(null)
-  const [editingGameName, setEditingGameName] = useState('')
+  /** Folder to reopen in Games explorer after leaving game detail via Back. */
+  const [returnGamesFolderId, setReturnGamesFolderId] = useState<string | null>(null)
+  /** Folder shown when Games explorer mounts (null = Games root). */
+  const [gamesExplorerFolderId, setGamesExplorerFolderId] = useState<string | null>(null)
+  /** Bumps to remount Games explorer so folder navigation resets. */
+  const [gamesExplorerKey, setGamesExplorerKey] = useState(0)
+  const [renameGameFolderId, setRenameGameFolderId] = useState<string | null>(null)
+  const [renameGameId, setRenameGameId] = useState<string | null>(null)
   const [addToGameTarget, setAddToGameTarget] = useState<{
     boardIds: string[]
     label: string
@@ -551,6 +563,59 @@ export default function HostPage() {
     }
     boardStore.emptyTrash()
     clearActiveBoardIfInIds(trashedBoardIds)
+    if (pickerNav !== 'all' && pickerNav !== 'games' && pickerNav !== 'trash') {
+      const stillExists = useBoardStore.getState().games.some((g) => g.id === pickerNav)
+      if (!stillExists) setPickerNav('trash')
+    }
+  }
+
+  function openGamesExplorer(folderId: string | null = null) {
+    setRenameGameFolderId(null)
+    setRenameGameId(null)
+    setGamesExplorerFolderId(folderId)
+    setGamesExplorerKey((k) => k + 1)
+    setPickerNav('games')
+  }
+
+  function handleTrashGame(game: Game) {
+    boardStore.trashGame(game.id)
+    if (renameGameId === game.id) setRenameGameId(null)
+    if (pickerNav === game.id) {
+      openGamesExplorer(returnGamesFolderId)
+    }
+  }
+
+  function handleTrashGameFolder(folder: GameFolder) {
+    boardStore.trashGameFolder(folder.id)
+    if (renameGameFolderId === folder.id) setRenameGameFolderId(null)
+  }
+
+  function handleRestoreGame(game: Game) {
+    boardStore.restoreGame(game.id)
+  }
+
+  function handleRestoreGameFolder(folder: GameFolder) {
+    boardStore.restoreGameFolder(folder.id)
+  }
+
+  function handlePermanentDeleteGame(game: Game) {
+    boardStore.deleteGame(game.id)
+    if (renameGameId === game.id) setRenameGameId(null)
+    if (pickerNav === game.id) setPickerNav('trash')
+  }
+
+  function handlePermanentDeleteGameFolder(folder: GameFolder) {
+    boardStore.deleteGameFolder(folder.id)
+    if (renameGameFolderId === folder.id) setRenameGameFolderId(null)
+  }
+
+  function handleOpenGame(game: Game) {
+    setReturnGamesFolderId(game.folderId ?? null)
+    setPickerNav(game.id)
+  }
+
+  function handleBackToGames() {
+    openGamesExplorer(returnGamesFolderId)
   }
 
   function openTrashNavMenu(e: ReactMouseEvent) {
@@ -707,7 +772,7 @@ export default function HostPage() {
   async function handleDuplicateBoard(board: Board) {
     const copy = await duplicateBoard(board)
     boardStore.saveBoard(copy)
-    if (pickerNav !== 'all' && pickerNav !== 'trash') {
+    if (pickerNav !== 'all' && pickerNav !== 'games' && pickerNav !== 'trash') {
       boardStore.addBoardToGame(pickerNav, copy.id)
     }
   }
@@ -719,6 +784,17 @@ export default function HostPage() {
       boardStore.boards,
       boardStore.createFolder,
       boardStore.saveBoard,
+    )
+  }
+
+  function handleDuplicateGameFolder(folder: GameFolder) {
+    duplicateGameFolder(
+      folder,
+      boardStore.gameFolders,
+      boardStore.games.filter((g) => !isGameTrashed(g)),
+      boardStore.createGameFolder,
+      boardStore.createGame,
+      boardStore.addBoardToGame,
     )
   }
 
@@ -853,10 +929,8 @@ export default function HostPage() {
   }
 
   function resetPickerDrafts() {
-    setCreatingGame(false)
-    setNewGameName('')
-    setEditingGameId(null)
-    setEditingGameName('')
+    setRenameGameFolderId(null)
+    setRenameGameId(null)
   }
 
   function openBoardPicker() {
@@ -916,14 +990,6 @@ export default function HostPage() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [mobileNavOpen, mobileNavExiting]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  function commitNewGame() {
-    const name = newGameName.trim()
-    if (!name) return
-    boardStore.createGame(name)
-    setNewGameName('')
-    setCreatingGame(false)
-  }
-
   function handleRequestAddToGame(boardIds: string[], label: string) {
     setAddToGameTarget({ boardIds, label })
   }
@@ -947,28 +1013,21 @@ export default function HostPage() {
     setAddToGameTarget(null)
   }
 
-  function commitGameRename(id: string) {
-    const name = editingGameName.trim()
-    if (!name) return
-    boardStore.renameGame(id, name)
-    setEditingGameId(null)
-  }
-
-  function handleDeleteGame(id: string) {
-    boardStore.deleteGame(id)
-    if (pickerNav === id) setPickerNav('all')
-  }
-
   const board = activeBoard ?? state.board
   const showOverlay = ['question', 'buzzing', 'revealed', 'dailyDouble', 'dailyDoubleBet'].includes(state.phase) && !!state.activeQuestion
   const inGame = !!state.activeGameId
   const activeGameData = inGame ? boardStore.games.find(g => g.id === state.activeGameId) : null
 
   const pickerIsAll = pickerNav === 'all'
+  const pickerIsGames = pickerNav === 'games'
   const pickerIsTrash = pickerNav === 'trash'
-  const pickerGameId = !pickerIsAll && !pickerIsTrash ? pickerNav : null
+  const pickerGameId = !pickerIsAll && !pickerIsGames && !pickerIsTrash ? pickerNav : null
+  const gamesNavActive = pickerIsGames || pickerGameId != null
   const libraryBoards = boardStore.boards.filter((b) => !isBoardTrashed(b))
-  const trashBoardCount = boardStore.boards.filter((b) => isBoardTrashed(b)).length
+  const libraryGames = boardStore.games.filter((g) => !isGameTrashed(g))
+  const trashItemCount =
+    boardStore.boards.filter((b) => isBoardTrashed(b)).length +
+    boardStore.games.filter((g) => isGameTrashed(g)).length
   const pickerGameData = pickerGameId ? boardStore.games.find(g => g.id === pickerGameId) : null
   const pickerBoardIds = pickerGameData?.boardIds ?? []
   const pickerBoards = pickerGameId
@@ -1315,6 +1374,18 @@ export default function HostPage() {
 
                   <button
                     type="button"
+                    className={`board-picker-nav-item flex-shrink-0${gamesNavActive ? ' board-picker-nav-item--active' : ''}`}
+                    onClick={() => openGamesExplorer(null)}
+                  >
+                    <Layers size={14} className="flex-shrink-0 opacity-70" aria-hidden />
+                    <span className="board-picker-nav-item__text">
+                      <span className="truncate">Games</span>
+                      <span className="board-picker-nav-item__count">({libraryGames.length})</span>
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
                     className={`board-picker-nav-item flex-shrink-0${pickerIsTrash ? ' board-picker-nav-item--active' : ''}`}
                     onClick={() => setPickerNav('trash')}
                     onContextMenu={openTrashNavMenu}
@@ -1322,107 +1393,9 @@ export default function HostPage() {
                     <Trash2 size={14} className="flex-shrink-0 opacity-70" aria-hidden />
                     <span className="board-picker-nav-item__text">
                       <span className="truncate">Trash</span>
-                      <span className="board-picker-nav-item__count">({trashBoardCount})</span>
+                      <span className="board-picker-nav-item__count">({trashItemCount})</span>
                     </span>
                   </button>
-                </div>
-
-                <div className="board-picker-system-sep" aria-hidden />
-
-                <div className="board-picker-section-label">Games</div>
-
-                {boardStore.games.map((g) =>
-                  editingGameId === g.id ? (
-                    <div key={g.id} className="flex items-center gap-1 flex-shrink-0">
-                      <input
-                        className="board-picker-input"
-                        value={editingGameName}
-                        onChange={(e) => setEditingGameName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitGameRename(g.id)
-                          if (e.key === 'Escape') setEditingGameId(null)
-                        }}
-                        autoFocus
-                      />
-                      <button
-                        type="button"
-                        className="board-picker-save-btn"
-                        onClick={() => commitGameRename(g.id)}
-                        title="Save"
-                      >
-                        <Check size={14} />
-                      </button>
-                    </div>
-                  ) : (
-                    <div
-                      key={g.id}
-                      className={`board-picker-game-row${pickerGameId === g.id ? ' board-picker-game-row--active' : ''}`}
-                    >
-                      <button
-                        type="button"
-                        className="board-picker-game-row__btn truncate"
-                        onClick={() => setPickerNav(g.id)}
-                      >
-                        <span className="flex items-center gap-1">
-                          <Layers size={12} className="flex-shrink-0 opacity-70" />
-                          <span className="truncate">{g.name}</span>
-                          <span className="text-xs flex-shrink-0 opacity-50">
-                            ({boardStore.boards.filter((b) => g.boardIds.includes(b.id) && !isBoardTrashed(b)).length})
-                          </span>
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        className="board-picker-icon-btn"
-                        title="Rename game"
-                        onClick={() => { setEditingGameId(g.id); setEditingGameName(g.name) }}
-                      >
-                        <Pencil size={11} />
-                      </button>
-                      <button
-                        type="button"
-                        className="board-picker-icon-btn board-picker-icon-btn--danger"
-                        title="Delete game"
-                        onClick={() => handleDeleteGame(g.id)}
-                      >
-                        <Trash2 size={11} />
-                      </button>
-                    </div>
-                  )
-                )}
-
-                <div className="flex-shrink-0 mt-1">
-                  {creatingGame ? (
-                    <div className="flex items-center gap-1">
-                      <input
-                        className="board-picker-input"
-                        placeholder="Game name"
-                        value={newGameName}
-                        onChange={(e) => setNewGameName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitNewGame()
-                          if (e.key === 'Escape') { setCreatingGame(false); setNewGameName('') }
-                        }}
-                        autoFocus
-                      />
-                      <button
-                        type="button"
-                        className="board-picker-save-btn"
-                        onClick={commitNewGame}
-                        title="Create"
-                      >
-                        <Check size={14} />
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      className="btn-ghost text-sm w-full text-left opacity-80"
-                      onClick={() => setCreatingGame(true)}
-                    >
-                      + New Game
-                    </button>
-                  )}
                 </div>
               </div>
 
@@ -1430,19 +1403,31 @@ export default function HostPage() {
 
               <div className="board-picker-boards">
                 <div className="board-picker-section-label board-picker-boards-header">
-                  <span>{pickerIsTrash ? 'Trash' : 'Boards'}</span>
-                  {(pickerIsAll || pickerIsTrash) && (
+                  <span>
+                    {pickerIsTrash
+                      ? 'Trash'
+                      : pickerIsGames
+                        ? 'Games'
+                        : pickerGameId
+                          ? (pickerGameData?.name ?? 'Game')
+                          : 'Boards'}
+                  </span>
+                  {(pickerIsAll || pickerIsGames || pickerIsTrash) && (
                     <span
                       className="board-picker-help"
                       data-tooltip={
                         pickerIsTrash
                           ? 'Right-click an item to restore it or delete it permanently. Right-click Trash to empty it.'
-                          : 'Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, duplicate, or delete.'
+                          : pickerIsGames
+                            ? 'Click a folder to open it. Right-click empty space or a folder to create items, or a game/folder to rename or delete.'
+                            : 'Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, duplicate, or delete.'
                       }
                       aria-label={
                         pickerIsTrash
                           ? 'Right-click an item to restore it or delete it permanently. Right-click Trash to empty it.'
-                          : 'Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, duplicate, or delete.'
+                          : pickerIsGames
+                            ? 'Click a folder to open it. Right-click empty space or a folder to create items, or a game/folder to rename or delete.'
+                            : 'Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, duplicate, or delete.'
                       }
                       tabIndex={0}
                     >
@@ -1456,6 +1441,8 @@ export default function HostPage() {
                     mode={pickerIsTrash ? 'trash' : 'library'}
                     boards={boardStore.boards}
                     folders={boardStore.folders}
+                    games={boardStore.games}
+                    gameFolders={boardStore.gameFolders}
                     onSelectBoard={handleSelectBoard}
                     onEditBoard={handleEditBoard}
                     onDeleteBoard={(b) => handleTrashBoard(b.id)}
@@ -1468,13 +1455,46 @@ export default function HostPage() {
                     onRestoreFolder={handleRestoreFolder}
                     onPermanentDeleteBoard={handlePermanentDeleteBoard}
                     onPermanentDeleteFolder={handlePermanentDeleteFolder}
+                    onRestoreGame={handleRestoreGame}
+                    onRestoreGameFolder={handleRestoreGameFolder}
+                    onPermanentDeleteGame={handlePermanentDeleteGame}
+                    onPermanentDeleteGameFolder={handlePermanentDeleteGameFolder}
                     renameFolderId={renameFolderId}
                     onRenameFolderIdChange={setRenameFolderId}
                     renameBoardId={renameBoardId}
                     onRenameBoardIdChange={setRenameBoardId}
                   />
+                ) : pickerIsGames ? (
+                  <GamesPickerExplorer
+                    key={`games-${gamesExplorerKey}`}
+                    games={boardStore.games}
+                    folders={boardStore.gameFolders}
+                    onSelectGame={handleOpenGame}
+                    onDeleteGame={handleTrashGame}
+                    onDuplicateFolder={handleDuplicateGameFolder}
+                    onRequestDeleteFolder={handleTrashGameFolder}
+                    renameFolderId={renameGameFolderId}
+                    onRenameFolderIdChange={setRenameGameFolderId}
+                    renameGameId={renameGameId}
+                    onRenameGameIdChange={setRenameGameId}
+                    initialFolderId={gamesExplorerFolderId}
+                  />
                 ) : (
                 <div className="board-picker-boards__scroll">
+                  <div className="board-picker-path-bar">
+                    <button
+                      type="button"
+                      className="board-picker-path-back"
+                      onClick={handleBackToGames}
+                      aria-label="Back to Games"
+                      title="Back"
+                    >
+                      <ArrowLeft size={16} aria-hidden />
+                    </button>
+                    <div className="board-picker-path-input board-picker-path-input--readonly" aria-label="Game">
+                      {pickerGameData?.name ?? 'Game'}
+                    </div>
+                  </div>
                   {pickerBoards.map((b, idx) => (
                     <div
                       key={b.id}
@@ -1681,7 +1701,7 @@ export default function HostPage() {
         <AddToGameModal
           boardIds={addToGameTarget.boardIds}
           label={addToGameTarget.label}
-          games={boardStore.games.map((g) => ({ id: g.id, name: g.name }))}
+          games={libraryGames.map((g) => ({ id: g.id, name: g.name }))}
           onConfirm={handleAddToGameConfirm}
           onCreateAndConfirm={handleAddToGameCreateAndConfirm}
           onCancel={() => setAddToGameTarget(null)}

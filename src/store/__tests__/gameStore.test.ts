@@ -37,7 +37,7 @@ function makeQuestion(overrides: Partial<Question> = {}): Question {
 
 describe('useBoardStore', () => {
   beforeEach(() => {
-    useBoardStore.setState({ boards: [], games: [], folders: [] })
+    useBoardStore.setState({ boards: [], games: [], folders: [], gameFolders: [] })
   })
 
   describe('saveBoard', () => {
@@ -306,6 +306,133 @@ describe('useBoardStore', () => {
       const c = useBoardStore.getState().createFolder('C', b)
       useBoardStore.getState().moveFolder(a, c)
       expect(useBoardStore.getState().folders.find((f) => f.id === a)?.parentId).toBeNull()
+    })
+  })
+
+  describe('game folders', () => {
+    it('creates a game at root with folderId null', () => {
+      const id = useBoardStore.getState().createGame('Legacy Style')
+      const game = useBoardStore.getState().games.find((g) => g.id === id)
+      expect(game?.folderId).toBeNull()
+      expect(game?.trashedAt).toBeUndefined()
+    })
+
+    it('creates a game inside a folder', () => {
+      const folderId = useBoardStore.getState().createGameFolder('Season 1')
+      const gameId = useBoardStore.getState().createGame('Episode 1', folderId)
+      expect(useBoardStore.getState().games.find((g) => g.id === gameId)?.folderId).toBe(folderId)
+    })
+
+    it('creates a game folder at root', () => {
+      const id = useBoardStore.getState().createGameFolder('My Games')
+      const folders = useBoardStore.getState().gameFolders
+      expect(folders).toHaveLength(1)
+      expect(folders[0].id).toBe(id)
+      expect(folders[0].name).toBe('My Games')
+      expect(folders[0].parentId).toBeNull()
+    })
+
+    it('auto-suffixes duplicate game folder names in the same parent', () => {
+      const a = useBoardStore.getState().createGameFolder('Docs')
+      const b = useBoardStore.getState().createGameFolder('Docs')
+      const folders = useBoardStore.getState().gameFolders
+      expect(folders.find((f) => f.id === a)?.name).toBe('Docs')
+      expect(folders.find((f) => f.id === b)?.name).toBe('Docs (2)')
+    })
+
+    it('moves a game into a folder', () => {
+      const folderId = useBoardStore.getState().createGameFolder('F')
+      const gameId = useBoardStore.getState().createGame('G')
+      useBoardStore.getState().moveGameToFolder(gameId, folderId)
+      expect(useBoardStore.getState().games[0].folderId).toBe(folderId)
+    })
+
+    it('trashes and restores a game', () => {
+      const folderId = useBoardStore.getState().createGameFolder('F')
+      const gameId = useBoardStore.getState().createGame('G', folderId)
+      useBoardStore.getState().trashGame(gameId)
+
+      let game = useBoardStore.getState().games.find((g) => g.id === gameId)
+      expect(game?.trashedAt).toEqual(expect.any(Number))
+      expect(game?.folderId).toBeNull()
+      expect(game?.restoreFolderId).toBe(folderId)
+
+      useBoardStore.getState().restoreGame(gameId)
+      game = useBoardStore.getState().games.find((g) => g.id === gameId)
+      expect(game?.trashedAt).toBeNull()
+      expect(game?.folderId).toBe(folderId)
+      expect(game?.restoreFolderId).toBeNull()
+    })
+
+    it('restores a game to root when previous folder is trashed', () => {
+      const folderId = useBoardStore.getState().createGameFolder('F')
+      const gameId = useBoardStore.getState().createGame('G', folderId)
+      useBoardStore.getState().trashGame(gameId)
+      useBoardStore.getState().trashGameFolder(folderId)
+      useBoardStore.getState().restoreGame(gameId)
+
+      const game = useBoardStore.getState().games.find((g) => g.id === gameId)
+      expect(game?.trashedAt).toBeNull()
+      expect(game?.folderId).toBeNull()
+    })
+
+    it('trashes a game folder subtree including games', () => {
+      const rootId = useBoardStore.getState().createGameFolder('Root')
+      const midId = useBoardStore.getState().createGameFolder('Mid', rootId)
+      const nestedId = useBoardStore.getState().createGameFolder('Nested', midId)
+      useBoardStore.getState().createGame('g1', midId)
+      useBoardStore.getState().createGame('g2', nestedId)
+      useBoardStore.getState().createGame('g3', rootId)
+
+      useBoardStore.getState().trashGameFolder(midId)
+
+      const state = useBoardStore.getState()
+      expect(state.gameFolders.find((f) => f.id === midId)?.trashedAt).toEqual(expect.any(Number))
+      expect(state.gameFolders.find((f) => f.id === nestedId)?.trashedAt).toEqual(expect.any(Number))
+      expect(state.gameFolders.find((f) => f.id === rootId)?.trashedAt).toBeUndefined()
+      expect(state.games.find((g) => g.name === 'g1')?.trashedAt).toEqual(expect.any(Number))
+      expect(state.games.find((g) => g.name === 'g2')?.trashedAt).toEqual(expect.any(Number))
+      expect(state.games.find((g) => g.name === 'g3')?.trashedAt).toBeUndefined()
+    })
+
+    it('restores a game folder to root when previous parent is gone', () => {
+      const rootId = useBoardStore.getState().createGameFolder('Root')
+      const midId = useBoardStore.getState().createGameFolder('Mid', rootId)
+      useBoardStore.getState().trashGameFolder(midId)
+      useBoardStore.getState().deleteGameFolder(rootId)
+      useBoardStore.getState().restoreGameFolder(midId)
+
+      expect(useBoardStore.getState().gameFolders.find((f) => f.id === midId)?.parentId).toBeNull()
+      expect(useBoardStore.getState().gameFolders.find((f) => f.id === midId)?.trashedAt).toBeNull()
+    })
+
+    it('empties trash including games and game folders', () => {
+      const folderId = useBoardStore.getState().createGameFolder('F')
+      useBoardStore.getState().createGame('g1', folderId)
+      useBoardStore.getState().createGame('g2')
+      useBoardStore.getState().trashGameFolder(folderId)
+      const g2 = useBoardStore.getState().games.find((g) => g.name === 'g2')!
+      useBoardStore.getState().trashGame(g2.id)
+
+      useBoardStore.getState().emptyTrash()
+
+      const state = useBoardStore.getState()
+      expect(state.gameFolders).toHaveLength(0)
+      expect(state.games).toHaveLength(0)
+    })
+
+    it('hard-deletes a game folder and contained games', () => {
+      const rootId = useBoardStore.getState().createGameFolder('Root')
+      const midId = useBoardStore.getState().createGameFolder('Mid', rootId)
+      useBoardStore.getState().createGame('g1', midId)
+      useBoardStore.getState().createGame('g3', rootId)
+
+      useBoardStore.getState().deleteGameFolder(midId)
+
+      const state = useBoardStore.getState()
+      expect(state.gameFolders.find((f) => f.id === midId)).toBeUndefined()
+      expect(state.games.find((g) => g.name === 'g1')).toBeUndefined()
+      expect(state.games.find((g) => g.name === 'g3')?.folderId).toBe(rootId)
     })
   })
 })
