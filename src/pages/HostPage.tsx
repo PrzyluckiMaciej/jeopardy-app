@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
-import { Settings, Trash2, Pencil, Check, Copy, Layers, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, RotateCcw, Shuffle, X, Users, CircleHelp } from 'lucide-react'
+import { useEffect, useRef, useState, type AnimationEvent as ReactAnimationEvent, type MouseEvent as ReactMouseEvent } from 'react'
+import { Settings, Trash2, Pencil, Check, Copy, Layers, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, RotateCcw, Shuffle, X, Users, CircleHelp, Menu } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useGameStore, useBoardStore, isBoardTrashed, isFolderTrashed } from '../store/gameStore'
 import * as net from '../lib/network'
@@ -26,7 +26,7 @@ import SettingsPanel from '../components/SettingsPanel'
 import Scoreboard from '../components/Scoreboard'
 import Podium from '../components/Podium'
 
-type Tab = 'board' | 'settings'
+type Tab = 'board' | 'settings' | 'boards'
 
 function pickRandom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
@@ -65,8 +65,6 @@ export default function HostPage() {
   const [tab, setTab] = useState<Tab>('board')
   const [editing, setEditing] = useState(false)
   const [activeBoard, setActiveBoard] = useState<Board | null>(null)
-  const [showBoardPicker, setShowBoardPicker] = useState(false)
-  const [boardPickerExiting, setBoardPickerExiting] = useState(false)
   const [copyFeedback, setCopyFeedback] = useState<'hidden' | 'visible' | 'hiding'>('hidden')
   const [showDdNoControlAlert, setShowDdNoControlAlert] = useState(false)
   const [renameFolderId, setRenameFolderId] = useState<string | null>(null)
@@ -95,6 +93,8 @@ export default function HostPage() {
   } | null>(null)
   const [activeEmojis, setActiveEmojis] = useState<Record<string, { emoji: string; seq: number }>>({})
   const [mobilePlayersOpen, setMobilePlayersOpen] = useState(false)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [mobileNavExiting, setMobileNavExiting] = useState(false)
 
   const peerToClient = useRef(new Map<string, string>())
   const nameSessions = useRef(new Map<string, NameSession>())
@@ -845,36 +845,69 @@ export default function HostPage() {
     navigate('/')
   }
 
-  function openBoardPicker() {
-    setPickerNav('all')
+  function resetPickerDrafts() {
     setCreatingGame(false)
     setNewGameName('')
     setEditingGameId(null)
     setEditingGameName('')
-    setBoardPickerExiting(false)
-    setShowBoardPicker(true)
+  }
+
+  function openBoardPicker() {
+    setPickerNav('all')
+    resetPickerDrafts()
+    setTab('boards')
   }
 
   function closeBoardPicker() {
-    if (boardPickerExiting) return
-    setBoardPickerExiting(true)
+    resetPickerDrafts()
+    setTab('board')
   }
 
-  function finishCloseBoardPicker() {
-    setCreatingGame(false)
-    setNewGameName('')
-    setEditingGameId(null)
-    setEditingGameName('')
-    setBoardPickerExiting(false)
-    setShowBoardPicker(false)
+  function openMobileNav() {
+    setMobileNavExiting(false)
+    setMobileNavOpen(true)
   }
 
-  function handleBoardPickerExitAnimationEnd(e: React.AnimationEvent<HTMLDivElement>) {
-    if (!boardPickerExiting) return
+  function closeMobileNav() {
+    if (!mobileNavOpen || mobileNavExiting) return
+    setMobileNavExiting(true)
+  }
+
+  function finishCloseMobileNav() {
+    setMobileNavExiting(false)
+    setMobileNavOpen(false)
+  }
+
+  function handleMobileNavExitAnimationEnd(e: ReactAnimationEvent<HTMLDivElement>) {
+    if (!mobileNavExiting) return
     if (e.target !== e.currentTarget) return
-    if (e.animationName !== 'fadeSlideDown') return
-    finishCloseBoardPicker()
+    if (e.animationName !== 'hostMobileNavOut' && e.animationName !== 'overlayFadeOut') return
+    finishCloseMobileNav()
   }
+
+  function handleMobileNavBoards() {
+    closeMobileNav()
+    openBoardPicker()
+  }
+
+  function handleMobileNavSettings() {
+    closeMobileNav()
+    resetPickerDrafts()
+    setTab('settings')
+  }
+
+  function handleMobileNavExit() {
+    handleExitRoom()
+  }
+
+  useEffect(() => {
+    if (!mobileNavOpen) return
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') closeMobileNav()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [mobileNavOpen, mobileNavExiting]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function commitNewGame() {
     const name = newGameName.trim()
@@ -941,7 +974,15 @@ export default function HostPage() {
     <div className="app-page h-screen flex flex-col overflow-hidden page-fade-in" style={{ background: 'var(--navy)' }}>
       {/* Top bar */}
       <header className="host-topbar">
-        <button type="button" className="host-topbar__logo" onClick={() => setTab('board')}>
+        <button
+          type="button"
+          className="host-topbar__logo"
+          onClick={() => {
+            if (mobileNavOpen) closeMobileNav()
+            resetPickerDrafts()
+            setTab('board')
+          }}
+        >
           JEOPARDY!
         </button>
         <div className="host-topbar__divider" aria-hidden />
@@ -967,24 +1008,55 @@ export default function HostPage() {
           )}
         </div>
         <div className="host-topbar__actions">
+          <div className="host-topbar__actions-desktop">
+            <button
+              type="button"
+              className="btn-icon"
+              style={{ color: tab === 'boards' ? 'var(--gold)' : undefined }}
+              onClick={() => {
+                if (tab === 'boards') {
+                  closeBoardPicker()
+                } else {
+                  openBoardPicker()
+                }
+              }}
+              title={tab === 'boards' ? 'Back to board' : 'Boards'}
+              aria-label={tab === 'boards' ? 'Back to board' : 'Boards'}
+            >
+              <LayoutGrid size={26} />
+            </button>
+            <button
+              type="button"
+              className="btn-icon"
+              style={{ color: tab === 'settings' ? 'var(--gold)' : undefined }}
+              onClick={() => {
+                resetPickerDrafts()
+                setTab(tab === 'settings' ? 'board' : 'settings')
+              }}
+              title={tab === 'settings' ? 'Back to board' : 'Settings'}
+              aria-label={tab === 'settings' ? 'Back to board' : 'Settings'}
+            >
+              <Settings size={26} />
+            </button>
+            <button
+              type="button"
+              className="btn-icon-exit"
+              onClick={handleExitRoom}
+              title="Exit room"
+              aria-label="Exit room"
+            >
+              <LogOut size={22} />
+            </button>
+          </div>
           <button
             type="button"
-            className="btn-icon"
-            style={{ color: tab === 'settings' ? 'var(--gold)' : undefined }}
-            onClick={() => setTab(tab === 'settings' ? 'board' : 'settings')}
-            title={tab === 'settings' ? 'Back to board' : 'Settings'}
-            aria-label={tab === 'settings' ? 'Back to board' : 'Settings'}
+            className="btn-icon host-topbar__menu-btn"
+            onClick={() => (mobileNavOpen ? closeMobileNav() : openMobileNav())}
+            title={mobileNavOpen ? 'Close menu' : 'Menu'}
+            aria-label={mobileNavOpen ? 'Close menu' : 'Menu'}
+            aria-expanded={mobileNavOpen}
           >
-            <Settings size={26} />
-          </button>
-          <button
-            type="button"
-            className="btn-icon-exit"
-            onClick={handleExitRoom}
-            title="Exit room"
-            aria-label="Exit room"
-          >
-            <LogOut size={22} />
+            <Menu size={26} />
           </button>
         </div>
       </header>
@@ -1029,14 +1101,6 @@ export default function HostPage() {
                 {!editing && (
                   <div className="host-board-toolbar">
                     <div className="host-board-toolbar__left">
-                      <button
-                        className="btn-outline text-sm btn-with-icon"
-                        onClick={openBoardPicker}
-                        title="Select a board from your library"
-                      >
-                        <LayoutGrid size={16} aria-hidden />
-                        <span>Select</span>
-                      </button>
                       {board && (
                         <>
                           <button
@@ -1220,31 +1284,11 @@ export default function HostPage() {
             />
           </div>
         )}
-      </div>
 
-      {/* Board picker modal */}
-      {showBoardPicker && (
-        <div
-          className={`board-picker-overlay${boardPickerExiting ? ' board-picker-overlay--exit' : ''}`}
-          onClick={closeBoardPicker}
-        >
-          <div
-            className={`panel board-picker-modal${boardPickerExiting ? ' modal-exit' : ' modal-enter'}`}
-            onClick={(e) => e.stopPropagation()}
-            onAnimationEnd={handleBoardPickerExitAnimationEnd}
-            role="dialog"
-            aria-labelledby="board-picker-title"
-          >
+        {tab === 'boards' && (
+          <div className="flex-1 min-h-0 overflow-hidden tab-fade-in safe-area-x host-boards-view">
             <div className="board-picker-header">
               <h2 id="board-picker-title" className="board-picker-header__title">Select Board</h2>
-              <button
-                type="button"
-                className="board-picker-close"
-                onClick={closeBoardPicker}
-                aria-label="Close board picker"
-              >
-                <X size={18} aria-hidden />
-              </button>
             </div>
 
             <div className="board-picker-body">
@@ -1524,6 +1568,46 @@ export default function HostPage() {
               </div>
             </div>
           </div>
+        )}
+      </div>
+
+      {/* Mobile nav drawer */}
+      {mobileNavOpen && (
+        <div
+          className={`host-mobile-nav-overlay${mobileNavExiting ? ' host-mobile-nav-overlay--exit' : ''}`}
+          onClick={closeMobileNav}
+          onAnimationEnd={handleMobileNavExitAnimationEnd}
+        >
+          <nav
+            className={`host-mobile-nav${mobileNavExiting ? ' host-mobile-nav--exit' : ''}`}
+            onClick={(e) => e.stopPropagation()}
+            aria-label="Host menu"
+          >
+            <button
+              type="button"
+              className={`host-mobile-nav__item${tab === 'boards' ? ' host-mobile-nav__item--active' : ''}`}
+              onClick={handleMobileNavBoards}
+            >
+              <LayoutGrid size={22} aria-hidden />
+              <span>Boards</span>
+            </button>
+            <button
+              type="button"
+              className={`host-mobile-nav__item${tab === 'settings' ? ' host-mobile-nav__item--active' : ''}`}
+              onClick={handleMobileNavSettings}
+            >
+              <Settings size={22} aria-hidden />
+              <span>Settings</span>
+            </button>
+            <button
+              type="button"
+              className="host-mobile-nav__item host-mobile-nav__item--exit"
+              onClick={handleMobileNavExit}
+            >
+              <LogOut size={22} aria-hidden />
+              <span>Exit</span>
+            </button>
+          </nav>
         </div>
       )}
 
