@@ -21,6 +21,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
   const roomCode = useGameStore(s => s.roomCode) ?? ''
 
   const [ddExiting, setDdExiting] = useState(false)
+  const [ddSplashDone, setDdSplashDone] = useState(false)
   const [overlayExiting, setOverlayExiting] = useState(false)
   const pendingOverlayAction = useRef<(() => void) | null>(null)
   const pendingDdAction = useRef<(() => void) | null>(null)
@@ -29,8 +30,23 @@ export default function QuestionOverlay({ state, settings }: Props) {
   const [answerRevealKey, setAnswerRevealKey] = useState(0)
 
   useEffect(() => {
+    if (phase === 'dailyDouble') {
+      setDdSplashDone(false)
+      setDdExiting(false)
+    }
+  }, [phase])
+
+  useEffect(() => {
     const prev = prevPhaseRef.current
-    if (phase === 'question' && prev !== 'question' && prev !== 'buzzing' && prev !== 'revealed') {
+    // Skip remount when leaving DD phases — host already previewed the content
+    if (
+      phase === 'question' &&
+      prev !== 'question' &&
+      prev !== 'buzzing' &&
+      prev !== 'revealed' &&
+      prev !== 'dailyDouble' &&
+      prev !== 'dailyDoubleBet'
+    ) {
       setClueRevealKey((k) => k + 1)
     }
     if (phase === 'revealed' && prev !== 'revealed') {
@@ -101,13 +117,20 @@ export default function QuestionOverlay({ state, settings }: Props) {
     })
   }
 
+  function doRevealDailyDoubleClue() {
+    const revealMedia = gameplay.autoRevealMedia
+    store.revealDailyDoubleClue(revealMedia)
+    const { mediaRevealed: revealed } = useGameStore.getState().state
+    net.broadcast({ type: 'DAILY_DOUBLE_REVEAL_CLUE', mediaRevealed: revealed })
+  }
+
   function handleRevealDailyDoubleClue() {
-    pendingDdAction.current = () => {
-      const revealMedia = gameplay.autoRevealMedia
-      store.revealDailyDoubleClue(revealMedia)
-      const { mediaRevealed } = useGameStore.getState().state
-      net.broadcast({ type: 'DAILY_DOUBLE_REVEAL_CLUE', mediaRevealed })
+    // Title already dismissed after splash — reveal to players immediately
+    if (ddSplashDone) {
+      doRevealDailyDoubleClue()
+      return
     }
+    pendingDdAction.current = doRevealDailyDoubleClue
     setDdExiting(true)
   }
 
@@ -154,7 +177,13 @@ export default function QuestionOverlay({ state, settings }: Props) {
   }
 
   const categoryName = category?.name ?? ''
-  const showClue = phase === 'question' || phase === 'buzzing' || phase === 'revealed'
+  const isDdPhase = phase === 'dailyDouble' || phase === 'dailyDoubleBet'
+  const showDdTitle = isDdPhase && (!ddSplashDone || ddExiting)
+  const showClue =
+    phase === 'question' ||
+    phase === 'buzzing' ||
+    phase === 'revealed' ||
+    (isDdPhase && ddSplashDone)
 
   return (
     <div
@@ -198,10 +227,14 @@ export default function QuestionOverlay({ state, settings }: Props) {
 
       <div className="question-overlay-layout">
         <div className={`question-overlay-main ${overlayExiting ? 'card-flip-exit' : 'card-flip'}`}>
-          {(phase === 'dailyDouble' || phase === 'dailyDoubleBet') && (
+          {showDdTitle && (
             <div
               className={`daily-double-title${ddExiting ? ' daily-double-title--exit' : ''}`}
               onAnimationEnd={(e) => {
+                if (e.animationName === 'ddReveal' && !ddExiting) {
+                  setDdSplashDone(true)
+                  return
+                }
                 if (ddExiting && e.animationName === 'ddRevealFadeOut') {
                   setDdExiting(false)
                   if (pendingDdAction.current) {
@@ -326,7 +359,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
               </div>
             )}
 
-            {showClue && hasClue && !clueRevealed && (
+            {showClue && !isDdPhase && hasClue && !clueRevealed && (
               <button
                 type="button"
                 className="btn-outline w-full btn-with-icon justify-center"
@@ -338,7 +371,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
               </button>
             )}
 
-            {showClue && activeMedia && !mediaRevealed && (
+            {showClue && !isDdPhase && activeMedia && !mediaRevealed && (
               <button
                 type="button"
                 className="btn-outline w-full btn-with-icon justify-center"
@@ -350,7 +383,7 @@ export default function QuestionOverlay({ state, settings }: Props) {
               </button>
             )}
 
-            {phase !== 'revealed' && phase !== 'dailyDouble' && phase !== 'dailyDoubleBet' && (
+            {phase !== 'revealed' && !isDdPhase && (
               <button
                 type="button"
                 className="btn-outline w-full btn-with-icon justify-center"
