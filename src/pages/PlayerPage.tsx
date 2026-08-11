@@ -284,8 +284,9 @@ export default function PlayerPage() {
       }
       if (msg.type === 'JUDGE') {
         const { playerId, correct, pointDelta, boardControlId } = msg
+        const currentPhase = useGameStore.getState().state.phase
         patchState({
-          phase: correct ? 'revealed' : 'buzzing',
+          phase: correct || currentPhase === 'revealed' ? 'revealed' : 'buzzing',
           players: useGameStore.getState().state.players.map(p =>
             p.id === playerId ? { ...p, score: p.score + pointDelta } : p
           ),

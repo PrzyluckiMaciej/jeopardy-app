@@ -147,6 +147,13 @@ export default function QuestionOverlay({ state, settings }: Props) {
   }
 
   function handleReveal() {
+    // Daily Double: revealing the answer before judging counts as incorrect
+    if (isDD && dailyDouble.wager != null && dailyDouble.playerId && phase !== 'revealed') {
+      handleJudge(dailyDouble.playerId, false)
+      store.revealAnswer()
+      net.broadcast({ type: 'REVEAL_ANSWER' })
+      return
+    }
     store.revealAnswer()
     net.broadcast({ type: 'REVEAL_ANSWER' })
   }
@@ -243,30 +250,29 @@ export default function QuestionOverlay({ state, settings }: Props) {
           )}
 
           {showClue && (
-            <div className={isDdPhase ? 'dd-host-content-enter' : undefined}>
-              <QuestionOverlayText
-                contentKey={`clue-${clueRevealKey}`}
-                clue={question.question}
-                answer={question.answer || '—'}
-                clueRevealed={clueRevealed}
-                answerRevealed={phase === 'revealed'}
-                answerKey={phase === 'revealed' ? `answer-${answerRevealKey}` : 'answer-pending'}
-                answerClassName={phase === 'revealed' ? 'answer-reveal' : ''}
-                hasMediaSlot={!!activeMedia}
-                media={
-                  activeMedia ? (
-                    <QuestionMediaPlayer
-                      media={activeMedia}
-                      role="host"
-                      playback={mediaPlayback}
-                      mountKey={clueRevealKey}
-                      mediaActive={mediaRevealed && !overlayExiting}
-                      className={`question-overlay-media${mediaRevealed ? '' : ' question-overlay-media--pending'}`}
-                    />
-                  ) : undefined
-                }
-              />
-            </div>
+            <QuestionOverlayText
+              className={isDdPhase ? 'dd-host-content-enter' : undefined}
+              contentKey={`clue-${clueRevealKey}`}
+              clue={question.question}
+              answer={question.answer || '—'}
+              clueRevealed={clueRevealed}
+              answerRevealed={phase === 'revealed'}
+              answerKey={phase === 'revealed' ? `answer-${answerRevealKey}` : 'answer-pending'}
+              answerClassName={phase === 'revealed' ? 'answer-reveal' : ''}
+              hasMediaSlot={!!activeMedia}
+              media={
+                activeMedia ? (
+                  <QuestionMediaPlayer
+                    media={activeMedia}
+                    role="host"
+                    playback={mediaPlayback}
+                    mountKey={clueRevealKey}
+                    mediaActive={mediaRevealed && !overlayExiting}
+                    className={`question-overlay-media${mediaRevealed ? '' : ' question-overlay-media--pending'}`}
+                  />
+                ) : undefined
+              }
+            />
           )}
         </div>
 
@@ -304,26 +310,28 @@ export default function QuestionOverlay({ state, settings }: Props) {
                 <div className="font-condensed text-sm text-gold-bright">
                   {ddPlayer.name} wagered <span className="font-display">${dailyDouble.wager}</span>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className="w-8 h-8 rounded flex items-center justify-center judge-btn--accept"
-                    onClick={() => handleJudge(ddPlayer.id, true)}
-                    title="Accept answer"
-                    aria-label="Accept answer"
-                  >
-                    <Check size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    className="w-8 h-8 rounded flex items-center justify-center judge-btn--decline"
-                    onClick={() => handleJudge(ddPlayer.id, false)}
-                    title="Decline answer"
-                    aria-label="Decline answer"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
+                {phase === 'question' && (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="w-8 h-8 rounded flex items-center justify-center judge-btn--accept"
+                      onClick={() => handleJudge(ddPlayer.id, true)}
+                      title="Accept answer"
+                      aria-label="Accept answer"
+                    >
+                      <Check size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      className="w-8 h-8 rounded flex items-center justify-center judge-btn--decline"
+                      onClick={() => handleJudge(ddPlayer.id, false)}
+                      title="Decline answer"
+                      aria-label="Decline answer"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

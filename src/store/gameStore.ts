@@ -986,7 +986,8 @@ export const useGameStore = create<GameStore>()(
         set((s) => ({
           state: {
             ...s.state,
-            phase: correct ? 'revealed' : 'buzzing',
+            // Keep answer visible if it was already revealed (e.g. incorrect after reveal)
+            phase: correct || s.state.phase === 'revealed' ? 'revealed' : 'buzzing',
             players: s.state.players.map((p) =>
               p.id === playerId ? { ...p, score: p.score + pointDelta } : p
             ),

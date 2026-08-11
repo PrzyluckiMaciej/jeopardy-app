@@ -9,6 +9,7 @@ interface Props {
   contentKey?: string | number
   clueKey?: string | number
   answerKey?: string | number
+  className?: string
   clueClassName?: string
   answerClassName?: string
   clueStyle?: CSSProperties
@@ -27,6 +28,7 @@ export default function QuestionOverlayText({
   contentKey,
   clueKey,
   answerKey,
+  className = '',
   clueClassName = '',
   answerClassName = '',
   clueStyle,
@@ -73,7 +75,7 @@ export default function QuestionOverlayText({
     <div
       key={contentKey}
       ref={containerRef}
-      className="question-overlay-content w-full"
+      className={`question-overlay-content w-full${className ? ` ${className}` : ''}`}
       style={contentStyle}
     >
       <div

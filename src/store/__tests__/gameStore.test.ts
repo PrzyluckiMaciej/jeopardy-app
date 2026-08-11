@@ -660,6 +660,14 @@ describe('useGameStore', () => {
       expect(state.players.find((p) => p.id === 'player-1')?.score).toBe(-200)
     })
 
+    it('keeps phase revealed when judging incorrect after answer was revealed', () => {
+      useGameStore.getState().revealAnswer()
+      useGameStore.getState().judgeAnswer('player-1', false, -200)
+      const { state } = useGameStore.getState()
+      expect(state.phase).toBe('revealed')
+      expect(state.players.find((p) => p.id === 'player-1')?.score).toBe(-200)
+    })
+
     it('removes incorrect player from buzz queue', () => {
       useGameStore.getState().judgeAnswer('player-1', false, -200)
       expect(useGameStore.getState().state.buzzQueue).not.toContain('player-1')
