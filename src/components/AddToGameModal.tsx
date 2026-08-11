@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type AnimationEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type AnimationEvent } from 'react'
 import { Check, ChevronDown, Layers } from 'lucide-react'
 
 interface GameOption {
@@ -45,10 +45,10 @@ export default function AddToGameModal({
     setDropdownOpen(true)
   }
 
-  function closeDropdown() {
+  const closeDropdown = useCallback(() => {
     if (!dropdownOpen || dropdownExiting) return
     setDropdownExiting(true)
-  }
+  }, [dropdownOpen, dropdownExiting])
 
   function requestClose(afterClose?: () => void) {
     if (exiting) return
@@ -89,7 +89,7 @@ export default function AddToGameModal({
       document.removeEventListener('mousedown', handlePointerDown)
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [dropdownActive, exiting])
+  }, [dropdownActive, exiting, closeDropdown])
 
   function handleAdd() {
     if (!canAdd || exiting) return

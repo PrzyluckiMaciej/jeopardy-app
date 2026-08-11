@@ -1,4 +1,4 @@
-import { formatScore, cellId, generateRoomCode, generateId, createDefaultBoard, orderPlayersForDisplay } from '../utils'
+import { formatScore, formatBoardTimestamp, cellId, generateRoomCode, generateId, createDefaultBoard, orderPlayersForDisplay } from '../utils'
 import type { Player } from '../../types'
 
 function player(id: string, name: string): Player {
@@ -49,6 +49,20 @@ describe('formatScore', () => {
 
   it('formats large negative numbers with locale grouping', () => {
     expect(formatScore(-2500)).toBe(`-$${(2500).toLocaleString()}`)
+  })
+})
+
+describe('formatBoardTimestamp', () => {
+  it('returns a dash for null, undefined, and non-finite values', () => {
+    expect(formatBoardTimestamp(null)).toBe('-')
+    expect(formatBoardTimestamp(undefined)).toBe('-')
+    expect(formatBoardTimestamp(Number.NaN)).toBe('-')
+    expect(formatBoardTimestamp(Number.POSITIVE_INFINITY)).toBe('-')
+  })
+
+  it('formats a valid timestamp as dd.mm.yyyy HH:mm', () => {
+    const date = new Date(2024, 5, 15, 18, 26)
+    expect(formatBoardTimestamp(date.getTime())).toBe('15.06.2024 18:26')
   })
 })
 

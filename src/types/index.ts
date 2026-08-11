@@ -48,8 +48,10 @@ export interface Board {
   trashedAt?: number | null
   /** Folder to restore into; null = All Boards root */
   restoreFolderId?: string | null
-  createdAt: number
-  updatedAt: number
+  /** Epoch ms; absent on boards created before timestamps were tracked */
+  createdAt?: number
+  /** Epoch ms; absent on boards created before timestamps were tracked */
+  updatedAt?: number
 }
 
 export interface BoardFolder {
