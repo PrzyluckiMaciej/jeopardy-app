@@ -553,6 +553,7 @@ export default function GamesPickerExplorer({
                 }}
                 onBlur={() => commitGameRename(game.id)}
                 autoFocus
+                onFocus={(e) => e.target.select()}
                 onClick={(e) => e.stopPropagation()}
               />
               <button
@@ -634,6 +635,7 @@ export default function GamesPickerExplorer({
                   }}
                   onBlur={() => commitRename(folder.id)}
                   autoFocus
+                  onFocus={(e) => e.target.select()}
                   onClick={(e) => e.stopPropagation()}
                   aria-invalid={folderRenameConflict}
                   aria-describedby={folderRenameConflict ? `game-folder-rename-error-${folder.id}` : undefined}
