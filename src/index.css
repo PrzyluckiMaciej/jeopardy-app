@@ -1748,6 +1748,143 @@ select:focus-visible {
   padding: 2px 0;
 }
 
+/* ── Add to game dropdown ───────────────────────────────────── */
+.add-to-game-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(6, 11, 40, 0.85);
+}
+.add-to-game-modal-overlay--exit {
+  animation: overlayFadeOut 0.18s ease-in forwards;
+  pointer-events: none;
+}
+.add-to-game-dropdown {
+  position: relative;
+  width: 100%;
+}
+.add-to-game-dropdown__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-default);
+  background: var(--navy);
+  color: var(--white);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 0.9375rem;
+  letter-spacing: 0.02em;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.add-to-game-dropdown__trigger:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--border-emphasis);
+}
+.add-to-game-dropdown__trigger--open,
+.add-to-game-dropdown__trigger:focus-visible {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold-muted);
+  outline: none;
+}
+.add-to-game-dropdown__value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+.add-to-game-dropdown__chevron {
+  flex-shrink: 0;
+  color: #8899cc;
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+.add-to-game-dropdown__chevron--open {
+  transform: rotate(180deg);
+  color: var(--gold);
+}
+.add-to-game-dropdown__menu {
+  position: absolute;
+  z-index: 2;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 12rem;
+  overflow-y: auto;
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transform-origin: top center;
+}
+@keyframes addToGameDropdownIn {
+  0%   { opacity: 0; transform: translateY(-6px) scale(0.96); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes addToGameDropdownOut {
+  0%   { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-6px) scale(0.96); }
+}
+.add-to-game-dropdown__menu--enter {
+  animation: addToGameDropdownIn 0.16s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.add-to-game-dropdown__menu--exit {
+  animation: addToGameDropdownOut 0.12s ease-in forwards;
+  pointer-events: none;
+}
+.add-to-game-dropdown__option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--white);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 0.9375rem;
+  letter-spacing: 0.02em;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.add-to-game-dropdown__option:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.add-to-game-dropdown__option--selected {
+  background: var(--gold-muted);
+  border-color: rgba(212, 160, 23, 0.45);
+  color: var(--gold);
+}
+.add-to-game-dropdown__option--selected:hover {
+  background: rgba(212, 160, 23, 0.22);
+}
+.add-to-game-dropdown__option-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
 /* ── Context menu ───────────────────────────────────────────── */
 .context-menu {
   position: fixed;
