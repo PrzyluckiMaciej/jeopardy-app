@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState, type AnimationEvent } from 'react'
+
 interface Props {
   title: string
   message: string
@@ -17,17 +19,47 @@ export default function ConfirmModal({
   onConfirm,
   onCancel,
 }: Props) {
+  const [exiting, setExiting] = useState(false)
+  const pendingCloseAction = useRef<(() => void) | null>(null)
+
+  function requestClose(afterClose?: () => void) {
+    if (exiting) return
+    pendingCloseAction.current = afterClose ?? (() => onCancel())
+    setExiting(true)
+  }
+
+  function handleModalExitAnimationEnd(e: AnimationEvent<HTMLDivElement>) {
+    if (!exiting) return
+    if (e.target !== e.currentTarget) return
+    if (e.animationName !== 'fadeSlideDown') return
+    const action = pendingCloseAction.current
+    pendingCloseAction.current = null
+    action?.()
+  }
+
+  useEffect(() => {
+    if (exiting) return
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return
+      pendingCloseAction.current = () => onCancel()
+      setExiting(true)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [exiting, onCancel])
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(6,11,40,0.85)' }}
-      onClick={onCancel}
+      className={`confirm-modal-overlay${exiting ? ' confirm-modal-overlay--exit' : ''}`}
+      onClick={() => requestClose()}
       role="presentation"
     >
       <div
-        className="panel modal-enter flex flex-col gap-4 max-w-sm w-full text-center"
+        className={`panel flex flex-col gap-4 max-w-sm w-full text-center${exiting ? ' modal-exit' : ' modal-enter'}`}
         onClick={(e) => e.stopPropagation()}
+        onAnimationEnd={handleModalExitAnimationEnd}
         role="dialog"
+        aria-modal="true"
         aria-labelledby="confirm-modal-title"
         aria-describedby="confirm-modal-message"
       >
@@ -49,11 +81,17 @@ export default function ConfirmModal({
           <button
             type="button"
             className={`w-full ${danger ? 'btn-danger' : 'btn-gold'}`}
-            onClick={onConfirm}
+            disabled={exiting}
+            onClick={() => requestClose(() => onConfirm())}
           >
             {confirmLabel}
           </button>
-          <button type="button" className="btn-ghost w-full" onClick={onCancel}>
+          <button
+            type="button"
+            className="btn-ghost w-full"
+            disabled={exiting}
+            onClick={() => requestClose()}
+          >
             {cancelLabel}
           </button>
         </div>
