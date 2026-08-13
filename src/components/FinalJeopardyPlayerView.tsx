@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { GameState } from '../types'
 import { formatScore } from '../lib/utils'
+import { useCountdownSeconds } from '../hooks/useCountdownSeconds'
 import * as net from '../lib/network'
 import QuestionMediaPlayer from './QuestionMediaPlayer'
 import QuestionOverlayText from './QuestionOverlayText'
@@ -12,28 +13,6 @@ interface Props {
   mediaLoading?: boolean
 }
 
-function useCountdown(timerEndsAt: number | null): number | null {
-  const [remaining, setRemaining] = useState<number | null>(() => {
-    if (timerEndsAt == null) return null
-    return Math.max(0, Math.ceil((timerEndsAt - Date.now()) / 1000))
-  })
-
-  useEffect(() => {
-    if (timerEndsAt == null) {
-      setRemaining(null)
-      return
-    }
-    function tick() {
-      setRemaining(Math.max(0, Math.ceil((timerEndsAt! - Date.now()) / 1000)))
-    }
-    tick()
-    const id = window.setInterval(tick, 250)
-    return () => window.clearInterval(id)
-  }, [timerEndsAt])
-
-  return remaining
-}
-
 export default function FinalJeopardyPlayerView({
   state,
   myId,
@@ -41,7 +20,7 @@ export default function FinalJeopardyPlayerView({
   mediaLoading = false,
 }: Props) {
   const { board, activeQuestion, activeMedia, mediaPlayback, finalJeopardy, players } = state
-  const remaining = useCountdown(finalJeopardy?.timerEndsAt ?? null)
+  const remaining = useCountdownSeconds(finalJeopardy?.timerEndsAt ?? null)
   const [wagerInput, setWagerInput] = useState('')
   const [wagerError, setWagerError] = useState('')
   const [answerInput, setAnswerInput] = useState('')
@@ -52,9 +31,7 @@ export default function FinalJeopardyPlayerView({
   const myWager = finalJeopardy?.wagers[myId]
   const hasWagered = myWager != null
   const hasAnswered = !!finalJeopardy?.submittedAnswerIds.includes(myId)
-  const timerDone =
-    finalJeopardy?.timerEndsAt != null &&
-    (remaining === 0 || Date.now() >= finalJeopardy.timerEndsAt)
+  const timerDone = finalJeopardy?.timerEndsAt != null && remaining === 0
   const canAnswer =
     eligible &&
     hasWagered &&

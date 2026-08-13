@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
 import { Check, CheckCircle, Eye, X } from 'lucide-react'
 import type { GameSettings, GameState } from '../types'
 import { FINAL_JEOPARDY_TIMER_MS } from '../types'
 import { formatScore } from '../lib/utils'
+import { useCountdownSeconds } from '../hooks/useCountdownSeconds'
 import * as net from '../lib/network'
 import { useGameStore } from '../store/gameStore'
 import QuestionMediaPlayer from './QuestionMediaPlayer'
@@ -13,32 +13,10 @@ interface Props {
   settings: GameSettings
 }
 
-function useCountdown(timerEndsAt: number | null): number | null {
-  const [remaining, setRemaining] = useState<number | null>(() => {
-    if (timerEndsAt == null) return null
-    return Math.max(0, Math.ceil((timerEndsAt - Date.now()) / 1000))
-  })
-
-  useEffect(() => {
-    if (timerEndsAt == null) {
-      setRemaining(null)
-      return
-    }
-    function tick() {
-      setRemaining(Math.max(0, Math.ceil((timerEndsAt! - Date.now()) / 1000)))
-    }
-    tick()
-    const id = window.setInterval(tick, 250)
-    return () => window.clearInterval(id)
-  }, [timerEndsAt])
-
-  return remaining
-}
-
 export default function FinalJeopardyOverlay({ state, settings }: Props) {
   const { activeQuestion, players, activeMedia, mediaPlayback, finalJeopardy, board } = state
   const store = useGameStore()
-  const remaining = useCountdown(finalJeopardy?.timerEndsAt ?? null)
+  const remaining = useCountdownSeconds(finalJeopardy?.timerEndsAt ?? null)
 
   if (!activeQuestion || !finalJeopardy || !board) return null
 
@@ -52,7 +30,7 @@ export default function FinalJeopardyOverlay({ state, settings }: Props) {
   const allEligibleWagered =
     eligible.length > 0 && eligible.every((p) => finalJeopardy.wagers[p.id] != null)
   const timerActive = finalJeopardy.timerEndsAt != null
-  const timerDone = timerActive && (remaining === 0 || (finalJeopardy.timerEndsAt != null && Date.now() >= finalJeopardy.timerEndsAt))
+  const timerDone = timerActive && remaining === 0
   const allAnswersIn =
     wageredIds.length > 0 &&
     wageredIds.every((id) => finalJeopardy.submittedAnswerIds.includes(id))

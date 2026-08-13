@@ -20,8 +20,14 @@ export default function FinalJeopardyEditor({ board, onChange, onClose, onDelete
   const fileRef = useRef<HTMLInputElement>(null)
   const draftRef = useRef(draft)
   const onChangeRef = useRef(onChange)
-  draftRef.current = draft
-  onChangeRef.current = onChange
+
+  useEffect(() => {
+    draftRef.current = draft
+  }, [draft])
+
+  useEffect(() => {
+    onChangeRef.current = onChange
+  }, [onChange])
 
   const category = draft.categories[0]
   const question = category?.questions[0]
