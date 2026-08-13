@@ -189,6 +189,7 @@ export type NetMessage =
 export interface GameSettings {
   pointDeduction: boolean
   allowNegativeScore: boolean
+  dailyDoubleMinWager: number
   autoBuzzQueue: boolean
   autoBuzzQueueOnMedia: boolean
   blurClueOnBuzz: boolean

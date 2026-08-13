@@ -7,6 +7,7 @@ import type { Category, CategorySettings, GameSettings } from '../../types'
 const globalOn: GameSettings = {
   pointDeduction: true,
   allowNegativeScore: true,
+  dailyDoubleMinWager: 5,
   autoBuzzQueue: true,
   autoBuzzQueueOnMedia: true,
   blurClueOnBuzz: true,
@@ -18,6 +19,7 @@ const globalOn: GameSettings = {
 const globalOff: GameSettings = {
   pointDeduction: false,
   allowNegativeScore: false,
+  dailyDoubleMinWager: 5,
   autoBuzzQueue: false,
   autoBuzzQueueOnMedia: false,
   blurClueOnBuzz: false,
