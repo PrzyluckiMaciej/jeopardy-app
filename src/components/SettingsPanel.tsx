@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Pencil, Trash2, Crown, Check, X, RefreshCw } from 'lucide-react'
 import type { GameSettings, Player, PlayerSyncStatus } from '../types'
 import { formatScore } from '../lib/utils'
@@ -35,14 +35,12 @@ export default function SettingsPanel({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [editScore, setEditScore] = useState('')
-  const [minWagerText, setMinWagerText] = useState(() => String(settings.dailyDoubleMinWager))
+  const [minWagerText, setMinWagerText] = useState('')
   const [minWagerFocused, setMinWagerFocused] = useState(false)
 
-  useEffect(() => {
-    if (!minWagerFocused) {
-      setMinWagerText(String(settings.dailyDoubleMinWager))
-    }
-  }, [settings.dailyDoubleMinWager, minWagerFocused])
+  const minWagerDisplay = minWagerFocused
+    ? minWagerText
+    : String(settings.dailyDoubleMinWager)
 
   function toggle(key: keyof GameSettings) {
     onSettingsChange({ ...settings, [key]: !settings[key] })
@@ -50,7 +48,6 @@ export default function SettingsPanel({
 
   function commitMinWager(raw: string) {
     const n = Math.max(0, parseInt(raw, 10) || 0)
-    setMinWagerText(String(n))
     if (n !== settings.dailyDoubleMinWager) {
       onSettingsChange({ ...settings, dailyDoubleMinWager: n })
     }
@@ -111,8 +108,11 @@ export default function SettingsPanel({
                 pattern="[0-9]*"
                 className="w-20 text-center font-display flex-shrink-0"
                 style={{ padding: '8px 4px' }}
-                value={minWagerText}
-                onFocus={() => setMinWagerFocused(true)}
+                value={minWagerDisplay}
+                onFocus={() => {
+                  setMinWagerFocused(true)
+                  setMinWagerText(String(settings.dailyDoubleMinWager))
+                }}
                 onChange={(e) => {
                   const raw = e.target.value
                   if (raw === '') {
@@ -123,8 +123,8 @@ export default function SettingsPanel({
                   setMinWagerText(String(parseInt(raw, 10)))
                 }}
                 onBlur={() => {
-                  setMinWagerFocused(false)
                   commitMinWager(minWagerText)
+                  setMinWagerFocused(false)
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
