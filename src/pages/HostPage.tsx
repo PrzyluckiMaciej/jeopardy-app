@@ -10,7 +10,7 @@ import {
 } from '../store/gameStore'
 import * as net from '../lib/network'
 import type { Board, BoardFolder, Game, GameFolder, Player, NetMessage, Question, GameSettings, PlayerSyncStatus } from '../types'
-import { createDefaultBoard, cellId } from '../lib/utils'
+import { createDefaultBoard, cellId, getDailyDoubleQuestionIds } from '../lib/utils'
 import { getCategoryGameplaySettings } from '../lib/settings'
 import { duplicateBoard } from '../lib/duplicateBoard'
 import { duplicateFolder } from '../lib/duplicateFolder'
@@ -825,7 +825,9 @@ export default function HostPage() {
     }
 
     const currentBoard = useGameStore.getState().state.board
-    const isDailyDouble = currentBoard?.dailyDoubleQuestionId === question.id
+    const isDailyDouble = currentBoard
+      ? getDailyDoubleQuestionIds(currentBoard).includes(question.id)
+      : false
 
     if (isDailyDouble) {
       const { boardControlId, players } = useGameStore.getState().state
@@ -1264,7 +1266,7 @@ export default function HostPage() {
                         board={board}
                         answeredCells={state.answeredCells}
                         onOpenCell={handleOpenCell}
-                        dailyDoubleQuestionId={board.dailyDoubleQuestionId}
+                        dailyDoubleQuestionIds={getDailyDoubleQuestionIds(board)}
                         fill
                       />
                     ) : (

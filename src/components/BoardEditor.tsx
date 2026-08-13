@@ -528,7 +528,7 @@ export default function BoardEditor({ board, globalSettings, onChange, onClose, 
                       </div>
                     )}
 
-                    {draft.dailyDoubleQuestionId === q.id && (
+                    {draft.dailyDoubleQuestionIds?.includes(q.id) && (
                       <div className="dd-badge">DD</div>
                     )}
                   </button>
@@ -704,21 +704,26 @@ export default function BoardEditor({ board, globalSettings, onChange, onClose, 
             <div
               className="board-editor-dd-toggle"
               onClick={() => {
-                const isDD = draft.dailyDoubleQuestionId === activeQ.id
-                updateBoard({ dailyDoubleQuestionId: isDD ? undefined : activeQ.id })
+                const ids = draft.dailyDoubleQuestionIds ?? []
+                const isDD = ids.includes(activeQ.id)
+                updateBoard({
+                  dailyDoubleQuestionIds: isDD
+                    ? ids.filter((id) => id !== activeQ.id)
+                    : [...ids, activeQ.id],
+                })
               }}
             >
               <div className="flex-1">
                 <div className="font-condensed font-bold text-sm">Daily Double</div>
                 <div className="text-xs" style={{ color: '#4a5580' }}>
-                  Mark this question as the daily double
+                  Mark this question as a Daily Double
                 </div>
               </div>
               <div
                 className="w-11 h-6 rounded-full relative transition-colors flex-shrink-0"
                 style={{
                   background:
-                    draft.dailyDoubleQuestionId === activeQ.id ? 'var(--gold)' : 'var(--navy-light)',
+                    draft.dailyDoubleQuestionIds?.includes(activeQ.id) ? 'var(--gold)' : 'var(--navy-light)',
                 }}
               >
                 <div
@@ -726,7 +731,7 @@ export default function BoardEditor({ board, globalSettings, onChange, onClose, 
                   style={{
                     background: 'var(--navy-mid)',
                     left:
-                      draft.dailyDoubleQuestionId === activeQ.id ? 'calc(100% - 22px)' : '2px',
+                      draft.dailyDoubleQuestionIds?.includes(activeQ.id) ? 'calc(100% - 22px)' : '2px',
                   }}
                 />
               </div>

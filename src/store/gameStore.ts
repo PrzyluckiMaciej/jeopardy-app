@@ -138,6 +138,19 @@ function uniqueFolderName(
   return `${base} (${n})`
 }
 
+function migrateBoardDailyDoubles(
+  board: Board & { dailyDoubleQuestionId?: string },
+): Board {
+  const { dailyDoubleQuestionId, ...rest } = board
+  if (Array.isArray(rest.dailyDoubleQuestionIds)) {
+    return rest
+  }
+  if (typeof dailyDoubleQuestionId === 'string' && dailyDoubleQuestionId) {
+    return { ...rest, dailyDoubleQuestionIds: [dailyDoubleQuestionId] }
+  }
+  return rest
+}
+
 function migrateBoardStore(persisted: unknown): PersistedBoardStore {
   if (!persisted || typeof persisted !== 'object') {
     return { boards: [], games: [], folders: [], gameFolders: [] }
@@ -152,7 +165,9 @@ function migrateBoardStore(persisted: unknown): PersistedBoardStore {
     folderId: g.folderId ?? null,
   }))
   return {
-    boards: state.boards ?? [],
+    boards: (state.boards ?? []).map((b) =>
+      migrateBoardDailyDoubles(b as Board & { dailyDoubleQuestionId?: string }),
+    ),
     games,
     folders: state.folders ?? [],
     gameFolders: state.gameFolders ?? [],
@@ -783,7 +798,7 @@ export const useBoardStore = create<BoardStore>()(
     {
       name: 'jeopardy-boards',
       migrate: migrateBoardStore,
-      version: 3,
+      version: 4,
     },
   ),
 )

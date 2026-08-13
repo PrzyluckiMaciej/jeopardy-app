@@ -1,7 +1,7 @@
 import type { Board } from '../types'
 import { getMedia, saveMedia } from './db'
 import { mimeTypeToMediaType } from './mediaType'
-import { generateId } from './utils'
+import { generateId, getDailyDoubleQuestionIds } from './utils'
 
 export async function duplicateBoard(source: Board): Promise<Board> {
   const now = Date.now()
@@ -62,9 +62,9 @@ export async function duplicateBoard(source: Board): Promise<Board> {
     id: newBoardId,
     name: `${source.name} (Copy)`,
     categories,
-    dailyDoubleQuestionId: source.dailyDoubleQuestionId
-      ? questionIdMap.get(source.dailyDoubleQuestionId)
-      : undefined,
+    dailyDoubleQuestionIds: getDailyDoubleQuestionIds(source)
+      .map((id) => questionIdMap.get(id))
+      .filter((id): id is string => !!id),
     createdAt: now,
     updatedAt: now,
   }
