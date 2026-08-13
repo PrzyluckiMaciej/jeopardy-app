@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import type { GameState } from '../types'
-import { formatScore } from '../lib/utils'
 import { useCountdownSeconds } from '../hooks/useCountdownSeconds'
 import * as net from '../lib/network'
 import QuestionMediaPlayer from './QuestionMediaPlayer'
+import QuestionOverlayText from './QuestionOverlayText'
 
 interface Props {
   state: GameState
@@ -41,6 +41,8 @@ export default function FinalJeopardyPlayerView({
   const myWager = finalJeopardy?.wagers[myId]
   const hasWagered = myWager != null
   const hasAnswered = !!finalJeopardy?.submittedAnswerIds.includes(myId)
+  const contentRevealed =
+    !!finalJeopardy?.clueRevealed || !!finalJeopardy?.mediaRevealed
   const timerDone = finalJeopardy?.timerEndsAt != null && remaining === 0
   const showTimer =
     finalJeopardy?.timerEndsAt != null &&
@@ -53,7 +55,11 @@ export default function FinalJeopardyPlayerView({
     !hasAnswered &&
     !timerDone
 
-  const showWagerForm = !!finalJeopardy?.categoryRevealed && eligible && !hasWagered
+  const showWagerForm =
+    !!finalJeopardy?.categoryRevealed &&
+    eligible &&
+    !hasWagered &&
+    !contentRevealed
   const answerRound = finalJeopardy?.timerEndsAt ?? 0
   if (canAnswer && answerFormKey !== answerRound) {
     setAnswerFormKey(answerRound)
@@ -65,6 +71,8 @@ export default function FinalJeopardyPlayerView({
   const question = activeQuestion?.question
   const showClue = !!finalJeopardy?.clueRevealed && !!question?.question.trim()
   const showMedia = !!finalJeopardy?.mediaRevealed && !!activeMedia
+  const showStage =
+    showClue || showMedia || !!finalJeopardy?.answerRevealed
 
   const focusRevealedId = [...(finalJeopardy?.revealedPlayerIds ?? [])].reverse()[0]
   const focusPlayer = focusRevealedId
@@ -94,7 +102,7 @@ export default function FinalJeopardyPlayerView({
   }
 
   function submitWager() {
-    if (!eligible || hasWagered || !hostPeerId) return
+    if (!eligible || hasWagered || contentRevealed || !hostPeerId) return
     const error = getFjWagerError(wagerInput, true)
     if (error) {
       setWagerError(error)
@@ -126,15 +134,17 @@ export default function FinalJeopardyPlayerView({
         <div className="font-display text-xl" style={{ color: 'var(--gold-bright)' }}>
           Final Jeopardy
         </div>
-        {showTimer && (
-          <div
-            className="font-display text-2xl tabular-nums"
-            style={{ color: remaining! <= 5 ? 'var(--red)' : 'var(--gold-bright)' }}
-          >
-            {remaining}s
-          </div>
-        )}
       </div>
+
+      {showTimer && (
+        <div
+          className={`final-jeopardy-player-timer${remaining! <= 5 ? ' final-jeopardy-player-timer--urgent' : ''}`}
+          aria-live="polite"
+        >
+          <span className="final-jeopardy-player-timer__value">{remaining}</span>
+          <span className="final-jeopardy-player-timer__label">seconds left</span>
+        </div>
+      )}
 
       <div className="final-jeopardy-layout flex-1 min-h-0">
         <div className="final-jeopardy-main panel flex flex-col gap-4 p-4 min-h-0 overflow-hidden">
@@ -156,7 +166,7 @@ export default function FinalJeopardyPlayerView({
                 </div>
               </div>
 
-              {!finalJeopardy.clueRevealed && !finalJeopardy.mediaRevealed && (
+              {!contentRevealed && (
                 <div className="text-center font-condensed text-sm animate-pulse" style={{ color: '#4a5580' }}>
                   {eligible
                     ? hasWagered
@@ -166,74 +176,69 @@ export default function FinalJeopardyPlayerView({
                 </div>
               )}
 
-              <div className="final-jeopardy-stage flex-1 min-h-0 flex flex-col gap-3">
-                {showClue && question && (
-                  <div className="final-jeopardy-clue-text font-condensed">
-                    {question.question}
-                  </div>
-                )}
-                {showMedia && activeMedia && (
-                  <div className="final-jeopardy-media flex-1 min-h-0">
-                    <QuestionMediaPlayer
-                      media={activeMedia}
-                      role="player"
-                      playback={mediaPlayback}
-                      mountKey={1}
-                      mediaActive
-                      loading={mediaLoading}
-                      className="question-overlay-media"
-                    />
-                  </div>
-                )}
-                {finalJeopardy.mediaRevealed && !activeMedia && mediaLoading && (
+              <div className="final-jeopardy-stage flex-1 min-h-0 flex flex-col">
+                {showStage && question ? (
+                  <QuestionOverlayText
+                    className="final-jeopardy-overlay-text"
+                    contentKey={`fj-player-${question.id}-${finalJeopardy.clueRevealed}-${finalJeopardy.mediaRevealed}-${finalJeopardy.answerRevealed}`}
+                    clue={question.question}
+                    answer={question.answer || '—'}
+                    clueRevealed={showClue}
+                    answerRevealed={finalJeopardy.answerRevealed}
+                    showClueContent={showClue}
+                    showAnswerContent={finalJeopardy.answerRevealed}
+                    hasMediaSlot={showMedia || (!!finalJeopardy.mediaRevealed && mediaLoading)}
+                    showMediaContent={showMedia}
+                    media={
+                      activeMedia ? (
+                        <QuestionMediaPlayer
+                          media={activeMedia}
+                          role="player"
+                          playback={mediaPlayback}
+                          mountKey={1}
+                          mediaActive
+                          loading={mediaLoading}
+                          className="question-overlay-media"
+                        />
+                      ) : undefined
+                    }
+                  />
+                ) : finalJeopardy.mediaRevealed && mediaLoading ? (
                   <div className="flex-1 flex items-center justify-center font-condensed text-sm animate-pulse" style={{ color: '#4a5580' }}>
                     Loading media…
                   </div>
-                )}
-                {finalJeopardy.answerRevealed && question && (
-                  <div className="final-jeopardy-correct-answer flex-shrink-0">
-                    <div
-                      className="font-condensed text-xs uppercase tracking-widest mb-1"
-                      style={{ color: 'var(--gold)', opacity: 0.7 }}
-                    >
-                      Answer
-                    </div>
-                    <div className="font-condensed text-xl" style={{ color: 'var(--gold-bright)' }}>
-                      {question.answer || '—'}
-                    </div>
-                  </div>
-                )}
+                ) : null}
               </div>
             </>
           )}
         </div>
 
         <aside className="final-jeopardy-side panel p-3 flex flex-col gap-3 min-h-0">
-          <div className="final-jeopardy-judge-slot flex-shrink-0" aria-live="polite">
-            {focusPlayer ? (
-              <div className="final-jeopardy-reveal flex flex-col gap-2">
-                <div className="font-condensed font-bold text-lg">{focusPlayer.name}</div>
-                <div className="font-display text-xl" style={{ color: 'var(--gold-bright)' }}>
-                  Wager: {formatScore(finalJeopardy.wagers[focusPlayer.id] ?? 0)}
-                </div>
+          {focusPlayer && (
+            <div className="final-jeopardy-player-card" aria-live="polite">
+              <div className="final-jeopardy-player-card__header">
+                <span className="font-condensed font-bold truncate">{focusPlayer.name}</span>
+              </div>
+              <div className="final-jeopardy-player-card__meta">
+                <span style={{ color: 'var(--gold)' }}>
+                  Wager {formatScore(finalJeopardy.wagers[focusPlayer.id] ?? 0)}
+                </span>
+              </div>
+              <div className="final-jeopardy-player-card__reveal">
                 <div className="font-condensed text-base break-words">
                   {finalJeopardy.answers[focusPlayer.id] ?? '(no answer)'}
                 </div>
                 {focusJudged != null && (
                   <div
-                    className="font-condensed text-sm"
+                    className="font-condensed text-sm mt-1"
                     style={{ color: focusJudged ? 'var(--success)' : 'var(--red)' }}
                   >
                     {focusJudged ? 'Correct!' : 'Incorrect'}
                   </div>
                 )}
               </div>
-            ) : (
-              <div className="font-condensed text-sm" style={{ color: '#4a5580' }}>
-                Player reveals appear here
-              </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {showWagerForm && (
             <div className="flex flex-col gap-2 flex-shrink-0">
@@ -303,4 +308,9 @@ export default function FinalJeopardyPlayerView({
       </div>
     </div>
   )
+}
+
+function formatScore(score: number): string {
+  if (score < 0) return `-$${Math.abs(score).toLocaleString()}`
+  return `$${score.toLocaleString()}`
 }

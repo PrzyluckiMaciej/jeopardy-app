@@ -2011,38 +2011,78 @@ body.board-picker-reordering * {
   min-height: 0;
 }
 .final-jeopardy-side {
-  overflow: hidden;
+  overflow: auto;
 }
-.final-jeopardy-clue-text {
+.final-jeopardy-stage {
+  container-type: size;
+}
+.final-jeopardy-overlay-text {
+  flex: 1 1 0;
+  min-height: 0;
+  height: 100%;
+}
+.final-jeopardy-player-timer {
   flex-shrink: 0;
-  text-align: center;
-  color: var(--white);
-  font-size: clamp(1.25rem, 2.4vw, 2rem);
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-}
-.final-jeopardy-media {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 8rem;
-}
-.final-jeopardy-media .question-overlay-media {
-  width: 100%;
-  height: 100%;
-  max-height: 100%;
-}
-.final-jeopardy-correct-answer {
-  padding-top: 0.5rem;
-  border-top: 1px solid rgba(59, 130, 246, 0.25);
+  gap: 0.15rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-lg);
+  background: rgba(250, 204, 21, 0.12);
+  border: 2px solid rgba(250, 204, 21, 0.55);
+  color: var(--gold-bright);
   text-align: center;
 }
-.final-jeopardy-judge-slot {
-  min-height: 8.5rem;
-  padding: 0.75rem;
+.final-jeopardy-player-timer__value {
+  font-family: 'Anton', sans-serif;
+  font-size: clamp(3.5rem, 14vw, 6rem);
+  line-height: 0.95;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.final-jeopardy-player-timer__label {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: clamp(0.85rem, 2.5vw, 1.1rem);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  opacity: 0.85;
+}
+.final-jeopardy-player-timer--urgent {
+  background: rgba(239, 68, 68, 0.16);
+  border-color: rgba(239, 68, 68, 0.7);
+  color: var(--red);
+}
+.final-jeopardy-player-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.7rem 0.75rem;
   border-radius: var(--radius-lg);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(59, 130, 246, 0.2);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(59, 130, 246, 0.22);
+}
+.final-jeopardy-player-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: var(--white);
+}
+.final-jeopardy-player-card__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.8rem;
+}
+.final-jeopardy-player-card__reveal {
+  margin-top: 0.15rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid rgba(59, 130, 246, 0.2);
+  color: var(--white);
 }
 @media (max-width: 900px) {
   .final-jeopardy-layout {

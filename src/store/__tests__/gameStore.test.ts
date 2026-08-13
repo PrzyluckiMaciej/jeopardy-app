@@ -735,6 +735,12 @@ describe('useGameStore', () => {
       expect(useGameStore.getState().state.finalJeopardy?.wagers.p1).toBe(0)
     })
 
+    it('rejects wagers after clue or media reveal', () => {
+      useGameStore.getState().revealFinalClue()
+      useGameStore.getState().setFinalWager('p1', 100)
+      expect(useGameStore.getState().state.finalJeopardy?.wagers.p1).toBeUndefined()
+    })
+
     it('starts the 30s timer on first clue or media reveal', () => {
       const before = Date.now()
       useGameStore.getState().revealFinalClue()

@@ -1222,6 +1222,7 @@ export const useGameStore = create<GameStore>()(
         set((s) => {
           const fj = s.state.finalJeopardy
           if (!fj || !fj.categoryRevealed) return s
+          if (fj.clueRevealed || fj.mediaRevealed) return s
           const player = s.state.players.find((p) => p.id === playerId)
           if (!player || player.score <= 0) return s
           if (fj.wagers[playerId] != null) return s
