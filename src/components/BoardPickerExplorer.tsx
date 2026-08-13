@@ -744,7 +744,7 @@ export default function BoardPickerExplorer({
         <div className="board-picker-explorer-row__name">
           {isEditing ? (
             <div className="flex items-center gap-1 flex-1 min-w-0">
-              <LayoutGrid size={14} className="flex-shrink-0 opacity-70" />
+              <LayoutGrid size={14} className="board-picker-object-icon board-picker-object-icon--board" />
               <input
                 className="board-picker-input"
                 value={boardRenameValue}
@@ -779,7 +779,7 @@ export default function BoardPickerExplorer({
                 if (!isTrash) onSelectBoard(board)
               }}
             >
-              <LayoutGrid size={14} className="flex-shrink-0 opacity-70" />
+              <LayoutGrid size={14} className="board-picker-object-icon board-picker-object-icon--board" />
               <span className="font-condensed font-bold truncate">{board.name}</span>
             </button>
           )}
@@ -830,7 +830,7 @@ export default function BoardPickerExplorer({
           {isEditing ? (
             <div className="board-picker-rename flex-1 min-w-0">
               <div className="flex items-center gap-1 min-w-0">
-                <Folder size={14} className="flex-shrink-0 opacity-70" />
+                <Folder size={14} className="board-picker-object-icon board-picker-object-icon--folder" />
                 <input
                   className={`board-picker-input${folderRenameConflict ? ' board-picker-input--error' : ''}`}
                   value={folderRenameValue}
@@ -876,7 +876,7 @@ export default function BoardPickerExplorer({
               className="board-picker-folder-row__btn"
               onClick={() => navigateTo(folder.id)}
             >
-              <Folder size={14} className="flex-shrink-0 opacity-70" />
+              <Folder size={14} className="board-picker-object-icon board-picker-object-icon--folder" />
               <span className="truncate">{folder.name}</span>
             </button>
           )}
@@ -895,7 +895,7 @@ export default function BoardPickerExplorer({
       >
         <div className="board-picker-explorer-row__name">
           <button type="button" className="board-picker-board-btn" disabled>
-            <Layers size={14} className="flex-shrink-0 opacity-70" />
+            <Layers size={14} className="board-picker-object-icon board-picker-object-icon--game" />
             <span className="font-condensed font-bold truncate">{game.name}</span>
           </button>
         </div>
@@ -917,7 +917,7 @@ export default function BoardPickerExplorer({
             className="board-picker-folder-row__btn"
             onClick={() => navigateTo(folder.id)}
           >
-            <Folder size={14} className="flex-shrink-0 opacity-70" />
+            <Folder size={14} className="board-picker-object-icon board-picker-object-icon--folder" />
             <span className="truncate">{folder.name}</span>
           </button>
         </div>

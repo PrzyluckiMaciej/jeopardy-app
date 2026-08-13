@@ -1544,7 +1544,7 @@ export default function HostPage() {
                     className={`board-picker-nav-item flex-shrink-0${pickerIsAll ? ' board-picker-nav-item--active' : ''}`}
                     onClick={() => setPickerNav('all')}
                   >
-                    <LayoutGrid size={14} className="flex-shrink-0 opacity-70" aria-hidden />
+                    <LayoutGrid size={14} className="board-picker-object-icon board-picker-object-icon--board" aria-hidden />
                     <span className="board-picker-nav-item__text">
                       <span className="truncate">All Boards</span>
                       <span className="board-picker-nav-item__count">({libraryBoards.length})</span>
@@ -1556,7 +1556,7 @@ export default function HostPage() {
                     className={`board-picker-nav-item flex-shrink-0${gamesNavActive ? ' board-picker-nav-item--active' : ''}`}
                     onClick={() => openGamesExplorer(null)}
                   >
-                    <Layers size={14} className="flex-shrink-0 opacity-70" aria-hidden />
+                    <Layers size={14} className="board-picker-object-icon board-picker-object-icon--game" aria-hidden />
                     <span className="board-picker-nav-item__text">
                       <span className="truncate">Games</span>
                       <span className="board-picker-nav-item__count">({libraryGames.length})</span>
@@ -1749,7 +1749,7 @@ export default function HostPage() {
                           >
                             {idx + 1}
                           </span>
-                          <LayoutGrid size={14} className="flex-shrink-0 opacity-70" />
+                          <LayoutGrid size={14} className="board-picker-object-icon board-picker-object-icon--board" />
                           <span className="font-condensed font-bold truncate">{b.name}</span>
                         </button>
                         <div className="board-picker-board-row__actions">
