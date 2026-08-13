@@ -2013,6 +2013,9 @@ body.board-picker-reordering * {
 .final-jeopardy-side {
   overflow: auto;
 }
+.final-jeopardy-body {
+  position: relative;
+}
 .final-jeopardy-stage {
   container-type: size;
 }
@@ -2021,8 +2024,26 @@ body.board-picker-reordering * {
   min-height: 0;
   height: 100%;
 }
+.final-jeopardy-host-timer-slot {
+  min-width: 4.5rem;
+  min-height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.final-jeopardy-host-timer {
+  animation: finalJeopardyPopIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.final-jeopardy-player-timer-wrap {
+  position: absolute;
+  top: 0.65rem;
+  left: 50%;
+  z-index: 20;
+  width: min(18rem, calc(100% - 2rem));
+  transform: translateX(-50%);
+  pointer-events: none;
+}
 .final-jeopardy-player-timer {
-  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2030,10 +2051,12 @@ body.board-picker-reordering * {
   gap: 0.15rem;
   padding: 0.85rem 1rem;
   border-radius: var(--radius-lg);
-  background: rgba(250, 204, 21, 0.12);
+  background: rgba(10, 18, 48, 0.92);
   border: 2px solid rgba(250, 204, 21, 0.55);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
   color: var(--gold-bright);
   text-align: center;
+  animation: finalJeopardyPopIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 .final-jeopardy-player-timer__value {
   font-family: 'Anton', sans-serif;
@@ -2050,7 +2073,7 @@ body.board-picker-reordering * {
   opacity: 0.85;
 }
 .final-jeopardy-player-timer--urgent {
-  background: rgba(239, 68, 68, 0.16);
+  background: rgba(48, 12, 16, 0.94);
   border-color: rgba(239, 68, 68, 0.7);
   color: var(--red);
 }
@@ -2084,6 +2107,71 @@ body.board-picker-reordering * {
   border-top: 1px solid rgba(59, 130, 246, 0.2);
   color: var(--white);
 }
+@keyframes finalJeopardyEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes finalJeopardyPopIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes finalJeopardyCategoryIn {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes finalJeopardySideIn {
+  0% {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes finalJeopardyRevealIn {
+  0% {
+    opacity: 0;
+    max-height: 0;
+    transform: translateY(-6px);
+  }
+  100% {
+    opacity: 1;
+    max-height: 12rem;
+    transform: translateY(0);
+  }
+}
+.final-jeopardy-enter {
+  animation: finalJeopardyEnter 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.final-jeopardy-category-enter {
+  animation: finalJeopardyCategoryIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.final-jeopardy-side-enter {
+  animation: finalJeopardySideIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.final-jeopardy-reveal-enter {
+  animation: finalJeopardyRevealIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  overflow: hidden;
+}
 @media (max-width: 900px) {
   .final-jeopardy-layout {
     grid-template-columns: 1fr;
@@ -2091,6 +2179,12 @@ body.board-picker-reordering * {
   }
   .final-jeopardy-side {
     max-height: 45%;
+  }
+  .final-jeopardy-side-enter {
+    animation-name: finalJeopardyEnter;
+  }
+  .final-jeopardy-player-timer-wrap {
+    top: 0.4rem;
   }
 }
 
