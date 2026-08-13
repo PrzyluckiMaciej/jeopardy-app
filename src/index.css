@@ -1952,6 +1952,18 @@ body.board-picker-reordering * {
   width: 100%;
   padding: 2px 0;
 }
+.board-picker-object-icon {
+  flex-shrink: 0;
+}
+.board-picker-object-icon--folder {
+  color: var(--gold);
+}
+.board-picker-object-icon--game {
+  color: var(--danger);
+}
+.board-picker-object-icon--board {
+  color: var(--success);
+}
 
 /* Transparent, content-sized drag preview (boards) */
 .board-picker-drag-ghost {

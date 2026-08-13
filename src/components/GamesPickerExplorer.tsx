@@ -543,7 +543,7 @@ export default function GamesPickerExplorer({
         <div className="board-picker-explorer-row__name">
           {isEditing ? (
             <div className="flex items-center gap-1 flex-1 min-w-0">
-              <Layers size={14} className="flex-shrink-0 opacity-70" />
+              <Layers size={14} className="board-picker-object-icon board-picker-object-icon--game" />
               <input
                 className="board-picker-input"
                 value={gameRenameValue}
@@ -576,7 +576,7 @@ export default function GamesPickerExplorer({
               className="board-picker-board-btn"
               onClick={() => onSelectGame(game)}
             >
-              <Layers size={14} className="flex-shrink-0 opacity-70" />
+              <Layers size={14} className="board-picker-object-icon board-picker-object-icon--game" />
               <span className="font-condensed font-bold truncate">{game.name}</span>
             </button>
           )}
@@ -625,7 +625,7 @@ export default function GamesPickerExplorer({
           {isEditing ? (
             <div className="board-picker-rename flex-1 min-w-0">
               <div className="flex items-center gap-1 min-w-0">
-                <Folder size={14} className="flex-shrink-0 opacity-70" />
+                <Folder size={14} className="board-picker-object-icon board-picker-object-icon--folder" />
                 <input
                   className={`board-picker-input${folderRenameConflict ? ' board-picker-input--error' : ''}`}
                   value={folderRenameValue}
@@ -671,7 +671,7 @@ export default function GamesPickerExplorer({
               className="board-picker-folder-row__btn"
               onClick={() => navigateTo(folder.id)}
             >
-              <Folder size={14} className="flex-shrink-0 opacity-70" />
+              <Folder size={14} className="board-picker-object-icon board-picker-object-icon--folder" />
               <span className="truncate">{folder.name}</span>
             </button>
           )}
