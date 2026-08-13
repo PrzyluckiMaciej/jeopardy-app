@@ -6,8 +6,10 @@ import {
   useBoardStore,
   isBoardTrashed,
   isFolderTrashed,
+  isGameFolderTrashed,
   isGameTrashed,
 } from '../store/gameStore'
+import { buildItemPathString, resolveFolderOrItemPath } from '../lib/folderPath'
 import * as net from '../lib/network'
 import type { Board, BoardFolder, Game, GameFolder, Player, NetMessage, Question, GameSettings, PlayerSyncStatus } from '../types'
 import { createDefaultBoard, cellId, getDailyDoubleQuestionIds } from '../lib/utils'
@@ -104,6 +106,8 @@ export default function HostPage() {
     boardIds: string[]
     label: string
   } | null>(null)
+  const [gamePathEditing, setGamePathEditing] = useState(false)
+  const [gamePathDraft, setGamePathDraft] = useState('/')
   /** Board id being dragged for reorder within the open game. */
   const [gameBoardDragId, setGameBoardDragId] = useState<string | null>(null)
   /** Insertion index in the visible game board list (0..length). */
@@ -624,11 +628,29 @@ export default function HostPage() {
 
   function handleOpenGame(game: Game) {
     setReturnGamesFolderId(game.folderId ?? null)
+    setGamePathEditing(false)
     setPickerNav(game.id)
   }
 
   function handleBackToGames() {
     openGamesExplorer(returnGamesFolderId)
+  }
+
+  function commitGamePath(pathValue: string, currentPath: string) {
+    const activeFolders = boardStore.gameFolders.filter((f) => !isGameFolderTrashed(f))
+    const activeGames = boardStore.games.filter((g) => !isGameTrashed(g))
+    const resolved = resolveFolderOrItemPath(activeFolders, activeGames, pathValue.trim())
+    if (resolved === undefined) {
+      setGamePathDraft(currentPath)
+      return
+    }
+    setGamePathEditing(false)
+    if (resolved.kind === 'folder') {
+      openGamesExplorer(resolved.id)
+      return
+    }
+    const game = activeGames.find((g) => g.id === resolved.id)
+    if (game) handleOpenGame(game)
   }
 
   function openTrashNavMenu(e: ReactMouseEvent) {
@@ -1050,6 +1072,14 @@ export default function HostPage() {
         .map(id => boardStore.boards.find(b => b.id === id))
         .filter((b): b is Board => !!b && !isBoardTrashed(b))
     : libraryBoards
+  const pickerGamePath = pickerGameData
+    ? buildItemPathString(
+        boardStore.gameFolders.filter((f) => !isGameFolderTrashed(f)),
+        pickerGameData.folderId ?? null,
+        pickerGameData.name,
+      )
+    : '/'
+  const gamePathValue = gamePathEditing ? gamePathDraft : pickerGamePath
 
   function clearGameBoardDragGhost() {
     gameBoardDragGhostRef.current?.remove()
@@ -1629,10 +1659,7 @@ export default function HostPage() {
                     initialFolderId={gamesExplorerFolderId}
                   />
                 ) : (
-                <div
-                  ref={gameBoardListRef}
-                  className={`board-picker-boards__scroll${gameBoardDragId ? ' board-picker-boards__scroll--reordering' : ''}`}
-                >
+                <>
                   <div className="board-picker-path-bar">
                     <button
                       type="button"
@@ -1643,10 +1670,39 @@ export default function HostPage() {
                     >
                       <ArrowLeft size={16} aria-hidden />
                     </button>
-                    <div className="board-picker-path-input board-picker-path-input--readonly" aria-label="Game">
-                      {pickerGameData?.name ?? 'Game'}
-                    </div>
+                    <input
+                      className="board-picker-path-input"
+                      value={gamePathValue}
+                      onFocus={() => {
+                        setGamePathDraft(pickerGamePath)
+                        setGamePathEditing(true)
+                      }}
+                      onChange={(e) => setGamePathDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          commitGamePath(gamePathValue, pickerGamePath)
+                          ;(e.target as HTMLInputElement).blur()
+                        }
+                        if (e.key === 'Escape') {
+                          e.preventDefault()
+                          setGamePathDraft(pickerGamePath)
+                          setGamePathEditing(false)
+                          ;(e.target as HTMLInputElement).blur()
+                        }
+                      }}
+                      onBlur={() => {
+                        setGamePathEditing(false)
+                        setGamePathDraft(pickerGamePath)
+                      }}
+                      aria-label="Game path"
+                      spellCheck={false}
+                    />
                   </div>
+                  <div
+                    ref={gameBoardListRef}
+                    className={`board-picker-boards__scroll${gameBoardDragId ? ' board-picker-boards__scroll--reordering' : ''}`}
+                  >
                   {pickerBoards.map((b, idx) => {
                     const isDragging = gameBoardDragId === b.id
                     const fromDisp = gameBoardDragId
@@ -1739,7 +1795,8 @@ export default function HostPage() {
                       </div>
                     )
                   })()}
-                </div>
+                  </div>
+                </>
                 )}
 
                 {pickerGameId && pickerBoards.length > 0 && (
