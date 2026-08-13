@@ -2068,6 +2068,82 @@ body.board-picker-reordering * {
   border-color: rgba(239, 68, 68, 0.7);
   color: var(--red);
 }
+.final-jeopardy-reveal-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 0.9rem 0.95rem;
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(59, 130, 246, 0.28);
+  color: var(--white);
+}
+.final-jeopardy-reveal-card__name {
+  font-size: clamp(1.35rem, 3.2vw, 1.75rem);
+  line-height: 1.15;
+  color: var(--gold-bright);
+}
+.final-jeopardy-reveal-card__label {
+  display: block;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+  opacity: 0.75;
+  margin-bottom: 0.2rem;
+}
+.final-jeopardy-reveal-card__wager {
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid rgba(59, 130, 246, 0.22);
+}
+.final-jeopardy-reveal-card__amount {
+  display: block;
+  font-size: clamp(2rem, 5vw, 2.75rem);
+  line-height: 1;
+  color: var(--gold-bright);
+  font-variant-numeric: tabular-nums;
+}
+.final-jeopardy-reveal-card__answer-text {
+  font-size: clamp(1.35rem, 3.4vw, 1.85rem);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  color: var(--white);
+}
+.final-jeopardy-reveal-card__result {
+  margin-top: 0.55rem;
+  font-size: clamp(1.15rem, 2.8vw, 1.4rem);
+}
+.final-jeopardy-player-form__title {
+  font-size: clamp(1.15rem, 2.8vw, 1.4rem);
+  color: var(--gold-bright);
+}
+.final-jeopardy-player-form__hint {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 1rem;
+  color: #7a86b0;
+}
+.final-jeopardy-player-form__input {
+  font-size: clamp(1.75rem, 4.5vw, 2.35rem) !important;
+  padding: 0.85rem 0.75rem !important;
+  line-height: 1.1;
+}
+.final-jeopardy-player-form__input--answer {
+  font-size: clamp(1.35rem, 3.5vw, 1.85rem) !important;
+}
+.final-jeopardy-player-form__error {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 1rem;
+  color: var(--red);
+}
+.final-jeopardy-player-status {
+  font-size: clamp(1.1rem, 2.6vw, 1.35rem);
+  color: #7a86b0;
+}
+.final-jeopardy-player-status--ok {
+  color: var(--success);
+}
 .final-jeopardy-player-answer {
   padding-top: 0.25rem;
 }
@@ -2149,7 +2225,7 @@ body.board-picker-reordering * {
   }
   100% {
     opacity: 1;
-    max-height: 12rem;
+    max-height: 20rem;
     transform: translateY(0);
   }
 }

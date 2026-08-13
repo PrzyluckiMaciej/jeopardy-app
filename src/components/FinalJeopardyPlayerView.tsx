@@ -240,23 +240,25 @@ export default function FinalJeopardyPlayerView({
 
           <div key={sidePanelKey} className="final-jeopardy-enter flex flex-col gap-3 flex-1 min-h-0">
             {focusPlayer && (
-              <div className="final-jeopardy-player-card flex-shrink-0" aria-live="polite">
-                <div className="final-jeopardy-player-card__header">
-                  <span className="font-condensed font-bold truncate">{focusPlayer.name}</span>
+              <div className="final-jeopardy-reveal-card flex-shrink-0" aria-live="polite">
+                <div className="final-jeopardy-reveal-card__name font-condensed font-bold truncate">
+                  {focusPlayer.name}
                 </div>
-                <div className="final-jeopardy-player-card__meta">
-                  <span style={{ color: 'var(--gold)' }}>
-                    Wager {formatScore(finalJeopardy.wagers[focusPlayer.id] ?? 0)}
+                <div className="final-jeopardy-reveal-card__wager">
+                  <span className="final-jeopardy-reveal-card__label">Wager</span>
+                  <span className="final-jeopardy-reveal-card__amount font-display">
+                    {formatScore(finalJeopardy.wagers[focusPlayer.id] ?? 0)}
                   </span>
                 </div>
-                <div className="final-jeopardy-player-card__reveal final-jeopardy-reveal-enter">
-                  <div className="font-condensed text-base break-words">
+                <div className="final-jeopardy-reveal-card__answer final-jeopardy-reveal-enter">
+                  <span className="final-jeopardy-reveal-card__label">Answer</span>
+                  <div className="final-jeopardy-reveal-card__answer-text font-condensed font-bold">
                     {finalJeopardy.answers[focusPlayer.id] ?? '(no answer)'}
                   </div>
                   {focusJudged != null && (
                     <div
                       key={`judged-${focusJudged}`}
-                      className="final-jeopardy-enter font-condensed text-sm mt-1"
+                      className="final-jeopardy-enter final-jeopardy-reveal-card__result font-condensed font-bold"
                       style={{ color: focusJudged ? 'var(--success)' : 'var(--red)' }}
                     >
                       {focusJudged ? 'Correct!' : 'Incorrect'}
@@ -267,18 +269,18 @@ export default function FinalJeopardyPlayerView({
             )}
 
             {showWagerForm && (
-              <div className="flex flex-col gap-2 flex-shrink-0">
-                <div className="font-condensed font-bold text-sm text-center" style={{ color: 'var(--gold-bright)' }}>
+              <div className="final-jeopardy-player-form flex flex-col gap-3 flex-shrink-0">
+                <div className="final-jeopardy-player-form__title font-condensed font-bold text-center">
                   Enter your wager
                 </div>
-                <div className="text-xs text-center" style={{ color: '#4a5580' }}>
+                <div className="final-jeopardy-player-form__hint text-center">
                   Min: $0 · Max: ${myScore}
                 </div>
                 <input
                   type="number"
                   min={0}
                   max={myScore}
-                  className="w-full text-center font-display text-xl"
+                  className="final-jeopardy-player-form__input w-full text-center font-display"
                   placeholder="Wager amount"
                   value={wagerInput}
                   onChange={(e) => handleWagerChange(e.target.value)}
@@ -286,34 +288,34 @@ export default function FinalJeopardyPlayerView({
                   autoFocus
                 />
                 {wagerError && (
-                  <div className="text-xs text-center" style={{ color: 'var(--red)' }}>{wagerError}</div>
+                  <div className="final-jeopardy-player-form__error text-center">{wagerError}</div>
                 )}
-                <button type="button" className="btn-gold w-full py-3" onClick={submitWager}>
+                <button type="button" className="btn-gold w-full py-3 text-base" onClick={submitWager}>
                   Submit wager
                 </button>
               </div>
             )}
 
             {hasWagered && finalJeopardy.timerEndsAt != null && hasAnswered && (
-              <div className="text-center font-condensed text-sm flex-shrink-0" style={{ color: 'var(--success)' }}>
+              <div className="final-jeopardy-player-status final-jeopardy-player-status--ok text-center font-condensed font-bold flex-shrink-0">
                 Answer submitted
               </div>
             )}
 
             {hasWagered && timerDone && !hasAnswered && (
-              <div className="text-center font-condensed text-sm flex-shrink-0" style={{ color: '#4a5580' }}>
+              <div className="final-jeopardy-player-status text-center font-condensed font-bold flex-shrink-0">
                 Time&apos;s up
               </div>
             )}
 
             {canAnswer && (
-              <div className="final-jeopardy-player-answer flex flex-col gap-2 flex-shrink-0 mt-auto">
-                <div className="font-condensed font-bold text-sm text-center" style={{ color: 'var(--gold-bright)' }}>
+              <div className="final-jeopardy-player-form final-jeopardy-player-answer flex flex-col gap-3 flex-shrink-0 mt-auto">
+                <div className="final-jeopardy-player-form__title font-condensed font-bold text-center">
                   Your answer
                 </div>
                 <input
                   type="text"
-                  className="w-full text-center font-condensed text-lg"
+                  className="final-jeopardy-player-form__input final-jeopardy-player-form__input--answer w-full text-center font-condensed font-bold"
                   placeholder="What is…?"
                   value={answerInput}
                   onChange={(e) => setAnswerInput(e.target.value)}
@@ -322,7 +324,7 @@ export default function FinalJeopardyPlayerView({
                 />
                 <button
                   type="button"
-                  className="btn-gold w-full py-3"
+                  className="btn-gold w-full py-3 text-base"
                   onClick={submitAnswer}
                   disabled={!answerInput.trim()}
                 >
