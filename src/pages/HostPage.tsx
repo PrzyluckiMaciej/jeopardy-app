@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type AnimationEvent as ReactAnimationEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
-import { Settings, Trash2, Copy, Layers, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, RotateCcw, Shuffle, X, Users, CircleHelp, Menu, ArrowLeft, Pencil, GripVertical } from 'lucide-react'
+import { Settings, Trash2, Copy, Layers, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, RotateCcw, Shuffle, X, Users, CircleHelp, Menu, ArrowLeft, Pencil, GripVertical, Trophy } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import {
   useGameStore,
@@ -12,13 +12,14 @@ import {
 import { buildItemPathString, resolveFolderOrItemPath } from '../lib/folderPath'
 import * as net from '../lib/network'
 import type { Board, BoardFolder, Game, GameFolder, Player, NetMessage, Question, GameSettings, PlayerSyncStatus } from '../types'
-import { createDefaultBoard, cellId, getDailyDoubleQuestionIds } from '../lib/utils'
+import { createDefaultBoard, createDefaultFinalJeopardy, cellId, getDailyDoubleQuestionIds, isFinalBoard } from '../lib/utils'
 import { getCategoryGameplaySettings } from '../lib/settings'
 import { duplicateBoard } from '../lib/duplicateBoard'
 import { duplicateFolder } from '../lib/duplicateFolder'
 import { duplicateGameFolder } from '../lib/duplicateGameFolder'
 import { collectFolderSubtree } from '../lib/folderSubtree'
 import { getMedia, blobToDataUrl } from '../lib/db'
+import { mimeTypeToMediaType } from '../lib/mediaType'
 import { logEvent } from '../lib/logger'
 import {
   evaluatePlayerJoin,
@@ -28,6 +29,8 @@ import {
 import AddToGameModal from '../components/AddToGameModal'
 import ConfirmModal from '../components/ConfirmModal'
 import BoardEditor from '../components/BoardEditor'
+import FinalJeopardyEditor from '../components/FinalJeopardyEditor'
+import FinalJeopardyOverlay from '../components/FinalJeopardyOverlay'
 import BoardPickerExplorer from '../components/BoardPickerExplorer'
 import GamesPickerExplorer from '../components/GamesPickerExplorer'
 import ContextMenu, { type ContextMenuItem } from '../components/ContextMenu'
@@ -70,7 +73,8 @@ export default function HostPage() {
   const store = useGameStore()
   const { state, settings, roomCode, setSettings, addPlayer, removePlayer, updatePlayer,
     openCard, patchState, setPlayerConnected, addBuzz, resetBoard, setBoardControl,
-    startDailyDouble, setDailyDoubleBet, selectGame, setBoardTransition, showPodium } = store
+    startDailyDouble, setDailyDoubleBet, selectGame, setBoardTransition, showPodium,
+    startFinalJeopardy, setFinalWager, submitFinalAnswer, stopFinalTimer } = store
   const boardStore = useBoardStore()
 
   const [tab, setTab] = useState<Tab>('board')
@@ -124,6 +128,7 @@ export default function HostPage() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [mobileNavExiting, setMobileNavExiting] = useState(false)
   const [showExitConfirm, setShowExitConfirm] = useState(false)
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
 
   const peerToClient = useRef(new Map<string, string>())
   const nameSessions = useRef(new Map<string, NameSession>())
@@ -403,6 +408,44 @@ export default function HostPage() {
         setDailyDoubleBet(wager)
         net.broadcast({ type: 'DAILY_DOUBLE_ACCEPT_BET', wager })
       }
+      if (msg.type === 'FINAL_JEOPARDY_WAGER') {
+        const clientId = peerToClient.current.get(peerId)
+        if (!clientId) return
+        setFinalWager(clientId, msg.wager)
+        const locked = useGameStore.getState().state.finalJeopardy?.wagers[clientId]
+        if (locked == null) return
+        // Confirm full wager only to the submitting peer; others get lock status.
+        net.send(
+          { type: 'FINAL_JEOPARDY_WAGER', playerId: clientId, wager: locked },
+          peerId,
+        )
+        net.broadcast({ type: 'FINAL_JEOPARDY_WAGER_LOCKED', playerId: clientId })
+      }
+      if (msg.type === 'FINAL_JEOPARDY_SUBMIT_ANSWER') {
+        const clientId = peerToClient.current.get(peerId)
+        if (!clientId) return
+        submitFinalAnswer(clientId, msg.text)
+        if (!useGameStore.getState().state.finalJeopardy?.submittedAnswerIds.includes(clientId)) {
+          return
+        }
+        net.send(
+          { type: 'FINAL_JEOPARDY_SUBMIT_ANSWER', playerId: clientId, text: msg.text },
+          peerId,
+        )
+        net.broadcast({ type: 'FINAL_JEOPARDY_ANSWER_LOCKED', playerId: clientId })
+        const fj = useGameStore.getState().state.finalJeopardy
+        if (fj) {
+          const wagered = Object.keys(fj.wagers)
+          if (
+            wagered.length > 0 &&
+            wagered.every((id) => fj.submittedAnswerIds.includes(id))
+          ) {
+            const timerEndsAt = Date.now()
+            stopFinalTimer(timerEndsAt)
+            net.broadcast({ type: 'FINAL_JEOPARDY_TIMER_STOP', timerEndsAt })
+          }
+        }
+      }
       if (msg.type === 'EMOJI_REACT') {
         const { playerId, emoji } = msg
         if (emojiTimers.current[playerId]) clearTimeout(emojiTimers.current[playerId])
@@ -440,16 +483,66 @@ export default function HostPage() {
     return () => net.leaveRoom()
   }, [roomCode]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  async function beginFinalJeopardyRound(b: Board) {
+    const category = b.categories[0]
+    const question = category?.questions[0]
+    if (!category || !question) return
+    let mediaDataUrl: string | undefined
+    let mediaType = question.mediaType
+    if (question.mediaId) {
+      const rec = await getMedia(question.mediaId)
+      if (rec) {
+        mediaDataUrl = await blobToDataUrl(rec.blob)
+        if (!mediaType) mediaType = mimeTypeToMediaType(rec.mimeType)
+      }
+    }
+    const q =
+      mediaType && mediaType !== question.mediaType
+        ? { ...question, mediaType }
+        : question
+    startFinalJeopardy(category.id, q, mediaDataUrl)
+  }
+
   function handleSelectBoard(board: Board) {
     const b = { ...board }
     setActiveBoard(b)
     const connectedPlayers = useGameStore.getState().state.players.filter(p => p.isConnected)
     const randomControl = connectedPlayers.length > 0 ? pickRandom(connectedPlayers).id : null
-    patchState({
-      board: b, answeredCells: [], phase: 'board', boardControlId: randomControl,
-      activeGameId: null, gameBoardIds: [], currentBoardIndex: 0, boardTransition: null,
-    })
-    net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+    if (isFinalBoard(b)) {
+      patchState({
+        board: b,
+        answeredCells: [],
+        boardControlId: randomControl,
+        activeGameId: null,
+        gameBoardIds: [],
+        currentBoardIndex: 0,
+        boardTransition: null,
+        dailyDouble: null,
+      })
+      void beginFinalJeopardyRound(b).then(() => {
+        net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+      })
+    } else {
+      patchState({
+        board: b,
+        answeredCells: [],
+        phase: 'board',
+        boardControlId: randomControl,
+        activeGameId: null,
+        gameBoardIds: [],
+        currentBoardIndex: 0,
+        boardTransition: null,
+        finalJeopardy: null,
+        dailyDouble: null,
+        activeQuestion: null,
+        buzzQueue: [],
+        activeMedia: null,
+        mediaPlayback: null,
+        clueRevealed: false,
+        mediaRevealed: false,
+      })
+      net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+    }
     closeBoardPicker()
     setEditing(false)
     startPreTransfer(b)
@@ -461,8 +554,22 @@ export default function HostPage() {
     const connectedPlayers = useGameStore.getState().state.players.filter(p => p.isConnected)
     const randomControl = connectedPlayers.length > 0 ? pickRandom(connectedPlayers).id : null
     patchState({
-      board: b, answeredCells: [], phase: 'board', boardControlId: randomControl,
-      activeGameId: null, gameBoardIds: [], currentBoardIndex: 0, boardTransition: null,
+      board: b,
+      answeredCells: [],
+      phase: 'board',
+      boardControlId: randomControl,
+      activeGameId: null,
+      gameBoardIds: [],
+      currentBoardIndex: 0,
+      boardTransition: null,
+      finalJeopardy: null,
+      dailyDouble: null,
+      activeQuestion: null,
+      buzzQueue: [],
+      activeMedia: null,
+      mediaPlayback: null,
+      clueRevealed: false,
+      mediaRevealed: false,
     })
     net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
     closeBoardPicker()
@@ -714,8 +821,27 @@ export default function HostPage() {
     setActiveBoard(b)
     setBoardTransitionExiting(false)
     setBoardTransition(b.name)
-    patchState({ board: b, answeredCells: [], phase: 'board' })
-    net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+    if (isFinalBoard(b)) {
+      patchState({ board: b, answeredCells: [], dailyDouble: null })
+      void beginFinalJeopardyRound(b).then(() => {
+        net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+      })
+    } else {
+      patchState({
+        board: b,
+        answeredCells: [],
+        phase: 'board',
+        finalJeopardy: null,
+        dailyDouble: null,
+        activeQuestion: null,
+        buzzQueue: [],
+        activeMedia: null,
+        mediaPlayback: null,
+        clueRevealed: false,
+        mediaRevealed: false,
+      })
+      net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+    }
     if (!manifestCoversBoard(b)) void startPreTransfer(b)
 
     setTimeout(() => {
@@ -743,8 +869,27 @@ export default function HostPage() {
     setBoardTransitionExiting(false)
     patchState({ currentBoardIndex: nextIndex })
     setBoardTransition(b.name)
-    patchState({ board: b, answeredCells: [], phase: 'board', activeQuestion: null, buzzQueue: [], activeMedia: null, mediaPlayback: null, dailyDouble: null })
-    net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+    if (isFinalBoard(b)) {
+      patchState({ board: b, answeredCells: [], dailyDouble: null })
+      void beginFinalJeopardyRound(b).then(() => {
+        net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+      })
+    } else {
+      patchState({
+        board: b,
+        answeredCells: [],
+        phase: 'board',
+        activeQuestion: null,
+        buzzQueue: [],
+        activeMedia: null,
+        mediaPlayback: null,
+        dailyDouble: null,
+        finalJeopardy: null,
+        clueRevealed: false,
+        mediaRevealed: false,
+      })
+      net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+    }
     if (!manifestCoversBoard(b)) void startPreTransfer(b)
 
     setTimeout(() => {
@@ -760,7 +905,20 @@ export default function HostPage() {
     const { currentBoardIndex, activeGameId, gameBoardIds } = useGameStore.getState().state
     if (currentBoardIndex <= 0) {
       if (activeGameId) {
-        patchState({ phase: 'gameStart', board: null, answeredCells: [], boardTransition: null })
+        patchState({
+          phase: 'gameStart',
+          board: null,
+          answeredCells: [],
+          boardTransition: null,
+          finalJeopardy: null,
+          dailyDouble: null,
+          activeQuestion: null,
+          buzzQueue: [],
+          activeMedia: null,
+          mediaPlayback: null,
+          clueRevealed: false,
+          mediaRevealed: false,
+        })
         setActiveBoard(null)
         void startPreTransferMedia(collectMediaIdsFromBoardIds(gameBoardIds), true)
         net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
@@ -776,8 +934,27 @@ export default function HostPage() {
     setBoardTransitionExiting(false)
     patchState({ currentBoardIndex: prevIndex })
     setBoardTransition(b.name)
-    patchState({ board: b, answeredCells: [], phase: 'board', activeQuestion: null, buzzQueue: [], activeMedia: null, mediaPlayback: null, dailyDouble: null })
-    net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+    if (isFinalBoard(b)) {
+      patchState({ board: b, answeredCells: [], dailyDouble: null })
+      void beginFinalJeopardyRound(b).then(() => {
+        net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+      })
+    } else {
+      patchState({
+        board: b,
+        answeredCells: [],
+        phase: 'board',
+        activeQuestion: null,
+        buzzQueue: [],
+        activeMedia: null,
+        mediaPlayback: null,
+        dailyDouble: null,
+        finalJeopardy: null,
+        clueRevealed: false,
+        mediaRevealed: false,
+      })
+      net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+    }
     if (!manifestCoversBoard(b)) void startPreTransfer(b)
 
     setTimeout(() => {
@@ -793,7 +970,9 @@ export default function HostPage() {
     patchState({
       phase: 'lobby', board: null, answeredCells: [], activeGameId: null,
       gameBoardIds: [], currentBoardIndex: 0, boardTransition: null,
-      activeQuestion: null, buzzQueue: [], activeMedia: null, mediaPlayback: null, dailyDouble: null,
+      activeQuestion: null, buzzQueue: [], activeMedia: null, mediaPlayback: null,
+      dailyDouble: null, finalJeopardy: null,
+      clueRevealed: false, mediaRevealed: false,
     })
     setActiveBoard(null)
     clearMediaSync()
@@ -835,6 +1014,14 @@ export default function HostPage() {
 
   function handleNewBoard(folderId: string | null = null) {
     const b = { ...createDefaultBoard(), folderId }
+    boardStore.saveBoard(b)
+    setRenameFolderId(null)
+    setRenameBoardId(b.id)
+    if (pickerNav !== 'all') setPickerNav('all')
+  }
+
+  function handleNewFinal(folderId: string | null = null) {
+    const b = { ...createDefaultFinalJeopardy(), folderId }
     boardStore.saveBoard(b)
     setRenameFolderId(null)
     setRenameBoardId(b.id)
@@ -932,7 +1119,30 @@ export default function HostPage() {
   }
 
   function handleResetBoard() {
-    if (!window.confirm('Reset the board? This will mark all questions as unanswered and set all scores to 0.')) return
+    setShowResetConfirm(true)
+  }
+
+  function confirmResetBoard() {
+    setShowResetConfirm(false)
+    const currentBoard = activeBoard ?? useGameStore.getState().state.board
+    if (currentBoard && isFinalBoard(currentBoard)) {
+      patchState({
+        answeredCells: [],
+        players: useGameStore.getState().state.players.map((p) => ({ ...p, score: 0 })),
+        boardControlId: null,
+        dailyDouble: null,
+      })
+      void beginFinalJeopardyRound(currentBoard).then(() => {
+        net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+      })
+      logEvent({
+        role: 'host',
+        roomCode: roomCode ?? '',
+        actor: 'host',
+        event: 'Final Jeopardy reset: round restarted and scores zeroed',
+      })
+      return
+    }
     resetBoard()
     net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
     logEvent({
@@ -1410,8 +1620,12 @@ export default function HostPage() {
                           className="btn-ghost text-sm btn-icon-only"
                           style={{ color: 'var(--red)', borderColor: 'var(--red)' }}
                           onClick={handleResetBoard}
-                          title="Mark all questions as unanswered and reset all scores to 0"
-                          aria-label="Reset board"
+                          title={
+                            isFinalBoard(board)
+                              ? 'Restart Final Jeopardy and reset all scores to 0'
+                              : 'Mark all questions as unanswered and reset all scores to 0'
+                          }
+                          aria-label={isFinalBoard(board) ? 'Reset Final Jeopardy' : 'Reset board'}
                         >
                           <RotateCcw size={18} aria-hidden />
                         </button>
@@ -1422,8 +1636,27 @@ export default function HostPage() {
 
                 <div className="board-and-players flex-1 flex flex-col min-h-0 overflow-hidden gap-4 px-4 pb-4 pt-2">
                   {/* Board — grows to fill space above scoreboard */}
-                  <div className="board-scroll-wrap">
-                    {editing && board ? (
+                  <div
+                    className={`board-scroll-wrap${
+                      board && (editing || state.phase === 'finalJeopardy' || isFinalBoard(board))
+                        ? ' board-scroll-wrap--no-edge-fade'
+                        : ''
+                    }`}
+                  >
+                    {editing && board && isFinalBoard(board) ? (
+                      <FinalJeopardyEditor
+                        board={board}
+                        onChange={handleBoardChange}
+                        onDelete={() => handleDeleteBoard(board.id)}
+                        onClose={() => {
+                          setEditing(false)
+                          void beginFinalJeopardyRound(board).then(() => {
+                            net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
+                          })
+                          void startPreTransferMedia(collectBoardMediaIds(board), false)
+                        }}
+                      />
+                    ) : editing && board ? (
                       <BoardEditor
                         board={board}
                         globalSettings={settings}
@@ -1436,6 +1669,16 @@ export default function HostPage() {
                           if (board) void startPreTransferMedia(collectBoardMediaIds(board), false)
                         }}
                       />
+                    ) : board && (state.phase === 'finalJeopardy' || isFinalBoard(board)) ? (
+                      state.phase === 'finalJeopardy' && state.finalJeopardy ? (
+                        <FinalJeopardyOverlay state={state} settings={settings} />
+                      ) : (
+                        <div className="h-full flex flex-col items-center justify-center gap-4">
+                          <div className="font-condensed text-lg" style={{ color: '#4a5580' }}>
+                            Loading Final Jeopardy…
+                          </div>
+                        </div>
+                      )
                     ) : board ? (
                       <GameBoard
                         board={board}
@@ -1629,6 +1872,7 @@ export default function HostPage() {
                     onDuplicateFolder={(f) => { void handleDuplicateFolder(f) }}
                     onRequestDeleteFolder={handleTrashFolder}
                     onCreateBoard={handleNewBoard}
+                    onCreateFinal={handleNewFinal}
                     onRequestAddToGame={handleRequestAddToGame}
                     onRestoreBoard={handleRestoreBoard}
                     onRestoreFolder={handleRestoreFolder}
@@ -1749,7 +1993,11 @@ export default function HostPage() {
                           >
                             {idx + 1}
                           </span>
-                          <LayoutGrid size={14} className="board-picker-object-icon board-picker-object-icon--board" />
+                          {isFinalBoard(b) ? (
+                            <Trophy size={14} className="board-picker-object-icon board-picker-object-icon--final" />
+                          ) : (
+                            <LayoutGrid size={14} className="board-picker-object-icon board-picker-object-icon--board" />
+                          )}
                           <span className="font-condensed font-bold truncate">{b.name}</span>
                         </button>
                         <div className="board-picker-board-row__actions">
@@ -1782,7 +2030,7 @@ export default function HostPage() {
                         <div className="board-picker-section-label text-muted">Add to game</div>
                         {unassigned.map((b) => (
                           <div key={b.id} className="board-picker-unassigned">
-                            <span className="flex-1 font-condensed text-sm text-subtle">{b.name}</span>
+                            <span className="flex-1 font-condensed text-sm text-subtle truncate">{b.name}</span>
                             <button
                               type="button"
                               className="board-picker-add-btn"
@@ -1935,6 +2183,21 @@ export default function HostPage() {
           danger
           onConfirm={confirmExitRoom}
           onCancel={() => setShowExitConfirm(false)}
+        />
+      )}
+
+      {showResetConfirm && (
+        <ConfirmModal
+          title={isFinalBoard(board) ? 'Reset Final Jeopardy?' : 'Reset board?'}
+          message={
+            isFinalBoard(board)
+              ? 'This will restart the Final Jeopardy round and set all scores to 0.'
+              : 'This will mark all questions as unanswered and set all scores to 0.'
+          }
+          confirmLabel="Reset"
+          danger
+          onConfirm={confirmResetBoard}
+          onCancel={() => setShowResetConfirm(false)}
         />
       )}
     </div>

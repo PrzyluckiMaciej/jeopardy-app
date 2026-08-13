@@ -1964,6 +1964,264 @@ body.board-picker-reordering * {
 .board-picker-object-icon--board {
   color: var(--success);
 }
+.board-picker-object-icon--final {
+  color: #7dd3fc; /* light blue — distinct from gold folders */
+}
+.board-scroll-wrap > .final-jeopardy-overlay,
+.board-scroll-wrap > .final-jeopardy-editor,
+.board-scroll-wrap > .final-jeopardy-player {
+  flex: 1 1 0;
+  align-self: stretch;
+  min-height: 0;
+  width: auto;
+  min-width: 0;
+  margin-inline: 0.75rem;
+  box-sizing: border-box;
+}
+.board-scroll-wrap > .final-jeopardy-editor {
+  margin-block: 0.75rem;
+  flex: 1 1 auto;
+  max-height: calc(100% - 1.5rem);
+}
+@media (max-width: 767px) {
+  .board-scroll-wrap > .final-jeopardy-overlay,
+  .board-scroll-wrap > .final-jeopardy-editor,
+  .board-scroll-wrap > .final-jeopardy-player {
+    margin-inline: 0.5rem;
+  }
+  .board-scroll-wrap > .final-jeopardy-editor {
+    margin-block: 0.5rem;
+    max-height: calc(100% - 1rem);
+  }
+}
+.board-scroll-wrap--no-edge-fade {
+  mask-image: none !important;
+  -webkit-mask-image: none !important;
+}
+
+.final-jeopardy-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 20rem);
+  gap: 0.75rem;
+  min-height: 0;
+  flex: 1;
+}
+.final-jeopardy-main,
+.final-jeopardy-side {
+  min-height: 0;
+}
+.final-jeopardy-side {
+  overflow: auto;
+}
+.final-jeopardy-stage {
+  container-type: size;
+}
+.final-jeopardy-overlay-text {
+  flex: 1 1 0;
+  min-height: 0;
+  height: 100%;
+}
+.final-jeopardy-host-timer-slot {
+  min-width: 4.5rem;
+  min-height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.final-jeopardy-host-timer {
+  animation: finalJeopardyPopIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.final-jeopardy-side--player {
+  overflow: hidden;
+}
+.final-jeopardy-player-timer {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  padding: 0.7rem 0.75rem;
+  border-radius: var(--radius-lg);
+  background: rgba(250, 204, 21, 0.12);
+  border: 2px solid rgba(250, 204, 21, 0.55);
+  color: var(--gold-bright);
+  text-align: center;
+  animation: finalJeopardyPopIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.final-jeopardy-player-timer__value {
+  font-family: 'Anton', sans-serif;
+  font-size: clamp(2.75rem, 8vw, 4.5rem);
+  line-height: 0.95;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.final-jeopardy-player-timer__label {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: clamp(0.75rem, 2vw, 0.95rem);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  opacity: 0.85;
+}
+.final-jeopardy-player-timer--urgent {
+  background: rgba(239, 68, 68, 0.16);
+  border-color: rgba(239, 68, 68, 0.7);
+  color: var(--red);
+}
+.final-jeopardy-reveal-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.75rem 0.8rem;
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(59, 130, 246, 0.28);
+  color: var(--white);
+}
+.final-jeopardy-reveal-card__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.final-jeopardy-reveal-card__name {
+  min-width: 0;
+  flex: 1 1 auto;
+  font-size: 1.15rem;
+  line-height: 1.2;
+  color: var(--gold-bright);
+}
+.final-jeopardy-reveal-card__wager {
+  flex-shrink: 0;
+  font-size: 1.25rem;
+  line-height: 1;
+  color: var(--gold-bright);
+  font-variant-numeric: tabular-nums;
+}
+.final-jeopardy-reveal-card__answer {
+  padding-top: 0.55rem;
+  border-top: 1px solid rgba(59, 130, 246, 0.22);
+}
+.final-jeopardy-reveal-card__answer-text {
+  font-size: 1.2rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  color: var(--white);
+}
+.final-jeopardy-reveal-card__result {
+  margin-top: 0.4rem;
+  font-size: 1rem;
+}
+.final-jeopardy-player-answer {
+  padding-top: 0.25rem;
+}
+.final-jeopardy-player-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.7rem 0.75rem;
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(59, 130, 246, 0.22);
+}
+.final-jeopardy-player-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: var(--white);
+}
+.final-jeopardy-player-card__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.8rem;
+}
+.final-jeopardy-player-card__reveal {
+  margin-top: 0.15rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid rgba(59, 130, 246, 0.2);
+  color: var(--white);
+}
+@keyframes finalJeopardyEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes finalJeopardyPopIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes finalJeopardyCategoryIn {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes finalJeopardySideIn {
+  0% {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes finalJeopardyRevealIn {
+  0% {
+    opacity: 0;
+    max-height: 0;
+    transform: translateY(-6px);
+  }
+  100% {
+    opacity: 1;
+    max-height: 20rem;
+    transform: translateY(0);
+  }
+}
+.final-jeopardy-enter {
+  animation: finalJeopardyEnter 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.final-jeopardy-category-enter {
+  animation: finalJeopardyCategoryIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.final-jeopardy-side-enter {
+  animation: finalJeopardySideIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.final-jeopardy-reveal-enter {
+  animation: finalJeopardyRevealIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  overflow: hidden;
+}
+@media (max-width: 900px) {
+  .final-jeopardy-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  .final-jeopardy-side {
+    max-height: 45%;
+  }
+  .final-jeopardy-side-enter {
+    animation-name: finalJeopardyEnter;
+  }
+}
 
 /* Transparent, content-sized drag preview (boards) */
 .board-picker-drag-ghost {

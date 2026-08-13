@@ -36,9 +36,13 @@ export interface Category {
   settings?: CategorySettings
 }
 
+export type BoardKind = 'board' | 'final'
+
 export interface Board {
   id: string
   name: string
+  /** Regular board vs Final Jeopardy; missing treated as 'board'. */
+  kind?: BoardKind
   categories: Category[]
   pointValues: number[] // e.g. [200, 400, 600, 800, 1000]
   /** Question ids marked as Daily Doubles (no limit). */
@@ -53,6 +57,43 @@ export interface Board {
   createdAt?: number
   /** Epoch ms; absent on boards created before timestamps were tracked */
   updatedAt?: number
+}
+
+/** Live Final Jeopardy round state (host-authoritative). */
+export interface FinalJeopardyState {
+  /** Epoch ms when this round object was created (resets local player form state). */
+  startedAt: number
+  categoryRevealed: boolean
+  clueRevealed: boolean
+  mediaRevealed: boolean
+  /** Host has revealed the correct answer text. */
+  answerRevealed: boolean
+  /** Epoch ms; null until first clue/media reveal starts the 30s timer. */
+  timerEndsAt: number | null
+  wagers: Record<string, number>
+  answers: Record<string, string>
+  submittedAnswerIds: string[]
+  revealedPlayerIds: string[]
+  /** playerId → whether the answer was judged correct */
+  judged: Record<string, boolean>
+}
+
+export const FINAL_JEOPARDY_TIMER_MS = 30_000
+
+export function emptyFinalJeopardyState(): FinalJeopardyState {
+  return {
+    startedAt: Date.now(),
+    categoryRevealed: false,
+    clueRevealed: false,
+    mediaRevealed: false,
+    answerRevealed: false,
+    timerEndsAt: null,
+    wagers: {},
+    answers: {},
+    submittedAnswerIds: [],
+    revealedPlayerIds: [],
+    judged: {},
+  }
 }
 
 export interface BoardFolder {
@@ -137,6 +178,7 @@ export type GamePhase =
   | 'revealed'         // answer revealed
   | 'dailyDouble'      // daily double title splash
   | 'dailyDoubleBet'   // player is inputting their wager
+  | 'finalJeopardy'    // Final Jeopardy round (category / wager / answer / reveal)
   | 'podium'           // end-of-game podium showing top 3 players
 
 export interface GameState {
@@ -150,6 +192,7 @@ export interface GameState {
   mediaPlayback: MediaPlaybackState | null
   boardControlId: string | null // player id of the player with board control
   dailyDouble: { playerId: string; wager: number | null } | null
+  finalJeopardy: FinalJeopardyState | null
   activeGameId: string | null
   gameBoardIds: string[]
   currentBoardIndex: number
@@ -185,6 +228,17 @@ export type NetMessage =
   | { type: 'DAILY_DOUBLE_BET'; wager: number; playerId: string }
   | { type: 'DAILY_DOUBLE_ACCEPT_BET'; wager: number }
   | { type: 'DAILY_DOUBLE_REVEAL_CLUE'; mediaRevealed?: boolean }
+  | { type: 'FINAL_JEOPARDY_REVEAL_CATEGORY' }
+  | { type: 'FINAL_JEOPARDY_WAGER'; playerId: string; wager: number }
+  | { type: 'FINAL_JEOPARDY_WAGER_LOCKED'; playerId: string }
+  | { type: 'FINAL_JEOPARDY_REVEAL_CLUE'; timerEndsAt: number }
+  | { type: 'FINAL_JEOPARDY_REVEAL_MEDIA'; timerEndsAt: number }
+  | { type: 'FINAL_JEOPARDY_SUBMIT_ANSWER'; playerId: string; text: string }
+  | { type: 'FINAL_JEOPARDY_ANSWER_LOCKED'; playerId: string }
+  | { type: 'FINAL_JEOPARDY_TIMER_STOP'; timerEndsAt: number }
+  | { type: 'FINAL_JEOPARDY_REVEAL_PLAYER'; playerId: string; wager: number; answer: string }
+  | { type: 'FINAL_JEOPARDY_REVEAL_ANSWER' }
+  | { type: 'FINAL_JEOPARDY_JUDGE'; playerId: string; correct: boolean; pointDelta: number }
   | { type: 'EMOJI_REACT'; playerId: string; emoji: string }
 
 export interface GameSettings {

@@ -52,12 +52,17 @@ export function cellId(categoryId: string, questionId: string): string {
   return `${categoryId}-${questionId}`
 }
 
+export function isFinalBoard(board: Pick<Board, 'kind'> | null | undefined): boolean {
+  return board?.kind === 'final'
+}
+
 export function createDefaultBoard(): Board {
   const id = generateId()
   const pointValues = [200, 400, 600, 800, 1000]
   return {
     id,
     name: 'New Board',
+    kind: 'board',
     pointValues,
     createdAt: Date.now(),
     updatedAt: Date.now(),
@@ -72,5 +77,33 @@ export function createDefaultBoard(): Board {
         points,
       })),
     })),
+  }
+}
+
+/** Final Jeopardy: one category + one question (no Daily Double / point grid). */
+export function createDefaultFinalJeopardy(): Board {
+  const now = Date.now()
+  return {
+    id: generateId(),
+    name: 'Final Jeopardy',
+    kind: 'final',
+    pointValues: [0],
+    createdAt: now,
+    updatedAt: now,
+    categories: [
+      {
+        id: generateId(),
+        name: 'Category',
+        syncSettingsWithGlobal: true,
+        questions: [
+          {
+            id: generateId(),
+            question: '',
+            answer: '',
+            points: 0,
+          },
+        ],
+      },
+    ],
   }
 }

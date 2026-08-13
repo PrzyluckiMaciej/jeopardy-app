@@ -1,9 +1,9 @@
 import { useCallback, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react'
-import { ArrowLeft, Check, ChevronDown, ChevronUp, Folder, Layers, LayoutGrid } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, ChevronUp, Folder, Layers, LayoutGrid, Trophy } from 'lucide-react'
 import type { Board, BoardFolder, Game, GameFolder } from '../types'
 import { buildPathString, isFolderInside, resolvePath } from '../lib/folderPath'
 import { collectFolderSubtree } from '../lib/folderSubtree'
-import { formatBoardTimestamp } from '../lib/utils'
+import { formatBoardTimestamp, isFinalBoard } from '../lib/utils'
 import {
   isBoardTrashed,
   isFolderTrashed,
@@ -43,6 +43,7 @@ interface Props {
   onDuplicateFolder: (folder: BoardFolder) => void
   onRequestDeleteFolder: (folder: BoardFolder) => void
   onCreateBoard: (folderId: string | null) => void
+  onCreateFinal?: (folderId: string | null) => void
   onRequestAddToGame: (boardIds: string[], label: string) => void
   onRestoreBoard?: (board: Board) => void
   onRestoreFolder?: (folder: BoardFolder) => void
@@ -114,6 +115,7 @@ export default function BoardPickerExplorer({
   onDuplicateFolder,
   onRequestDeleteFolder,
   onCreateBoard,
+  onCreateFinal,
   onRequestAddToGame,
   onRestoreBoard,
   onRestoreFolder,
@@ -397,6 +399,15 @@ export default function BoardPickerExplorer({
           label: 'New Board',
           onSelect: () => onCreateBoard(currentFolderId),
         },
+        ...(onCreateFinal
+          ? [
+              {
+                id: 'new-final',
+                label: 'New Final Jeopardy',
+                onSelect: () => onCreateFinal(currentFolderId),
+              },
+            ]
+          : []),
         {
           id: 'new-folder',
           label: 'New Folder',
@@ -446,6 +457,18 @@ export default function BoardPickerExplorer({
             onCreateBoard(folder.id)
           },
         },
+        ...(onCreateFinal
+          ? [
+              {
+                id: 'new-final',
+                label: 'New Final Jeopardy',
+                onSelect: () => {
+                  navigateTo(folder.id)
+                  onCreateFinal(folder.id)
+                },
+              },
+            ]
+          : []),
         {
           id: 'rename',
           label: 'Rename',
@@ -744,7 +767,11 @@ export default function BoardPickerExplorer({
         <div className="board-picker-explorer-row__name">
           {isEditing ? (
             <div className="flex items-center gap-1 flex-1 min-w-0">
-              <LayoutGrid size={14} className="board-picker-object-icon board-picker-object-icon--board" />
+              {isFinalBoard(board) ? (
+                <Trophy size={14} className="board-picker-object-icon board-picker-object-icon--final" />
+              ) : (
+                <LayoutGrid size={14} className="board-picker-object-icon board-picker-object-icon--board" />
+              )}
               <input
                 className="board-picker-input"
                 value={boardRenameValue}
@@ -779,7 +806,11 @@ export default function BoardPickerExplorer({
                 if (!isTrash) onSelectBoard(board)
               }}
             >
-              <LayoutGrid size={14} className="board-picker-object-icon board-picker-object-icon--board" />
+              {isFinalBoard(board) ? (
+                <Trophy size={14} className="board-picker-object-icon board-picker-object-icon--final" />
+              ) : (
+                <LayoutGrid size={14} className="board-picker-object-icon board-picker-object-icon--board" />
+              )}
               <span className="font-condensed font-bold truncate">{board.name}</span>
             </button>
           )}
