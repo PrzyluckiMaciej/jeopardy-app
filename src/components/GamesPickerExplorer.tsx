@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react'
 import { ArrowLeft, Check, ChevronDown, ChevronUp, Folder, Layers } from 'lucide-react'
 import type { Game, GameFolder } from '../types'
-import { buildPathString, isFolderInside, resolvePath } from '../lib/folderPath'
+import { buildPathString, isFolderInside, resolveFolderOrItemPath } from '../lib/folderPath'
 import { formatBoardTimestamp } from '../lib/utils'
 import {
   isGameFolderTrashed,
@@ -279,13 +279,18 @@ export default function GamesPickerExplorer({
   }
 
   function commitPath() {
-    const resolved = resolvePath(scopedFolders, pathValue.trim())
+    const resolved = resolveFolderOrItemPath(scopedFolders, scopedGames, pathValue.trim())
     if (resolved === undefined) {
       setPathDraft(currentPath)
       return
     }
     setPathEditing(false)
-    setUserFolderId(resolved)
+    if (resolved.kind === 'folder') {
+      setUserFolderId(resolved.id)
+      return
+    }
+    const game = scopedGames.find((g) => g.id === resolved.id)
+    if (game) onSelectGame(game)
   }
 
   function closeMenu() {
