@@ -1,3 +1,16 @@
+import type { Board, Player } from '../types'
+
+/** Daily Double question ids for a board; also accepts legacy single-id boards. */
+export function getDailyDoubleQuestionIds(
+  board: Board & { dailyDoubleQuestionId?: string },
+): string[] {
+  if (Array.isArray(board.dailyDoubleQuestionIds)) return board.dailyDoubleQuestionIds
+  if (typeof board.dailyDoubleQuestionId === 'string' && board.dailyDoubleQuestionId) {
+    return [board.dailyDoubleQuestionId]
+  }
+  return []
+}
+
 export function generateId(): string {
   return crypto.randomUUID()
 }
@@ -6,8 +19,6 @@ export function generateRoomCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
   return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
 }
-
-import type { Player } from '../types'
 
 export function orderPlayersForDisplay(
   players: Player[],
@@ -41,7 +52,7 @@ export function cellId(categoryId: string, questionId: string): string {
   return `${categoryId}-${questionId}`
 }
 
-export function createDefaultBoard(): import('../types').Board {
+export function createDefaultBoard(): Board {
   const id = generateId()
   const pointValues = [200, 400, 600, 800, 1000]
   return {

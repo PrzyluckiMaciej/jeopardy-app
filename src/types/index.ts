@@ -41,7 +41,8 @@ export interface Board {
   name: string
   categories: Category[]
   pointValues: number[] // e.g. [200, 400, 600, 800, 1000]
-  dailyDoubleQuestionId?: string
+  /** Question ids marked as Daily Doubles (no limit). */
+  dailyDoubleQuestionIds?: string[]
   /** Folder containing this board; null/absent = All Boards root */
   folderId?: string | null
   /** Set when the board is in the trash */

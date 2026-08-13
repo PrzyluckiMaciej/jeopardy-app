@@ -1,5 +1,5 @@
-import { formatScore, formatBoardTimestamp, cellId, generateRoomCode, generateId, createDefaultBoard, orderPlayersForDisplay } from '../utils'
-import type { Player } from '../../types'
+import { formatScore, formatBoardTimestamp, cellId, generateRoomCode, generateId, createDefaultBoard, orderPlayersForDisplay, getDailyDoubleQuestionIds } from '../utils'
+import type { Board, Player } from '../../types'
 
 function player(id: string, name: string): Player {
   return { id, name, score: 0, isConnected: true }
@@ -26,6 +26,34 @@ describe('orderPlayersForDisplay', () => {
 
   it('returns the array unchanged when myPlayerId is not found', () => {
     expect(orderPlayersForDisplay(players, 'missing')).toEqual(players)
+  })
+})
+
+describe('getDailyDoubleQuestionIds', () => {
+  const base: Board = {
+    id: 'b1',
+    name: 'Board',
+    categories: [],
+    pointValues: [200],
+  }
+
+  it('returns the ids array when present', () => {
+    expect(getDailyDoubleQuestionIds({ ...base, dailyDoubleQuestionIds: ['a', 'b'] })).toEqual([
+      'a',
+      'b',
+    ])
+  })
+
+  it('returns an empty array when ids are explicitly empty', () => {
+    expect(getDailyDoubleQuestionIds({ ...base, dailyDoubleQuestionIds: [] })).toEqual([])
+  })
+
+  it('falls back to legacy single id', () => {
+    expect(
+      getDailyDoubleQuestionIds({ ...base, dailyDoubleQuestionId: 'legacy' } as Board & {
+        dailyDoubleQuestionId?: string
+      }),
+    ).toEqual(['legacy'])
   })
 })
 

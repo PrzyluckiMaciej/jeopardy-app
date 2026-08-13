@@ -6,7 +6,7 @@ interface GameBoardProps {
   board: Board
   answeredCells: string[]
   onOpenCell?: (categoryId: string, q: Question) => void
-  dailyDoubleQuestionId?: string
+  dailyDoubleQuestionIds?: string[]
   /** Stretch grid to fill parent height (host view) */
   fill?: boolean
 }
@@ -15,7 +15,7 @@ export default function GameBoard({
   board,
   answeredCells,
   onOpenCell,
-  dailyDoubleQuestionId,
+  dailyDoubleQuestionIds,
   fill = false,
 }: GameBoardProps) {
   const rowCount = board.pointValues.length
@@ -88,7 +88,7 @@ export default function GameBoard({
                 >
                   ${pts}
                 </span>
-                {dailyDoubleQuestionId === q.id && !isAnswered && (
+                {dailyDoubleQuestionIds?.includes(q.id) && !isAnswered && (
                   <div className="dd-badge">DD</div>
                 )}
               </button>

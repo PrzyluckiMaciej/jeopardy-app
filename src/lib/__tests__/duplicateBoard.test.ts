@@ -24,7 +24,7 @@ function makeBoard(overrides: Partial<Board> = {}): Board {
         ],
       },
     ],
-    dailyDoubleQuestionId: 'q-2',
+    dailyDoubleQuestionIds: ['q-2'],
     createdAt: 1000,
     updatedAt: 1000,
     ...overrides,
@@ -49,7 +49,20 @@ describe('duplicateBoard', () => {
     expect(copy.categories[0].id).not.toBe('cat-1')
     expect(copy.categories[0].questions[0].id).not.toBe('q-1')
     expect(copy.categories[0].questions[1].id).not.toBe('q-2')
-    expect(copy.dailyDoubleQuestionId).toBe(copy.categories[0].questions[1].id)
+    expect(copy.dailyDoubleQuestionIds).toEqual([copy.categories[0].questions[1].id])
+  })
+
+  it('maps multiple daily doubles to new question ids', async () => {
+    vi.mocked(getMedia).mockResolvedValue(undefined)
+
+    const copy = await duplicateBoard(
+      makeBoard({ dailyDoubleQuestionIds: ['q-1', 'q-2'] }),
+    )
+
+    expect(copy.dailyDoubleQuestionIds).toEqual([
+      copy.categories[0].questions[0].id,
+      copy.categories[0].questions[1].id,
+    ])
   })
 
   it('copies media attachments with new ids', async () => {
