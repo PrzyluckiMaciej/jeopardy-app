@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type AnimationEvent as ReactAnimationEvent, type MouseEvent as ReactMouseEvent } from 'react'
-import { Settings, Trash2, Copy, Layers, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, RotateCcw, Shuffle, X, Users, CircleHelp, Menu, ArrowLeft, Pencil } from 'lucide-react'
+import { useEffect, useRef, useState, type AnimationEvent as ReactAnimationEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { Settings, Trash2, Copy, Layers, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, RotateCcw, Shuffle, X, Users, CircleHelp, Menu, ArrowLeft, Pencil, GripVertical } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import {
   useGameStore,
@@ -104,6 +104,17 @@ export default function HostPage() {
     boardIds: string[]
     label: string
   } | null>(null)
+  /** Board id being dragged for reorder within the open game. */
+  const [gameBoardDragId, setGameBoardDragId] = useState<string | null>(null)
+  /** Insertion index in the visible game board list (0..length). */
+  const [gameBoardDropIndex, setGameBoardDropIndex] = useState<number | null>(null)
+  const gameBoardDragIdRef = useRef<string | null>(null)
+  const gameBoardDropIndexRef = useRef<number | null>(null)
+  const gameBoardDragGhostRef = useRef<HTMLElement | null>(null)
+  const gameBoardListRef = useRef<HTMLDivElement | null>(null)
+  const gameBoardDragOffsetRef = useRef({ x: 0, y: 0 })
+  const gameBoardDragOriginRef = useRef({ x: 0, y: 0 })
+  const gameBoardDragMovedRef = useRef(false)
   const [activeEmojis, setActiveEmojis] = useState<Record<string, { emoji: string; seq: number }>>({})
   const [mobilePlayersOpen, setMobilePlayersOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
@@ -1040,6 +1051,140 @@ export default function HostPage() {
         .filter((b): b is Board => !!b && !isBoardTrashed(b))
     : libraryBoards
 
+  function clearGameBoardDragGhost() {
+    gameBoardDragGhostRef.current?.remove()
+    gameBoardDragGhostRef.current = null
+  }
+
+  function clearGameBoardDrag() {
+    clearGameBoardDragGhost()
+    gameBoardDragIdRef.current = null
+    gameBoardDropIndexRef.current = null
+    gameBoardDragMovedRef.current = false
+    document.body.classList.remove('board-picker-reordering')
+    setGameBoardDragId(null)
+    setGameBoardDropIndex(null)
+  }
+
+  function updateGameBoardDropFromPoint(clientY: number) {
+    const root = gameBoardListRef.current
+    if (!root) return
+    const rows = [...root.querySelectorAll<HTMLElement>('[data-game-board-row]')]
+    if (rows.length === 0) return
+
+    let insertIndex = rows.length
+    for (let i = 0; i < rows.length; i++) {
+      const rect = rows[i].getBoundingClientRect()
+      if (clientY < rect.top + rect.height / 2) {
+        insertIndex = i
+        break
+      }
+    }
+
+    if (gameBoardDropIndexRef.current !== insertIndex) {
+      gameBoardDropIndexRef.current = insertIndex
+      setGameBoardDropIndex(insertIndex)
+    }
+  }
+
+  function commitGameBoardReorder() {
+    const dragId = gameBoardDragIdRef.current
+    const dropIndex = gameBoardDropIndexRef.current
+    if (!pickerGameId || dragId == null || dropIndex == null) {
+      clearGameBoardDrag()
+      return
+    }
+
+    const fromDisplay = pickerBoards.findIndex((b) => b.id === dragId)
+    if (fromDisplay < 0) {
+      clearGameBoardDrag()
+      return
+    }
+
+    let toDisplay = dropIndex
+    if (fromDisplay < toDisplay) toDisplay -= 1
+    if (fromDisplay === toDisplay) {
+      clearGameBoardDrag()
+      return
+    }
+
+    const fromBoardId = pickerBoards[fromDisplay].id
+    const toBoardId = pickerBoards[toDisplay].id
+    const fromIndex = pickerBoardIds.indexOf(fromBoardId)
+    const toIndex = pickerBoardIds.indexOf(toBoardId)
+    if (fromIndex >= 0 && toIndex >= 0 && fromIndex !== toIndex) {
+      boardStore.reorderBoardInGame(pickerGameId, fromIndex, toIndex)
+    }
+    clearGameBoardDrag()
+  }
+
+  function handleGameBoardPointerDown(e: ReactPointerEvent<HTMLElement>, boardId: string) {
+    if (!pickerGameId || e.button !== 0) return
+    e.preventDefault()
+    e.stopPropagation()
+
+    const handle = e.currentTarget
+    const row = handle.closest('.board-picker-board-row')
+    const contentEl = row?.querySelector('.board-picker-board-btn')
+    const source = contentEl instanceof HTMLElement ? contentEl : handle
+    const rect = source.getBoundingClientRect()
+
+    clearGameBoardDragGhost()
+    const ghost = document.createElement('div')
+    ghost.className = 'board-picker-drag-ghost board-picker-drag-ghost--pointer'
+    ghost.appendChild(source.cloneNode(true))
+    ghost.style.width = `${rect.width}px`
+    ghost.style.transform = `translate(${rect.left}px, ${rect.top}px)`
+    document.body.appendChild(ghost)
+    gameBoardDragGhostRef.current = ghost
+    gameBoardDragOffsetRef.current = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    }
+    gameBoardDragOriginRef.current = { x: e.clientX, y: e.clientY }
+    gameBoardDragMovedRef.current = false
+    gameBoardDragIdRef.current = boardId
+    gameBoardDropIndexRef.current = null
+    document.body.classList.add('board-picker-reordering')
+    setGameBoardDragId(boardId)
+    setGameBoardDropIndex(null)
+
+    handle.setPointerCapture(e.pointerId)
+    updateGameBoardDropFromPoint(e.clientY)
+  }
+
+  function handleGameBoardPointerMove(e: ReactPointerEvent<HTMLElement>) {
+    if (!gameBoardDragIdRef.current) return
+    const origin = gameBoardDragOriginRef.current
+    if (
+      !gameBoardDragMovedRef.current &&
+      Math.hypot(e.clientX - origin.x, e.clientY - origin.y) < 4
+    ) {
+      return
+    }
+    gameBoardDragMovedRef.current = true
+    const ghost = gameBoardDragGhostRef.current
+    if (ghost) {
+      const { x, y } = gameBoardDragOffsetRef.current
+      ghost.style.transform = `translate(${e.clientX - x}px, ${e.clientY - y}px)`
+    }
+    updateGameBoardDropFromPoint(e.clientY)
+  }
+
+  function handleGameBoardPointerUp(e: ReactPointerEvent<HTMLElement>) {
+    if (!gameBoardDragIdRef.current) return
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    } catch {
+      /* already released */
+    }
+    if (gameBoardDragMovedRef.current) {
+      commitGameBoardReorder()
+    } else {
+      clearGameBoardDrag()
+    }
+  }
+
   return (
     <div className="app-page h-screen flex flex-col overflow-hidden page-fade-in" style={{ background: 'var(--navy)' }}>
       {/* Top bar */}
@@ -1484,7 +1629,10 @@ export default function HostPage() {
                     initialFolderId={gamesExplorerFolderId}
                   />
                 ) : (
-                <div className="board-picker-boards__scroll">
+                <div
+                  ref={gameBoardListRef}
+                  className={`board-picker-boards__scroll${gameBoardDragId ? ' board-picker-boards__scroll--reordering' : ''}`}
+                >
                   <div className="board-picker-path-bar">
                     <button
                       type="button"
@@ -1499,58 +1647,68 @@ export default function HostPage() {
                       {pickerGameData?.name ?? 'Game'}
                     </div>
                   </div>
-                  {pickerBoards.map((b, idx) => (
-                    <div
-                      key={b.id}
-                      className="board-picker-board-row"
-                      onContextMenu={(e) => openBoardRowContextMenu(e, b)}
-                    >
-                      <div className="flex flex-col gap-0.5 flex-shrink-0">
-                          <button
-                            type="button"
-                            className="board-picker-reorder-btn"
-                            disabled={idx === 0}
-                            onClick={() => boardStore.reorderBoardInGame(pickerGameId!, idx, idx - 1)}
-                            title="Move up"
-                          >
-                            <ChevronUp size={12} />
-                          </button>
-                          <button
-                            type="button"
-                            className="board-picker-reorder-btn"
-                            disabled={idx === pickerBoards.length - 1}
-                            onClick={() => boardStore.reorderBoardInGame(pickerGameId!, idx, idx + 1)}
-                            title="Move down"
-                          >
-                            <ChevronDown size={12} />
-                          </button>
-                        </div>
-                      <button
-                        type="button"
-                        className="board-picker-board-btn"
-                        onClick={() => handleSelectBoard(b)}
+                  {pickerBoards.map((b, idx) => {
+                    const isDragging = gameBoardDragId === b.id
+                    const fromDisp = gameBoardDragId
+                      ? pickerBoards.findIndex((x) => x.id === gameBoardDragId)
+                      : -1
+                    const dropIsNoOp =
+                      fromDisp >= 0 &&
+                      gameBoardDropIndex != null &&
+                      (gameBoardDropIndex === fromDisp || gameBoardDropIndex === fromDisp + 1)
+                    const showDropBefore =
+                      !dropIsNoOp && gameBoardDropIndex === idx
+                    const showDropAfter =
+                      !dropIsNoOp &&
+                      idx === pickerBoards.length - 1 &&
+                      gameBoardDropIndex === pickerBoards.length
+                    return (
+                      <div
+                        key={b.id}
+                        data-game-board-row={b.id}
+                        className={`board-picker-board-row${isDragging ? ' board-picker-board-row--dragging' : ''}${
+                          showDropBefore ? ' board-picker-board-row--drop-before' : ''
+                        }${showDropAfter ? ' board-picker-board-row--drop-after' : ''}`}
+                        onContextMenu={(e) => openBoardRowContextMenu(e, b)}
                       >
                         <span
-                          className={`board-picker-board-order${idx === 0 ? ' board-picker-board-order--first' : ''}`}
-                          aria-label={`Board position ${idx + 1}`}
+                          className="board-picker-drag-handle"
+                          title="Drag to reorder"
+                          aria-label="Drag to reorder"
+                          onPointerDown={(e) => handleGameBoardPointerDown(e, b.id)}
+                          onPointerMove={handleGameBoardPointerMove}
+                          onPointerUp={handleGameBoardPointerUp}
+                          onPointerCancel={handleGameBoardPointerUp}
                         >
-                          {idx + 1}
+                          <GripVertical size={14} aria-hidden />
                         </span>
-                        <LayoutGrid size={14} className="flex-shrink-0 opacity-70" />
-                        <span className="font-condensed font-bold truncate">{b.name}</span>
-                      </button>
-                      <div className="board-picker-board-row__actions">
                         <button
                           type="button"
-                          className="board-picker-remove-btn"
-                          title="Remove from game"
-                          onClick={() => boardStore.removeBoardFromGame(pickerGameId!, b.id)}
+                          className="board-picker-board-btn"
+                          onClick={() => handleSelectBoard(b)}
                         >
-                          –
+                          <span
+                            className={`board-picker-board-order${idx === 0 ? ' board-picker-board-order--first' : ''}`}
+                            aria-label={`Board position ${idx + 1}`}
+                          >
+                            {idx + 1}
+                          </span>
+                          <LayoutGrid size={14} className="flex-shrink-0 opacity-70" />
+                          <span className="font-condensed font-bold truncate">{b.name}</span>
                         </button>
+                        <div className="board-picker-board-row__actions">
+                          <button
+                            type="button"
+                            className="board-picker-remove-btn"
+                            title="Remove from game"
+                            onClick={() => boardStore.removeBoardFromGame(pickerGameId!, b.id)}
+                          >
+                            –
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
 
                   {pickerBoards.length === 0 && (
                     <div className="board-picker-empty">
