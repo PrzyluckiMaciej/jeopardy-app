@@ -614,6 +614,26 @@ export default function PlayerPage() {
   })()
   const minDdWager = Math.min(Math.max(0, settings.dailyDoubleMinWager), maxDdWager)
 
+  function getDdWagerError(raw: string, requireValue = false): string {
+    const trimmed = raw.trim()
+    if (!trimmed) {
+      return requireValue ? `Minimum wager is $${minDdWager}` : ''
+    }
+    const wager = parseInt(trimmed, 10)
+    if (isNaN(wager) || wager < minDdWager) {
+      return `Minimum wager is $${minDdWager}`
+    }
+    if (wager > maxDdWager) {
+      return `Maximum wager is $${maxDdWager}`
+    }
+    return ''
+  }
+
+  function handleDdWagerChange(raw: string) {
+    setDdWagerInput(raw)
+    setDdWagerError(getDdWagerError(raw))
+  }
+
   const ddWagerForm = (
     <div className="dd-wager-form w-full flex flex-col gap-3">
       <div className="font-condensed font-bold text-sm text-center" style={{ color: 'var(--gold-bright)' }}>
@@ -628,7 +648,7 @@ export default function PlayerPage() {
         className="w-full text-center font-display text-xl"
         placeholder="Wager amount"
         value={ddWagerInput}
-        onChange={(e) => { setDdWagerInput(e.target.value); setDdWagerError('') }}
+        onChange={(e) => handleDdWagerChange(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && handleSubmitWager()}
         disabled={ddWagerSubmitted}
         autoFocus
@@ -647,15 +667,12 @@ export default function PlayerPage() {
   )
 
   function handleSubmitWager() {
+    const error = getDdWagerError(ddWagerInput, true)
+    if (error) {
+      setDdWagerError(error)
+      return
+    }
     const wager = parseInt(ddWagerInput, 10)
-    if (isNaN(wager) || wager < minDdWager) {
-      setDdWagerError(`Minimum wager is $${minDdWager}`)
-      return
-    }
-    if (wager > maxDdWager) {
-      setDdWagerError(`Maximum wager is $${maxDdWager}`)
-      return
-    }
     setDdWagerError('')
     setDdWagerSubmitted(true)
     if (hostPeerId.current) {
