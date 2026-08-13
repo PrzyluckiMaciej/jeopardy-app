@@ -1964,6 +1964,40 @@ body.board-picker-reordering * {
 .board-picker-object-icon--board {
   color: var(--success);
 }
+.board-picker-object-icon--final {
+  color: #7dd3fc; /* light blue — distinct from gold folders */
+}
+.board-scroll-wrap > .final-jeopardy-overlay,
+.board-scroll-wrap > .final-jeopardy-editor,
+.board-scroll-wrap > .final-jeopardy-player {
+  flex: 1 1 0;
+  align-self: stretch;
+  min-height: 0;
+  width: auto;
+  min-width: 0;
+  margin-inline: 0.75rem;
+  box-sizing: border-box;
+}
+.board-scroll-wrap > .final-jeopardy-editor {
+  margin-block: 0.75rem;
+  flex: 1 1 auto;
+  max-height: calc(100% - 1.5rem);
+}
+@media (max-width: 767px) {
+  .board-scroll-wrap > .final-jeopardy-overlay,
+  .board-scroll-wrap > .final-jeopardy-editor,
+  .board-scroll-wrap > .final-jeopardy-player {
+    margin-inline: 0.5rem;
+  }
+  .board-scroll-wrap > .final-jeopardy-editor {
+    margin-block: 0.5rem;
+    max-height: calc(100% - 1rem);
+  }
+}
+.board-scroll-wrap--no-edge-fade {
+  mask-image: none !important;
+  -webkit-mask-image: none !important;
+}
 
 /* Transparent, content-sized drag preview (boards) */
 .board-picker-drag-ghost {

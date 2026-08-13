@@ -6,11 +6,13 @@ import { useGameStore } from '../store/gameStore'
 import * as net from '../lib/network'
 import type { NetMessage, Player } from '../types'
 import { initialMediaPlaybackForType, questionMediaAutoplay } from '../types'
-import { generateId, formatScore } from '../lib/utils'
+import { generateId, formatScore, isFinalBoard } from '../lib/utils'
 import { getCategoryGameplaySettings } from '../lib/settings'
 import { logEvent } from '../lib/logger'
 import { setCachedMedia, resolveActiveMedia, clearCache } from '../lib/mediaCache'
+import { sanitizeGameStateForPlayer } from '../lib/finalJeopardySync'
 import ConfirmModal from '../components/ConfirmModal'
+import FinalJeopardyPlayerView from '../components/FinalJeopardyPlayerView'
 import GameBoard from '../components/GameBoard'
 import Scoreboard from '../components/Scoreboard'
 import Podium from '../components/Podium'
@@ -22,7 +24,10 @@ export default function PlayerPage() {
   const [params, setParams] = useSearchParams()
   const playerName = params.get('name') || 'Player'
   const { roomCode, state, settings, setState, setMyPlayerId,
-    addBuzz, patchState, updatePlayer, removePlayer, setSettings, setPlayerConnected } = useGameStore()
+    addBuzz, patchState, updatePlayer, removePlayer, setSettings, setPlayerConnected,
+    revealFinalCategory, revealFinalClue, revealFinalMedia, setFinalWager, submitFinalAnswer,
+    markFinalAnswerSubmitted, applyFinalPlayerReveal, judgeFinalAnswer,
+  } = useGameStore()
 
   const [connected, setConnected] = useState(false)
   const [hasBuzzed, setHasBuzzed] = useState(false)
@@ -123,7 +128,11 @@ export default function PlayerPage() {
     net.onMessage((msg: NetMessage, peerId: string) => {
       if (msg.type === 'SYNC_STATE') {
         if (!hostPeerId.current) hostPeerId.current = peerId
-        setState(msg.state)
+        const myIdForSync =
+          useGameStore.getState().myPlayerId ??
+          msg.state.players.find((p) => p.name === playerName && p.isConnected)?.id ??
+          myId
+        setState(sanitizeGameStateForPlayer(msg.state, myIdForSync))
         const me = msg.state.players.find(
           (p) => p.name === playerName && p.isConnected
         )
@@ -137,6 +146,24 @@ export default function PlayerPage() {
         if (!hasLoggedJoin.current) {
           hasLoggedJoin.current = true
           logEvent({ role: 'player', roomCode, actor: playerName, event: 'Joined room successfully' })
+        }
+        const fjQuestion = msg.state.activeQuestion?.question
+        if (
+          msg.state.phase === 'finalJeopardy' &&
+          fjQuestion?.mediaId &&
+          !msg.state.activeMedia
+        ) {
+          const resolved = resolveActiveMedia(fjQuestion.mediaId, fjQuestion.mediaType)
+          if (resolved) {
+            patchState({ activeMedia: resolved })
+            setMediaLoading(false)
+          } else {
+            setMediaLoading(true)
+            pendingMediaRequest.current = fjQuestion.mediaId
+            if (hostPeerId.current) {
+              net.send({ type: 'MEDIA_REQUEST', mediaId: fjQuestion.mediaId }, hostPeerId.current)
+            }
+          }
         }
       }
       if (msg.type === 'OPEN_CARD') {
@@ -173,7 +200,7 @@ export default function PlayerPage() {
         })
       }
       if (msg.type === 'CLOSE_CARD') {
-        patchState({ phase: 'board', activeQuestion: null, buzzQueue: [], activeMedia: null, mediaPlayback: null, dailyDouble: null, clueRevealed: false, mediaRevealed: false })
+        patchState({ phase: 'board', activeQuestion: null, buzzQueue: [], activeMedia: null, mediaPlayback: null, dailyDouble: null, finalJeopardy: null, clueRevealed: false, mediaRevealed: false })
         setHasBuzzed(false)
         wasInBuzzQueueRef.current = false
         setJudgeResult(null)
@@ -311,6 +338,7 @@ export default function PlayerPage() {
           activeMedia: null,
           mediaPlayback: null,
           dailyDouble: null,
+          finalJeopardy: null,
           clueRevealed: false,
           mediaRevealed: false,
         })
@@ -322,6 +350,53 @@ export default function PlayerPage() {
         setDdWagerSubmitted(false)
         setMediaLoading(false)
         pendingMediaRequest.current = null
+      }
+      if (msg.type === 'FINAL_JEOPARDY_REVEAL_CATEGORY') {
+        revealFinalCategory()
+      }
+      if (msg.type === 'FINAL_JEOPARDY_WAGER') {
+        setFinalWager(msg.playerId, msg.wager)
+      }
+      if (msg.type === 'FINAL_JEOPARDY_WAGER_LOCKED') {
+        // Status-only for other players; own wager arrives via FINAL_JEOPARDY_WAGER.
+      }
+      if (msg.type === 'FINAL_JEOPARDY_REVEAL_CLUE') {
+        revealFinalClue(msg.timerEndsAt)
+      }
+      if (msg.type === 'FINAL_JEOPARDY_REVEAL_MEDIA') {
+        const current = useGameStore.getState().state
+        const question = current.activeQuestion?.question
+        const activeMedia =
+          current.activeMedia ??
+          resolveActiveMedia(question?.mediaId, question?.mediaType)
+
+        if (question?.mediaId && !activeMedia) {
+          setMediaLoading(true)
+          pendingMediaRequest.current = question.mediaId
+          if (hostPeerId.current) {
+            net.send({ type: 'MEDIA_REQUEST', mediaId: question.mediaId }, hostPeerId.current)
+          }
+        }
+
+        if (activeMedia && !current.activeMedia) {
+          patchState({ activeMedia })
+        }
+        revealFinalMedia(msg.timerEndsAt)
+      }
+      if (msg.type === 'FINAL_JEOPARDY_SUBMIT_ANSWER') {
+        submitFinalAnswer(msg.playerId, msg.text)
+      }
+      if (msg.type === 'FINAL_JEOPARDY_ANSWER_LOCKED') {
+        markFinalAnswerSubmitted(msg.playerId)
+      }
+      if (msg.type === 'FINAL_JEOPARDY_REVEAL_PLAYER') {
+        applyFinalPlayerReveal(msg.playerId, msg.wager, msg.answer)
+      }
+      if (msg.type === 'FINAL_JEOPARDY_JUDGE') {
+        judgeFinalAnswer(msg.playerId, msg.correct, msg.pointDelta)
+        if (msg.playerId === myId) {
+          setJudgeResult(msg.correct ? 'correct' : 'wrong')
+        }
       }
       if (msg.type === 'PLAYER_LEAVE') {
         setPlayerConnected(msg.playerId, false)
@@ -801,7 +876,13 @@ export default function PlayerPage() {
             className={`player-main flex-1 flex flex-col min-h-0 gap-4 px-4 pb-4${questionOverlayOpen ? ' player-main--hidden' : ''}`}
             aria-hidden={questionOverlayOpen}
           >
-            <div className="board-scroll-wrap">
+            <div
+              className={`board-scroll-wrap${
+                state.phase === 'finalJeopardy' || isFinalBoard(state.board)
+                  ? ' board-scroll-wrap--no-edge-fade'
+                  : ''
+              }`}
+            >
               {state.phase === 'gameStart' && (
                 <div className="h-full flex flex-col items-center justify-center gap-4">
                   <div className="font-display text-4xl" style={{ color: 'var(--gold-bright)' }}>JEOPARDY!</div>
@@ -814,7 +895,19 @@ export default function PlayerPage() {
                 </div>
               )}
 
-              {state.phase !== 'gameStart' && state.board && (
+              {state.phase === 'finalJeopardy' && state.board && (
+                <FinalJeopardyPlayerView
+                  state={state}
+                  myId={myId}
+                  hostPeerId={hostPeerId.current}
+                  mediaLoading={mediaLoading}
+                />
+              )}
+
+              {state.phase !== 'gameStart' &&
+                state.phase !== 'finalJeopardy' &&
+                state.board &&
+                !isFinalBoard(state.board) && (
                 <GameBoard
                   board={state.board}
                   answeredCells={state.answeredCells}
@@ -822,11 +915,24 @@ export default function PlayerPage() {
                 />
               )}
 
-              {state.phase !== 'gameStart' && !state.board && (
+              {state.phase !== 'gameStart' &&
+                state.phase !== 'finalJeopardy' &&
+                !state.board && (
                 <div className="h-full flex flex-col items-center justify-center gap-2">
                   <div className="font-display text-4xl" style={{ color: 'var(--gold)', opacity: 0.3 }}>?</div>
                   <div className="font-condensed text-lg" style={{ color: '#4a5580' }}>
                     Waiting for host to load a board…
+                  </div>
+                </div>
+              )}
+
+              {state.phase !== 'gameStart' &&
+                state.phase !== 'finalJeopardy' &&
+                state.board &&
+                isFinalBoard(state.board) && (
+                <div className="h-full flex flex-col items-center justify-center gap-2">
+                  <div className="font-condensed text-lg animate-pulse" style={{ color: '#4a5580' }}>
+                    Loading Final Jeopardy…
                   </div>
                 </div>
               )}

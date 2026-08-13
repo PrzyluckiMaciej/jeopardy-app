@@ -1,4 +1,4 @@
-import { formatScore, formatBoardTimestamp, cellId, generateRoomCode, generateId, createDefaultBoard, orderPlayersForDisplay, getDailyDoubleQuestionIds } from '../utils'
+import { formatScore, formatBoardTimestamp, cellId, generateRoomCode, generateId, createDefaultBoard, createDefaultFinalJeopardy, isFinalBoard, orderPlayersForDisplay, getDailyDoubleQuestionIds } from '../utils'
 import type { Board, Player } from '../../types'
 
 function player(id: string, name: string): Player {
@@ -190,5 +190,26 @@ describe('createDefaultBoard', () => {
     expect(board.createdAt).toBeLessThanOrEqual(after)
     expect(board.updatedAt).toBeGreaterThanOrEqual(before)
     expect(board.updatedAt).toBeLessThanOrEqual(after)
+  })
+
+  it('marks kind as board', () => {
+    expect(createDefaultBoard().kind).toBe('board')
+  })
+})
+
+describe('createDefaultFinalJeopardy', () => {
+  it('creates a final board with one category and one question', () => {
+    const board = createDefaultFinalJeopardy()
+    expect(board.kind).toBe('final')
+    expect(board.name).toBe('Final Jeopardy')
+    expect(board.categories).toHaveLength(1)
+    expect(board.categories[0].questions).toHaveLength(1)
+    expect(isFinalBoard(board)).toBe(true)
+  })
+
+  it('isFinalBoard treats missing kind as regular board', () => {
+    expect(isFinalBoard({ kind: undefined })).toBe(false)
+    expect(isFinalBoard({ kind: 'board' })).toBe(false)
+    expect(isFinalBoard({ kind: 'final' })).toBe(true)
   })
 })

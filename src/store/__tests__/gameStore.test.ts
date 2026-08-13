@@ -687,6 +687,79 @@ describe('useGameStore', () => {
     })
   })
 
+  describe('finalJeopardy', () => {
+    const question = makeQuestion({ id: 'fj-q', question: 'Clue', answer: 'Answer', points: 0 })
+
+    beforeEach(() => {
+      useGameStore.getState().addPlayer(makePlayer({ id: 'p1', name: 'Alice', score: 500 }))
+      useGameStore.getState().addPlayer(makePlayer({ id: 'p2', name: 'Bob', score: 0 }))
+      useGameStore.getState().addPlayer(makePlayer({ id: 'p3', name: 'Carol', score: 200 }))
+      useGameStore.getState().startFinalJeopardy('cat-fj', question)
+      useGameStore.getState().revealFinalCategory()
+    })
+
+    it('starts in finalJeopardy with empty round state', () => {
+      useGameStore.setState({
+        state: {
+          ...useGameStore.getState().state,
+          finalJeopardy: null,
+          phase: 'lobby',
+          activeQuestion: null,
+        },
+      })
+      useGameStore.getState().startFinalJeopardy('cat-fj', question)
+      const { state } = useGameStore.getState()
+      expect(state.phase).toBe('finalJeopardy')
+      expect(state.finalJeopardy?.categoryRevealed).toBe(false)
+      expect(state.activeQuestion?.question.id).toBe('fj-q')
+    })
+
+    it('rejects wagers from players with score <= 0', () => {
+      useGameStore.getState().setFinalWager('p2', 50)
+      expect(useGameStore.getState().state.finalJeopardy?.wagers.p2).toBeUndefined()
+    })
+
+    it('clamps wagers to [0, player score]', () => {
+      useGameStore.getState().setFinalWager('p1', 9999)
+      expect(useGameStore.getState().state.finalJeopardy?.wagers.p1).toBe(500)
+      useGameStore.setState({
+        state: {
+          ...useGameStore.getState().state,
+          finalJeopardy: {
+            ...useGameStore.getState().state.finalJeopardy!,
+            wagers: {},
+          },
+        },
+      })
+      useGameStore.getState().setFinalWager('p1', -10)
+      expect(useGameStore.getState().state.finalJeopardy?.wagers.p1).toBe(0)
+    })
+
+    it('starts the 30s timer on first clue or media reveal', () => {
+      const before = Date.now()
+      useGameStore.getState().revealFinalClue()
+      const endsAt = useGameStore.getState().state.finalJeopardy?.timerEndsAt
+      expect(endsAt).toBeGreaterThanOrEqual(before + 29_000)
+      expect(endsAt).toBeLessThanOrEqual(before + 31_000)
+      useGameStore.getState().revealFinalMedia()
+      expect(useGameStore.getState().state.finalJeopardy?.timerEndsAt).toBe(endsAt)
+    })
+
+    it('applies plus or minus wager on judge regardless of pointDeduction', () => {
+      useGameStore.getState().setSettings({
+        ...useGameStore.getState().settings,
+        pointDeduction: false,
+        allowNegativeScore: true,
+      })
+      useGameStore.getState().setFinalWager('p1', 100)
+      useGameStore.getState().submitFinalAnswer('p1', 'What is test?')
+      useGameStore.getState().revealFinalPlayer('p1')
+      useGameStore.getState().judgeFinalAnswer('p1', false, -100)
+      expect(useGameStore.getState().state.players.find((p) => p.id === 'p1')?.score).toBe(400)
+      expect(useGameStore.getState().state.finalJeopardy?.judged.p1).toBe(false)
+    })
+  })
+
   describe('markAnswered', () => {
     it('adds cell id and resets phase/question/buzz/media', () => {
       useGameStore.getState().openCard('cat-1', makeQuestion(), 'data:image/png;base64,abc')

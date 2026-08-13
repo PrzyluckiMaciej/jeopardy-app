@@ -11,7 +11,12 @@ import type {
   Player,
   Question,
 } from '../types'
-import { initialMediaPlaybackForType, questionMediaAutoplay } from '../types'
+import {
+  emptyFinalJeopardyState,
+  FINAL_JEOPARDY_TIMER_MS,
+  initialMediaPlaybackForType,
+  questionMediaAutoplay,
+} from '../types'
 
 type FolderLike = { id: string; name: string; parentId: string | null; trashedAt?: number | null }
 
@@ -142,13 +147,17 @@ function migrateBoardDailyDoubles(
   board: Board & { dailyDoubleQuestionId?: string },
 ): Board {
   const { dailyDoubleQuestionId, ...rest } = board
-  if (Array.isArray(rest.dailyDoubleQuestionIds)) {
-    return rest
+  const withKind: Board = {
+    ...rest,
+    kind: rest.kind === 'final' ? 'final' : 'board',
+  }
+  if (Array.isArray(withKind.dailyDoubleQuestionIds)) {
+    return withKind
   }
   if (typeof dailyDoubleQuestionId === 'string' && dailyDoubleQuestionId) {
-    return { ...rest, dailyDoubleQuestionIds: [dailyDoubleQuestionId] }
+    return { ...withKind, dailyDoubleQuestionIds: [dailyDoubleQuestionId] }
   }
-  return rest
+  return withKind
 }
 
 function migrateBoardStore(persisted: unknown): PersistedBoardStore {
@@ -798,7 +807,7 @@ export const useBoardStore = create<BoardStore>()(
     {
       name: 'jeopardy-boards',
       migrate: migrateBoardStore,
-      version: 4,
+      version: 5,
     },
   ),
 )
@@ -844,6 +853,17 @@ interface GameStore {
   selectGame: (gameId: string, boardIds: string[]) => void
   setBoardTransition: (boardName: string | null) => void
   showPodium: () => void
+
+  startFinalJeopardy: (categoryId: string, question: Question, mediaDataUrl?: string) => void
+  revealFinalCategory: () => void
+  setFinalWager: (playerId: string, wager: number) => void
+  revealFinalClue: (timerEndsAt?: number) => void
+  revealFinalMedia: (timerEndsAt?: number) => void
+  submitFinalAnswer: (playerId: string, text: string) => void
+  markFinalAnswerSubmitted: (playerId: string) => void
+  revealFinalPlayer: (playerId: string) => void
+  applyFinalPlayerReveal: (playerId: string, wager: number, answer: string) => void
+  judgeFinalAnswer: (playerId: string, correct: boolean, pointDelta: number) => void
 }
 
 const defaultState: GameState = {
@@ -857,6 +877,7 @@ const defaultState: GameState = {
   mediaPlayback: null,
   boardControlId: null,
   dailyDouble: null,
+  finalJeopardy: null,
   activeGameId: null,
   gameBoardIds: [],
   currentBoardIndex: 0,
@@ -973,6 +994,7 @@ export const useGameStore = create<GameStore>()(
             activeMedia: null,
             mediaPlayback: null,
             dailyDouble: null,
+            finalJeopardy: null,
             clueRevealed: false,
             mediaRevealed: false,
           },
@@ -1043,6 +1065,7 @@ export const useGameStore = create<GameStore>()(
             activeMedia: null,
             mediaPlayback: null,
             dailyDouble: null,
+            finalJeopardy: null,
             clueRevealed: false,
             mediaRevealed: false,
           },
@@ -1100,6 +1123,7 @@ export const useGameStore = create<GameStore>()(
             mediaPlayback: null,
             boardControlId: null,
             dailyDouble: null,
+            finalJeopardy: null,
             clueRevealed: false,
             mediaRevealed: false,
           },
@@ -1121,6 +1145,7 @@ export const useGameStore = create<GameStore>()(
             mediaPlayback: null,
             boardControlId: null,
             dailyDouble: null,
+            finalJeopardy: null,
             boardTransition: null,
             clueRevealed: false,
             mediaRevealed: false,
@@ -1144,11 +1169,208 @@ export const useGameStore = create<GameStore>()(
             activeMedia: null,
             mediaPlayback: null,
             dailyDouble: null,
+            finalJeopardy: null,
             boardTransition: null,
             clueRevealed: false,
             mediaRevealed: false,
           },
         })),
+
+      startFinalJeopardy: (categoryId, question, mediaDataUrl) =>
+        set((s) => {
+          let mediaType: 'image' | 'audio' | 'video' | undefined
+          if (mediaDataUrl) {
+            if (mediaDataUrl.startsWith('data:image')) mediaType = 'image'
+            else if (mediaDataUrl.startsWith('data:audio')) mediaType = 'audio'
+            else if (mediaDataUrl.startsWith('data:video')) mediaType = 'video'
+          }
+          return {
+            state: {
+              ...s.state,
+              phase: 'finalJeopardy',
+              activeQuestion: { categoryId, question },
+              buzzQueue: [],
+              dailyDouble: null,
+              finalJeopardy: emptyFinalJeopardyState(),
+              activeMedia: mediaDataUrl && mediaType
+                ? { type: mediaType, dataUrl: mediaDataUrl }
+                : null,
+              mediaPlayback: null,
+              clueRevealed: false,
+              mediaRevealed: false,
+            },
+          }
+        }),
+
+      revealFinalCategory: () =>
+        set((s) => {
+          if (!s.state.finalJeopardy) return s
+          return {
+            state: {
+              ...s.state,
+              finalJeopardy: {
+                ...s.state.finalJeopardy,
+                categoryRevealed: true,
+              },
+            },
+          }
+        }),
+
+      setFinalWager: (playerId, wager) =>
+        set((s) => {
+          const fj = s.state.finalJeopardy
+          if (!fj || !fj.categoryRevealed) return s
+          const player = s.state.players.find((p) => p.id === playerId)
+          if (!player || player.score <= 0) return s
+          if (fj.wagers[playerId] != null) return s
+          const clamped = Math.max(0, Math.min(Math.floor(wager), player.score))
+          return {
+            state: {
+              ...s.state,
+              finalJeopardy: {
+                ...fj,
+                wagers: { ...fj.wagers, [playerId]: clamped },
+              },
+            },
+          }
+        }),
+
+      revealFinalClue: (timerEndsAt) =>
+        set((s) => {
+          const fj = s.state.finalJeopardy
+          if (!fj) return s
+          const endsAt =
+            fj.timerEndsAt ??
+            timerEndsAt ??
+            Date.now() + FINAL_JEOPARDY_TIMER_MS
+          return {
+            state: {
+              ...s.state,
+              clueRevealed: true,
+              finalJeopardy: {
+                ...fj,
+                clueRevealed: true,
+                timerEndsAt: endsAt,
+              },
+            },
+          }
+        }),
+
+      revealFinalMedia: (timerEndsAt) =>
+        set((s) => {
+          const fj = s.state.finalJeopardy
+          if (!fj) return s
+          const endsAt =
+            fj.timerEndsAt ??
+            timerEndsAt ??
+            Date.now() + FINAL_JEOPARDY_TIMER_MS
+          return {
+            state: {
+              ...s.state,
+              mediaRevealed: true,
+              mediaPlayback: initialMediaPlaybackForType(
+                s.state.activeMedia?.type,
+                questionMediaAutoplay(s.state.activeQuestion?.question),
+              ),
+              finalJeopardy: {
+                ...fj,
+                mediaRevealed: true,
+                timerEndsAt: endsAt,
+              },
+            },
+          }
+        }),
+
+      submitFinalAnswer: (playerId, text) =>
+        set((s) => {
+          const fj = s.state.finalJeopardy
+          if (!fj || fj.wagers[playerId] == null) return s
+          if (fj.submittedAnswerIds.includes(playerId)) return s
+          if (fj.timerEndsAt != null && Date.now() > fj.timerEndsAt) return s
+          const trimmed = text.trim()
+          if (!trimmed) return s
+          return {
+            state: {
+              ...s.state,
+              finalJeopardy: {
+                ...fj,
+                answers: { ...fj.answers, [playerId]: trimmed },
+                submittedAnswerIds: [...fj.submittedAnswerIds, playerId],
+              },
+            },
+          }
+        }),
+
+      markFinalAnswerSubmitted: (playerId) =>
+        set((s) => {
+          const fj = s.state.finalJeopardy
+          if (!fj) return s
+          if (fj.submittedAnswerIds.includes(playerId)) return s
+          return {
+            state: {
+              ...s.state,
+              finalJeopardy: {
+                ...fj,
+                submittedAnswerIds: [...fj.submittedAnswerIds, playerId],
+              },
+            },
+          }
+        }),
+
+      revealFinalPlayer: (playerId) =>
+        set((s) => {
+          const fj = s.state.finalJeopardy
+          if (!fj || fj.wagers[playerId] == null) return s
+          if (fj.revealedPlayerIds.includes(playerId)) return s
+          return {
+            state: {
+              ...s.state,
+              finalJeopardy: {
+                ...fj,
+                revealedPlayerIds: [...fj.revealedPlayerIds, playerId],
+              },
+            },
+          }
+        }),
+
+      applyFinalPlayerReveal: (playerId, wager, answer) =>
+        set((s) => {
+          const fj = s.state.finalJeopardy
+          if (!fj) return s
+          return {
+            state: {
+              ...s.state,
+              finalJeopardy: {
+                ...fj,
+                wagers: { ...fj.wagers, [playerId]: wager },
+                answers: { ...fj.answers, [playerId]: answer },
+                revealedPlayerIds: fj.revealedPlayerIds.includes(playerId)
+                  ? fj.revealedPlayerIds
+                  : [...fj.revealedPlayerIds, playerId],
+              },
+            },
+          }
+        }),
+
+      judgeFinalAnswer: (playerId, correct, pointDelta) =>
+        set((s) => {
+          const fj = s.state.finalJeopardy
+          if (!fj || fj.wagers[playerId] == null) return s
+          if (fj.judged[playerId] != null) return s
+          if (!fj.revealedPlayerIds.includes(playerId)) return s
+          return {
+            state: {
+              ...s.state,
+              players: s.state.players.map((p) =>
+                p.id === playerId ? { ...p, score: p.score + pointDelta } : p
+              ),
+              finalJeopardy: {
+                ...fj,
+                judged: { ...fj.judged, [playerId]: correct },
+              },
+            },
+          }
+        }),
 
       reset: () =>
         set({
