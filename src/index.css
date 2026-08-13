@@ -1433,6 +1433,58 @@ select:focus-visible {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
+  position: relative;
+}
+.board-picker-board-row--dragging {
+  opacity: 0.45;
+}
+body.board-picker-reordering,
+body.board-picker-reordering * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+.board-picker-boards__scroll--reordering .board-picker-board-btn,
+.board-picker-boards__scroll--reordering .board-picker-board-row__actions {
+  pointer-events: none;
+}
+.board-picker-board-row--drop-before::before,
+.board-picker-board-row--drop-after::after {
+  content: '';
+  position: absolute;
+  left: 1.75rem;
+  right: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--gold);
+  box-shadow: 0 0 8px rgba(212, 160, 23, 0.45);
+  pointer-events: none;
+  z-index: 1;
+}
+.board-picker-board-row--drop-before::before {
+  top: -1px;
+}
+.board-picker-board-row--drop-after::after {
+  bottom: -1px;
+}
+.board-picker-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #8899cc;
+  cursor: grab;
+  touch-action: none;
+  border-radius: var(--radius-sm);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.board-picker-drag-handle:hover {
+  color: var(--white);
+  background: rgba(255, 255, 255, 0.08);
+}
+.board-picker-drag-handle:active {
+  cursor: grabbing;
 }
 .board-picker-board-btn {
   flex: 1;
@@ -1917,16 +1969,37 @@ select:focus-visible {
   pointer-events: none;
   color: var(--white);
 }
-.board-picker-drag-ghost,
-.board-picker-drag-ghost * {
+.board-picker-drag-ghost:not(.board-picker-drag-ghost--pointer),
+.board-picker-drag-ghost:not(.board-picker-drag-ghost--pointer) * {
   background: transparent !important;
   background-color: transparent !important;
   box-shadow: none !important;
   border: none !important;
   border-radius: 0 !important;
 }
-.board-picker-drag-ghost .board-picker-board-btn,
-.board-picker-drag-ghost .board-picker-folder-row__btn {
+.board-picker-drag-ghost--pointer {
+  top: 0;
+  left: 0;
+  z-index: 10000;
+  max-width: none;
+  opacity: 0.92;
+  will-change: transform;
+}
+.board-picker-drag-ghost--pointer .board-picker-board-btn {
+  width: 100%;
+  max-width: none;
+  padding: 10px 12px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 0.9375rem;
+  color: var(--white);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  border: 1px solid var(--gold);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.board-picker-drag-ghost:not(.board-picker-drag-ghost--pointer) .board-picker-board-btn,
+.board-picker-drag-ghost:not(.board-picker-drag-ghost--pointer) .board-picker-folder-row__btn {
   width: auto;
   max-width: 16rem;
   padding: 2px 0;
