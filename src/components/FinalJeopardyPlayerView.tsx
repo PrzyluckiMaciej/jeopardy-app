@@ -146,195 +146,192 @@ export default function FinalJeopardyPlayerView({
         </div>
       </div>
 
-      <div className="final-jeopardy-body flex-1 min-h-0 relative">
-        {showTimer && (
-          <div className="final-jeopardy-player-timer-wrap" aria-live="polite">
+      <div className="final-jeopardy-layout flex-1 min-h-0">
+        <div className="final-jeopardy-main panel flex flex-col gap-4 p-4 min-h-0 overflow-hidden">
+          {!finalJeopardy.categoryRevealed ? (
+            <div
+              key="waiting-category"
+              className="final-jeopardy-enter flex-1 flex items-center justify-center font-condensed animate-pulse"
+              style={{ color: '#4a5580' }}
+            >
+              Waiting for category…
+            </div>
+          ) : (
+            <div key="category-live" className="final-jeopardy-enter flex-1 min-h-0 flex flex-col gap-4">
+              <div className="final-jeopardy-category-enter text-center flex-shrink-0">
+                <div
+                  className="font-condensed text-xs uppercase tracking-widest mb-1"
+                  style={{ color: 'var(--gold)', opacity: 0.7 }}
+                >
+                  Category
+                </div>
+                <div className="font-display text-3xl" style={{ color: 'var(--gold-bright)' }}>
+                  {categoryName}
+                </div>
+              </div>
+
+              {!contentRevealed && (
+                <div
+                  key={`status-${hasWagered}-${eligible}`}
+                  className="final-jeopardy-enter text-center font-condensed text-sm animate-pulse"
+                  style={{ color: '#4a5580' }}
+                >
+                  {eligible
+                    ? hasWagered
+                      ? 'Wager locked in — waiting for the clue…'
+                      : 'Place your wager'
+                    : 'Spectating — score must be above $0 to play'}
+                </div>
+              )}
+
+              <div className="final-jeopardy-stage flex-1 min-h-0 flex flex-col">
+                {showStage && question ? (
+                  <QuestionOverlayText
+                    className="final-jeopardy-overlay-text"
+                    contentKey={`fj-player-${question.id}-${finalJeopardy.clueRevealed}-${finalJeopardy.mediaRevealed}-${finalJeopardy.answerRevealed}`}
+                    clue={question.question}
+                    answer={question.answer || '—'}
+                    clueRevealed={showClue}
+                    answerRevealed={finalJeopardy.answerRevealed}
+                    showClueContent={showClue}
+                    showAnswerContent={finalJeopardy.answerRevealed}
+                    hasMediaSlot={showMedia || (!!finalJeopardy.mediaRevealed && mediaLoading)}
+                    showMediaContent={showMedia}
+                    clueClassName={showClue ? 'clue-reveal' : ''}
+                    answerClassName={finalJeopardy.answerRevealed ? 'answer-reveal' : ''}
+                    media={
+                      activeMedia ? (
+                        <QuestionMediaPlayer
+                          media={activeMedia}
+                          role="player"
+                          playback={mediaPlayback}
+                          mountKey={1}
+                          mediaActive
+                          loading={mediaLoading}
+                          className={`question-overlay-media${showMedia ? ' clue-reveal' : ''}`}
+                        />
+                      ) : undefined
+                    }
+                  />
+                ) : finalJeopardy.mediaRevealed && mediaLoading ? (
+                  <div
+                    key="loading-media"
+                    className="final-jeopardy-enter flex-1 flex items-center justify-center font-condensed text-sm animate-pulse"
+                    style={{ color: '#4a5580' }}
+                  >
+                    Loading media…
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <aside className="final-jeopardy-side final-jeopardy-side--player panel p-3 flex flex-col gap-3 min-h-0">
+          {showTimer && (
             <div
               className={`final-jeopardy-player-timer${remaining! <= 5 ? ' final-jeopardy-player-timer--urgent' : ''}`}
+              aria-live="polite"
             >
               <span className="final-jeopardy-player-timer__value">{remaining}</span>
               <span className="final-jeopardy-player-timer__label">seconds left</span>
             </div>
-          </div>
-        )}
+          )}
 
-        <div className="final-jeopardy-layout h-full min-h-0">
-          <div className="final-jeopardy-main panel flex flex-col gap-4 p-4 min-h-0 overflow-hidden">
-            {!finalJeopardy.categoryRevealed ? (
-              <div
-                key="waiting-category"
-                className="final-jeopardy-enter flex-1 flex items-center justify-center font-condensed animate-pulse"
-                style={{ color: '#4a5580' }}
-              >
-                Waiting for category…
-              </div>
-            ) : (
-              <div key="category-live" className="final-jeopardy-enter flex-1 min-h-0 flex flex-col gap-4">
-                <div className="final-jeopardy-category-enter text-center flex-shrink-0">
-                  <div
-                    className="font-condensed text-xs uppercase tracking-widest mb-1"
-                    style={{ color: 'var(--gold)', opacity: 0.7 }}
-                  >
-                    Category
-                  </div>
-                  <div className="font-display text-3xl" style={{ color: 'var(--gold-bright)' }}>
-                    {categoryName}
-                  </div>
+          <div key={sidePanelKey} className="final-jeopardy-enter flex flex-col gap-3 flex-1 min-h-0">
+            {focusPlayer && (
+              <div className="final-jeopardy-player-card flex-shrink-0" aria-live="polite">
+                <div className="final-jeopardy-player-card__header">
+                  <span className="font-condensed font-bold truncate">{focusPlayer.name}</span>
                 </div>
-
-                {!contentRevealed && (
-                  <div
-                    key={`status-${hasWagered}-${eligible}`}
-                    className="final-jeopardy-enter text-center font-condensed text-sm animate-pulse"
-                    style={{ color: '#4a5580' }}
-                  >
-                    {eligible
-                      ? hasWagered
-                        ? 'Wager locked in — waiting for the clue…'
-                        : 'Place your wager'
-                      : 'Spectating — score must be above $0 to play'}
+                <div className="final-jeopardy-player-card__meta">
+                  <span style={{ color: 'var(--gold)' }}>
+                    Wager {formatScore(finalJeopardy.wagers[focusPlayer.id] ?? 0)}
+                  </span>
+                </div>
+                <div className="final-jeopardy-player-card__reveal final-jeopardy-reveal-enter">
+                  <div className="font-condensed text-base break-words">
+                    {finalJeopardy.answers[focusPlayer.id] ?? '(no answer)'}
                   </div>
-                )}
-
-                <div className="final-jeopardy-stage flex-1 min-h-0 flex flex-col">
-                  {showStage && question ? (
-                    <QuestionOverlayText
-                      className="final-jeopardy-overlay-text"
-                      contentKey={`fj-player-${question.id}-${finalJeopardy.clueRevealed}-${finalJeopardy.mediaRevealed}-${finalJeopardy.answerRevealed}`}
-                      clue={question.question}
-                      answer={question.answer || '—'}
-                      clueRevealed={showClue}
-                      answerRevealed={finalJeopardy.answerRevealed}
-                      showClueContent={showClue}
-                      showAnswerContent={finalJeopardy.answerRevealed}
-                      hasMediaSlot={showMedia || (!!finalJeopardy.mediaRevealed && mediaLoading)}
-                      showMediaContent={showMedia}
-                      clueClassName={showClue ? 'clue-reveal' : ''}
-                      answerClassName={finalJeopardy.answerRevealed ? 'answer-reveal' : ''}
-                      media={
-                        activeMedia ? (
-                          <QuestionMediaPlayer
-                            media={activeMedia}
-                            role="player"
-                            playback={mediaPlayback}
-                            mountKey={1}
-                            mediaActive
-                            loading={mediaLoading}
-                            className={`question-overlay-media${showMedia ? ' clue-reveal' : ''}`}
-                          />
-                        ) : undefined
-                      }
-                    />
-                  ) : finalJeopardy.mediaRevealed && mediaLoading ? (
+                  {focusJudged != null && (
                     <div
-                      key="loading-media"
-                      className="final-jeopardy-enter flex-1 flex items-center justify-center font-condensed text-sm animate-pulse"
-                      style={{ color: '#4a5580' }}
+                      key={`judged-${focusJudged}`}
+                      className="final-jeopardy-enter font-condensed text-sm mt-1"
+                      style={{ color: focusJudged ? 'var(--success)' : 'var(--red)' }}
                     >
-                      Loading media…
+                      {focusJudged ? 'Correct!' : 'Incorrect'}
                     </div>
-                  ) : null}
+                  )}
                 </div>
               </div>
             )}
+
+            {showWagerForm && (
+              <div className="flex flex-col gap-2 flex-shrink-0">
+                <div className="font-condensed font-bold text-sm text-center" style={{ color: 'var(--gold-bright)' }}>
+                  Enter your wager
+                </div>
+                <div className="text-xs text-center" style={{ color: '#4a5580' }}>
+                  Min: $0 · Max: ${myScore}
+                </div>
+                <input
+                  type="number"
+                  min={0}
+                  max={myScore}
+                  className="w-full text-center font-display text-xl"
+                  placeholder="Wager amount"
+                  value={wagerInput}
+                  onChange={(e) => handleWagerChange(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && submitWager()}
+                  autoFocus
+                />
+                {wagerError && (
+                  <div className="text-xs text-center" style={{ color: 'var(--red)' }}>{wagerError}</div>
+                )}
+                <button type="button" className="btn-gold w-full py-3" onClick={submitWager}>
+                  Submit wager
+                </button>
+              </div>
+            )}
+
+            {hasWagered && finalJeopardy.timerEndsAt != null && hasAnswered && (
+              <div className="text-center font-condensed text-sm flex-shrink-0" style={{ color: 'var(--success)' }}>
+                Answer submitted
+              </div>
+            )}
+
+            {hasWagered && timerDone && !hasAnswered && (
+              <div className="text-center font-condensed text-sm flex-shrink-0" style={{ color: '#4a5580' }}>
+                Time&apos;s up
+              </div>
+            )}
+
+            {canAnswer && (
+              <div className="final-jeopardy-player-answer flex flex-col gap-2 flex-shrink-0 mt-auto">
+                <div className="font-condensed font-bold text-sm text-center" style={{ color: 'var(--gold-bright)' }}>
+                  Your answer
+                </div>
+                <input
+                  type="text"
+                  className="w-full text-center font-condensed text-lg"
+                  placeholder="What is…?"
+                  value={answerInput}
+                  onChange={(e) => setAnswerInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && submitAnswer()}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  className="btn-gold w-full py-3"
+                  onClick={submitAnswer}
+                  disabled={!answerInput.trim()}
+                >
+                  Submit answer
+                </button>
+              </div>
+            )}
           </div>
-
-          <aside className="final-jeopardy-side panel p-3 flex flex-col gap-3 min-h-0">
-            <div key={sidePanelKey} className="final-jeopardy-enter flex flex-col gap-3 min-h-0">
-              {focusPlayer && (
-                <div className="final-jeopardy-player-card" aria-live="polite">
-                  <div className="final-jeopardy-player-card__header">
-                    <span className="font-condensed font-bold truncate">{focusPlayer.name}</span>
-                  </div>
-                  <div className="final-jeopardy-player-card__meta">
-                    <span style={{ color: 'var(--gold)' }}>
-                      Wager {formatScore(finalJeopardy.wagers[focusPlayer.id] ?? 0)}
-                    </span>
-                  </div>
-                  <div className="final-jeopardy-player-card__reveal final-jeopardy-reveal-enter">
-                    <div className="font-condensed text-base break-words">
-                      {finalJeopardy.answers[focusPlayer.id] ?? '(no answer)'}
-                    </div>
-                    {focusJudged != null && (
-                      <div
-                        key={`judged-${focusJudged}`}
-                        className="final-jeopardy-enter font-condensed text-sm mt-1"
-                        style={{ color: focusJudged ? 'var(--success)' : 'var(--red)' }}
-                      >
-                        {focusJudged ? 'Correct!' : 'Incorrect'}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {showWagerForm && (
-                <div className="flex flex-col gap-2 flex-shrink-0">
-                  <div className="font-condensed font-bold text-sm text-center" style={{ color: 'var(--gold-bright)' }}>
-                    Enter your wager
-                  </div>
-                  <div className="text-xs text-center" style={{ color: '#4a5580' }}>
-                    Min: $0 · Max: ${myScore}
-                  </div>
-                  <input
-                    type="number"
-                    min={0}
-                    max={myScore}
-                    className="w-full text-center font-display text-xl"
-                    placeholder="Wager amount"
-                    value={wagerInput}
-                    onChange={(e) => handleWagerChange(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && submitWager()}
-                    autoFocus
-                  />
-                  {wagerError && (
-                    <div className="text-xs text-center" style={{ color: 'var(--red)' }}>{wagerError}</div>
-                  )}
-                  <button type="button" className="btn-gold w-full py-3" onClick={submitWager}>
-                    Submit wager
-                  </button>
-                </div>
-              )}
-
-              {canAnswer && (
-                <div className="flex flex-col gap-2 flex-shrink-0">
-                  <div className="font-condensed font-bold text-sm text-center" style={{ color: 'var(--gold-bright)' }}>
-                    Your answer
-                  </div>
-                  <input
-                    type="text"
-                    className="w-full text-center font-condensed text-lg"
-                    placeholder="What is…?"
-                    value={answerInput}
-                    onChange={(e) => setAnswerInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && submitAnswer()}
-                    autoFocus
-                  />
-                  <button
-                    type="button"
-                    className="btn-gold w-full py-3"
-                    onClick={submitAnswer}
-                    disabled={!answerInput.trim()}
-                  >
-                    Submit answer
-                  </button>
-                </div>
-              )}
-
-              {hasWagered && finalJeopardy.timerEndsAt != null && hasAnswered && (
-                <div className="text-center font-condensed text-sm" style={{ color: 'var(--success)' }}>
-                  Answer submitted
-                </div>
-              )}
-
-              {hasWagered && timerDone && !hasAnswered && (
-                <div className="text-center font-condensed text-sm" style={{ color: '#4a5580' }}>
-                  Time&apos;s up
-                </div>
-              )}
-            </div>
-          </aside>
-        </div>
+        </aside>
       </div>
     </div>
   )

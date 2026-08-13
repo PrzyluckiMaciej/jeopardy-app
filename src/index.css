@@ -2013,9 +2013,6 @@ body.board-picker-reordering * {
 .final-jeopardy-side {
   overflow: auto;
 }
-.final-jeopardy-body {
-  position: relative;
-}
 .final-jeopardy-stage {
   container-type: size;
 }
@@ -2034,48 +2031,45 @@ body.board-picker-reordering * {
 .final-jeopardy-host-timer {
   animation: finalJeopardyPopIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
-.final-jeopardy-player-timer-wrap {
-  position: absolute;
-  top: 0.65rem;
-  left: 50%;
-  z-index: 20;
-  width: min(18rem, calc(100% - 2rem));
-  transform: translateX(-50%);
-  pointer-events: none;
+.final-jeopardy-side--player {
+  overflow: hidden;
 }
 .final-jeopardy-player-timer {
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.15rem;
-  padding: 0.85rem 1rem;
+  gap: 0.1rem;
+  padding: 0.7rem 0.75rem;
   border-radius: var(--radius-lg);
-  background: rgba(10, 18, 48, 0.92);
+  background: rgba(250, 204, 21, 0.12);
   border: 2px solid rgba(250, 204, 21, 0.55);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
   color: var(--gold-bright);
   text-align: center;
   animation: finalJeopardyPopIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 .final-jeopardy-player-timer__value {
   font-family: 'Anton', sans-serif;
-  font-size: clamp(3.5rem, 14vw, 6rem);
+  font-size: clamp(2.75rem, 8vw, 4.5rem);
   line-height: 0.95;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
 }
 .final-jeopardy-player-timer__label {
   font-family: 'Barlow Condensed', sans-serif;
-  font-size: clamp(0.85rem, 2.5vw, 1.1rem);
+  font-size: clamp(0.75rem, 2vw, 0.95rem);
   text-transform: uppercase;
   letter-spacing: 0.14em;
   opacity: 0.85;
 }
 .final-jeopardy-player-timer--urgent {
-  background: rgba(48, 12, 16, 0.94);
+  background: rgba(239, 68, 68, 0.16);
   border-color: rgba(239, 68, 68, 0.7);
   color: var(--red);
+}
+.final-jeopardy-player-answer {
+  padding-top: 0.25rem;
 }
 .final-jeopardy-player-card {
   display: flex;
@@ -2182,9 +2176,6 @@ body.board-picker-reordering * {
   }
   .final-jeopardy-side-enter {
     animation-name: finalJeopardyEnter;
-  }
-  .final-jeopardy-player-timer-wrap {
-    top: 0.4rem;
   }
 }
 
