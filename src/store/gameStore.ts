@@ -1346,12 +1346,14 @@ export const useGameStore = create<GameStore>()(
           const fj = s.state.finalJeopardy
           if (!fj || fj.wagers[playerId] == null) return s
           if (fj.revealedPlayerIds.includes(playerId)) return s
+          // Keep judged reveals visible; collapse any unjudged reveal so it can be shown again later.
+          const kept = fj.revealedPlayerIds.filter((id) => fj.judged[id] != null)
           return {
             state: {
               ...s.state,
               finalJeopardy: {
                 ...fj,
-                revealedPlayerIds: [...fj.revealedPlayerIds, playerId],
+                revealedPlayerIds: [...kept, playerId],
               },
             },
           }
@@ -1361,6 +1363,9 @@ export const useGameStore = create<GameStore>()(
         set((s) => {
           const fj = s.state.finalJeopardy
           if (!fj) return s
+          const kept = fj.revealedPlayerIds.filter(
+            (id) => id === playerId || fj.judged[id] != null
+          )
           return {
             state: {
               ...s.state,
@@ -1368,9 +1373,7 @@ export const useGameStore = create<GameStore>()(
                 ...fj,
                 wagers: { ...fj.wagers, [playerId]: wager },
                 answers: { ...fj.answers, [playerId]: answer },
-                revealedPlayerIds: fj.revealedPlayerIds.includes(playerId)
-                  ? fj.revealedPlayerIds
-                  : [...fj.revealedPlayerIds, playerId],
+                revealedPlayerIds: kept.includes(playerId) ? kept : [...kept, playerId],
               },
             },
           }

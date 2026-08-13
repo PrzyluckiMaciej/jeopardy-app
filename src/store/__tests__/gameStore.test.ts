@@ -764,6 +764,32 @@ describe('useGameStore', () => {
       expect(useGameStore.getState().state.players.find((p) => p.id === 'p1')?.score).toBe(400)
       expect(useGameStore.getState().state.finalJeopardy?.judged.p1).toBe(false)
     })
+
+    it('collapses unjudged reveals when revealing another player', () => {
+      useGameStore.getState().setFinalWager('p1', 100)
+      useGameStore.getState().setFinalWager('p3', 50)
+      useGameStore.getState().submitFinalAnswer('p1', 'Alice answer')
+      useGameStore.getState().submitFinalAnswer('p3', 'Carol answer')
+      useGameStore.getState().revealFinalPlayer('p1')
+      expect(useGameStore.getState().state.finalJeopardy?.revealedPlayerIds).toEqual(['p1'])
+
+      useGameStore.getState().revealFinalPlayer('p3')
+      expect(useGameStore.getState().state.finalJeopardy?.revealedPlayerIds).toEqual(['p3'])
+
+      useGameStore.getState().revealFinalPlayer('p1')
+      expect(useGameStore.getState().state.finalJeopardy?.revealedPlayerIds).toEqual(['p1'])
+    })
+
+    it('keeps judged reveals visible when revealing another player', () => {
+      useGameStore.getState().setFinalWager('p1', 100)
+      useGameStore.getState().setFinalWager('p3', 50)
+      useGameStore.getState().submitFinalAnswer('p1', 'Alice answer')
+      useGameStore.getState().submitFinalAnswer('p3', 'Carol answer')
+      useGameStore.getState().revealFinalPlayer('p1')
+      useGameStore.getState().judgeFinalAnswer('p1', true, 100)
+      useGameStore.getState().revealFinalPlayer('p3')
+      expect(useGameStore.getState().state.finalJeopardy?.revealedPlayerIds).toEqual(['p1', 'p3'])
+    })
   })
 
   describe('markAnswered', () => {
