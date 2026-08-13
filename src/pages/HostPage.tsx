@@ -382,7 +382,9 @@ export default function HostPage() {
         if (!player) return
         const maxPointValue = Math.max(...(gs.state.board?.pointValues ?? [0]))
         const maxWager = player.score > maxPointValue ? player.score : maxPointValue
-        const wager = Math.max(1, Math.min(msg.wager, maxWager))
+        const configuredMin = Math.max(0, gs.settings.dailyDoubleMinWager)
+        const minWager = Math.min(configuredMin, maxWager)
+        const wager = Math.max(minWager, Math.min(msg.wager, maxWager))
         setDailyDoubleBet(wager)
         net.broadcast({ type: 'DAILY_DOUBLE_ACCEPT_BET', wager })
       }

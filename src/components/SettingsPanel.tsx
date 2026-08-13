@@ -35,9 +35,22 @@ export default function SettingsPanel({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [editScore, setEditScore] = useState('')
+  const [minWagerText, setMinWagerText] = useState('')
+  const [minWagerFocused, setMinWagerFocused] = useState(false)
+
+  const minWagerDisplay = minWagerFocused
+    ? minWagerText
+    : String(settings.dailyDoubleMinWager)
 
   function toggle(key: keyof GameSettings) {
     onSettingsChange({ ...settings, [key]: !settings[key] })
+  }
+
+  function commitMinWager(raw: string) {
+    const n = Math.max(0, parseInt(raw, 10) || 0)
+    if (n !== settings.dailyDoubleMinWager) {
+      onSettingsChange({ ...settings, dailyDoubleMinWager: n })
+    }
   }
 
   function startEdit(p: Player) {
@@ -74,6 +87,53 @@ export default function SettingsPanel({
               onChange={() => toggle('allowNegativeScore')}
               disabled={!settings.pointDeduction}
             />
+            <div
+              className="settings-toggle"
+              style={{ cursor: 'default' }}
+            >
+              <div className="flex-1 min-w-0">
+                <div className="font-condensed font-bold" style={{ fontSize: '1.0625rem', lineHeight: 1.3 }}>
+                  Daily Double minimum wager
+                </div>
+                <div
+                  className="leading-relaxed"
+                  style={{ color: '#6b7db3', fontSize: '0.9375rem', marginTop: 'var(--space-xs)' }}
+                >
+                  Lowest amount a player can wager on a Daily Double
+                </div>
+              </div>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                className="w-20 text-center font-display flex-shrink-0"
+                style={{ padding: '8px 4px' }}
+                value={minWagerDisplay}
+                onFocus={() => {
+                  setMinWagerFocused(true)
+                  setMinWagerText(String(settings.dailyDoubleMinWager))
+                }}
+                onChange={(e) => {
+                  const raw = e.target.value
+                  if (raw === '') {
+                    setMinWagerText('')
+                    return
+                  }
+                  if (!/^\d+$/.test(raw)) return
+                  setMinWagerText(String(parseInt(raw, 10)))
+                }}
+                onBlur={() => {
+                  commitMinWager(minWagerText)
+                  setMinWagerFocused(false)
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.currentTarget.blur()
+                  }
+                }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
             <SettingsToggle
               label="Auto buzz queue on clue"
               description="Players can buzz immediately after the clue is revealed"

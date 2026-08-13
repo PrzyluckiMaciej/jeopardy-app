@@ -612,6 +612,7 @@ export default function PlayerPage() {
     const maxPV = Math.max(...(state.board?.pointValues ?? [0]))
     return myScore > maxPV ? myScore : maxPV
   })()
+  const minDdWager = Math.min(Math.max(0, settings.dailyDoubleMinWager), maxDdWager)
 
   const ddWagerForm = (
     <div className="dd-wager-form w-full flex flex-col gap-3">
@@ -619,11 +620,11 @@ export default function PlayerPage() {
         Enter your wager
       </div>
       <div className="text-xs text-center" style={{ color: '#4a5580' }}>
-        Min: $1 &middot; Max: ${maxDdWager}
+        Min: ${minDdWager} &middot; Max: ${maxDdWager}
       </div>
       <input
         type="number"
-        min={1}
+        min={minDdWager}
         className="w-full text-center font-display text-xl"
         placeholder="Wager amount"
         value={ddWagerInput}
@@ -647,14 +648,12 @@ export default function PlayerPage() {
 
   function handleSubmitWager() {
     const wager = parseInt(ddWagerInput, 10)
-    if (isNaN(wager) || wager < 1) {
-      setDdWagerError('Minimum wager is $1')
+    if (isNaN(wager) || wager < minDdWager) {
+      setDdWagerError(`Minimum wager is $${minDdWager}`)
       return
     }
-    const maxPointValue = Math.max(...(state.board?.pointValues ?? [0]))
-    const maxWager = myScore > maxPointValue ? myScore : maxPointValue
-    if (wager > maxWager) {
-      setDdWagerError(`Maximum wager is $${maxWager}`)
+    if (wager > maxDdWager) {
+      setDdWagerError(`Maximum wager is $${maxDdWager}`)
       return
     }
     setDdWagerError('')

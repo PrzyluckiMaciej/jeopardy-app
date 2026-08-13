@@ -853,6 +853,7 @@ const defaultState: GameState = {
 const defaultSettings: GameSettings = {
   pointDeduction: false,
   allowNegativeScore: false,
+  dailyDoubleMinWager: 5,
   autoBuzzQueue: false,
   autoBuzzQueueOnMedia: false,
   blurClueOnBuzz: false,
