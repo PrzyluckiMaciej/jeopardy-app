@@ -26,7 +26,8 @@ export default function PlayerPage() {
   const { roomCode, state, settings, setState, setMyPlayerId,
     addBuzz, patchState, updatePlayer, removePlayer, setSettings, setPlayerConnected,
     revealFinalCategory, revealFinalClue, revealFinalMedia, setFinalWager, submitFinalAnswer,
-    markFinalAnswerSubmitted, applyFinalPlayerReveal, judgeFinalAnswer,
+    markFinalAnswerSubmitted, applyFinalPlayerReveal, judgeFinalAnswer, stopFinalTimer,
+    revealFinalAnswer,
   } = useGameStore()
 
   const [connected, setConnected] = useState(false)
@@ -389,8 +390,14 @@ export default function PlayerPage() {
       if (msg.type === 'FINAL_JEOPARDY_ANSWER_LOCKED') {
         markFinalAnswerSubmitted(msg.playerId)
       }
+      if (msg.type === 'FINAL_JEOPARDY_TIMER_STOP') {
+        stopFinalTimer(msg.timerEndsAt)
+      }
       if (msg.type === 'FINAL_JEOPARDY_REVEAL_PLAYER') {
         applyFinalPlayerReveal(msg.playerId, msg.wager, msg.answer)
+      }
+      if (msg.type === 'FINAL_JEOPARDY_REVEAL_ANSWER') {
+        revealFinalAnswer()
       }
       if (msg.type === 'FINAL_JEOPARDY_JUDGE') {
         judgeFinalAnswer(msg.playerId, msg.correct, msg.pointDelta)

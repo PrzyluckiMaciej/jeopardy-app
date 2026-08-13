@@ -859,10 +859,12 @@ interface GameStore {
   setFinalWager: (playerId: string, wager: number) => void
   revealFinalClue: (timerEndsAt?: number) => void
   revealFinalMedia: (timerEndsAt?: number) => void
+  stopFinalTimer: (timerEndsAt?: number) => void
   submitFinalAnswer: (playerId: string, text: string) => void
   markFinalAnswerSubmitted: (playerId: string) => void
   revealFinalPlayer: (playerId: string) => void
   applyFinalPlayerReveal: (playerId: string, wager: number, answer: string) => void
+  revealFinalAnswer: () => void
   judgeFinalAnswer: (playerId: string, correct: boolean, pointDelta: number) => void
 }
 
@@ -1178,8 +1180,8 @@ export const useGameStore = create<GameStore>()(
 
       startFinalJeopardy: (categoryId, question, mediaDataUrl) =>
         set((s) => {
-          let mediaType: 'image' | 'audio' | 'video' | undefined
-          if (mediaDataUrl) {
+          let mediaType = question.mediaType
+          if (mediaDataUrl && !mediaType) {
             if (mediaDataUrl.startsWith('data:image')) mediaType = 'image'
             else if (mediaDataUrl.startsWith('data:audio')) mediaType = 'audio'
             else if (mediaDataUrl.startsWith('data:video')) mediaType = 'video'
@@ -1281,6 +1283,27 @@ export const useGameStore = create<GameStore>()(
           }
         }),
 
+      stopFinalTimer: (timerEndsAt) =>
+        set((s) => {
+          const fj = s.state.finalJeopardy
+          if (!fj || fj.timerEndsAt == null) return s
+          const endsAt = timerEndsAt ?? Date.now()
+          if (endsAt >= fj.timerEndsAt) {
+            return {
+              state: {
+                ...s.state,
+                finalJeopardy: { ...fj, timerEndsAt: endsAt },
+              },
+            }
+          }
+          return {
+            state: {
+              ...s.state,
+              finalJeopardy: { ...fj, timerEndsAt: endsAt },
+            },
+          }
+        }),
+
       submitFinalAnswer: (playerId, text) =>
         set((s) => {
           const fj = s.state.finalJeopardy
@@ -1347,6 +1370,21 @@ export const useGameStore = create<GameStore>()(
                 revealedPlayerIds: fj.revealedPlayerIds.includes(playerId)
                   ? fj.revealedPlayerIds
                   : [...fj.revealedPlayerIds, playerId],
+              },
+            },
+          }
+        }),
+
+      revealFinalAnswer: () =>
+        set((s) => {
+          const fj = s.state.finalJeopardy
+          if (!fj) return s
+          return {
+            state: {
+              ...s.state,
+              finalJeopardy: {
+                ...fj,
+                answerRevealed: true,
               },
             },
           }

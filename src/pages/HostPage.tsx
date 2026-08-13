@@ -19,6 +19,7 @@ import { duplicateFolder } from '../lib/duplicateFolder'
 import { duplicateGameFolder } from '../lib/duplicateGameFolder'
 import { collectFolderSubtree } from '../lib/folderSubtree'
 import { getMedia, blobToDataUrl } from '../lib/db'
+import { mimeTypeToMediaType } from '../lib/mediaType'
 import { logEvent } from '../lib/logger'
 import {
   evaluatePlayerJoin,
@@ -73,7 +74,7 @@ export default function HostPage() {
   const { state, settings, roomCode, setSettings, addPlayer, removePlayer, updatePlayer,
     openCard, patchState, setPlayerConnected, addBuzz, resetBoard, setBoardControl,
     startDailyDouble, setDailyDoubleBet, selectGame, setBoardTransition, showPodium,
-    startFinalJeopardy, setFinalWager, submitFinalAnswer } = store
+    startFinalJeopardy, setFinalWager, submitFinalAnswer, stopFinalTimer } = store
   const boardStore = useBoardStore()
 
   const [tab, setTab] = useState<Tab>('board')
@@ -432,6 +433,18 @@ export default function HostPage() {
           peerId,
         )
         net.broadcast({ type: 'FINAL_JEOPARDY_ANSWER_LOCKED', playerId: clientId })
+        const fj = useGameStore.getState().state.finalJeopardy
+        if (fj) {
+          const wagered = Object.keys(fj.wagers)
+          if (
+            wagered.length > 0 &&
+            wagered.every((id) => fj.submittedAnswerIds.includes(id))
+          ) {
+            const timerEndsAt = Date.now()
+            stopFinalTimer(timerEndsAt)
+            net.broadcast({ type: 'FINAL_JEOPARDY_TIMER_STOP', timerEndsAt })
+          }
+        }
       }
       if (msg.type === 'EMOJI_REACT') {
         const { playerId, emoji } = msg
@@ -475,11 +488,19 @@ export default function HostPage() {
     const question = category?.questions[0]
     if (!category || !question) return
     let mediaDataUrl: string | undefined
+    let mediaType = question.mediaType
     if (question.mediaId) {
       const rec = await getMedia(question.mediaId)
-      if (rec) mediaDataUrl = await blobToDataUrl(rec.blob)
+      if (rec) {
+        mediaDataUrl = await blobToDataUrl(rec.blob)
+        if (!mediaType) mediaType = mimeTypeToMediaType(rec.mimeType)
+      }
     }
-    startFinalJeopardy(category.id, question, mediaDataUrl)
+    const q =
+      mediaType && mediaType !== question.mediaType
+        ? { ...question, mediaType }
+        : question
+    startFinalJeopardy(category.id, q, mediaDataUrl)
   }
 
   function handleSelectBoard(board: Board) {

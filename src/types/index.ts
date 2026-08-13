@@ -61,9 +61,13 @@ export interface Board {
 
 /** Live Final Jeopardy round state (host-authoritative). */
 export interface FinalJeopardyState {
+  /** Epoch ms when this round object was created (resets local player form state). */
+  startedAt: number
   categoryRevealed: boolean
   clueRevealed: boolean
   mediaRevealed: boolean
+  /** Host has revealed the correct answer text. */
+  answerRevealed: boolean
   /** Epoch ms; null until first clue/media reveal starts the 30s timer. */
   timerEndsAt: number | null
   wagers: Record<string, number>
@@ -78,9 +82,11 @@ export const FINAL_JEOPARDY_TIMER_MS = 30_000
 
 export function emptyFinalJeopardyState(): FinalJeopardyState {
   return {
+    startedAt: Date.now(),
     categoryRevealed: false,
     clueRevealed: false,
     mediaRevealed: false,
+    answerRevealed: false,
     timerEndsAt: null,
     wagers: {},
     answers: {},
@@ -229,7 +235,9 @@ export type NetMessage =
   | { type: 'FINAL_JEOPARDY_REVEAL_MEDIA'; timerEndsAt: number }
   | { type: 'FINAL_JEOPARDY_SUBMIT_ANSWER'; playerId: string; text: string }
   | { type: 'FINAL_JEOPARDY_ANSWER_LOCKED'; playerId: string }
+  | { type: 'FINAL_JEOPARDY_TIMER_STOP'; timerEndsAt: number }
   | { type: 'FINAL_JEOPARDY_REVEAL_PLAYER'; playerId: string; wager: number; answer: string }
+  | { type: 'FINAL_JEOPARDY_REVEAL_ANSWER' }
   | { type: 'FINAL_JEOPARDY_JUDGE'; playerId: string; correct: boolean; pointDelta: number }
   | { type: 'EMOJI_REACT'; playerId: string; emoji: string }
 

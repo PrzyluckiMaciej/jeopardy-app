@@ -6,7 +6,6 @@ import { useCountdownSeconds } from '../hooks/useCountdownSeconds'
 import * as net from '../lib/network'
 import { useGameStore } from '../store/gameStore'
 import QuestionMediaPlayer from './QuestionMediaPlayer'
-import QuestionOverlayText from './QuestionOverlayText'
 
 interface Props {
   state: GameState
@@ -30,10 +29,11 @@ export default function FinalJeopardyOverlay({ state, settings }: Props) {
   const allEligibleWagered =
     eligible.length > 0 && eligible.every((p) => finalJeopardy.wagers[p.id] != null)
   const timerActive = finalJeopardy.timerEndsAt != null
-  const timerDone = timerActive && remaining === 0
   const allAnswersIn =
     wageredIds.length > 0 &&
     wageredIds.every((id) => finalJeopardy.submittedAnswerIds.includes(id))
+  const timerDone = (timerActive && remaining === 0) || allAnswersIn
+  const showTimer = timerActive && remaining != null && remaining > 0 && !allAnswersIn
   const canRevealPlayers = timerDone || allAnswersIn
   const allJudged =
     wageredIds.length > 0 &&
@@ -58,6 +58,11 @@ export default function FinalJeopardyOverlay({ state, settings }: Props) {
     const timerEndsAt = ensureTimerEndsAt()
     store.revealFinalMedia(timerEndsAt)
     net.broadcast({ type: 'FINAL_JEOPARDY_REVEAL_MEDIA', timerEndsAt })
+  }
+
+  function handleRevealAnswer() {
+    store.revealFinalAnswer()
+    net.broadcast({ type: 'FINAL_JEOPARDY_REVEAL_ANSWER' })
   }
 
   function handleRevealPlayer(playerId: string) {
@@ -101,198 +106,228 @@ export default function FinalJeopardyOverlay({ state, settings }: Props) {
         <div className="font-display text-xl" style={{ color: 'var(--gold-bright)' }}>
           Final Jeopardy
         </div>
-        {timerActive && remaining != null && (
+        {showTimer && (
           <div
             className="font-display text-2xl tabular-nums"
-            style={{ color: remaining <= 5 ? 'var(--red)' : 'var(--gold-bright)' }}
+            style={{ color: remaining! <= 5 ? 'var(--red)' : 'var(--gold-bright)' }}
           >
             {remaining}s
           </div>
         )}
       </div>
 
-      <div className="flex-1 min-h-0 panel flex flex-col gap-4 p-4 overflow-auto">
-        {!finalJeopardy.categoryRevealed ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-4">
-            <div className="font-condensed text-lg" style={{ color: '#4a5580' }}>
-              Ready when you are
+      <div className="final-jeopardy-layout flex-1 min-h-0">
+        <div className="final-jeopardy-main panel flex flex-col gap-4 p-4 min-h-0 overflow-hidden">
+          {!finalJeopardy.categoryRevealed ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-4">
+              <div className="font-condensed text-lg" style={{ color: '#4a5580' }}>
+                Ready when you are
+              </div>
+              <button type="button" className="btn-gold btn-with-icon" onClick={handleRevealCategory}>
+                <Eye size={16} aria-hidden />
+                <span>Reveal category</span>
+              </button>
             </div>
-            <button type="button" className="btn-gold btn-with-icon" onClick={handleRevealCategory}>
-              <Eye size={16} aria-hidden />
-              <span>Reveal category</span>
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className="text-center">
-              <div
-                className="font-condensed text-xs uppercase tracking-widest mb-1"
-                style={{ color: 'var(--gold)', opacity: 0.7 }}
-              >
-                Category
-              </div>
-              <div className="font-display text-3xl" style={{ color: 'var(--gold-bright)' }}>
-                {categoryName}
-              </div>
-            </div>
-
-            {(showClue || showMedia) && (
-              <div className="flex flex-col gap-3 flex-1 min-h-0">
-                <QuestionOverlayText
-                  className="final-jeopardy-clue"
-                  contentKey={`fj-${question.id}-${finalJeopardy.clueRevealed}-${finalJeopardy.mediaRevealed}`}
-                  clue={question.question}
-                  answer={question.answer || '—'}
-                  clueRevealed={showClue}
-                  answerRevealed={false}
-                  showAnswerContent={false}
-                  hasMediaSlot={hasMedia}
-                  showMediaContent={showMedia}
-                  media={
-                    activeMedia ? (
-                      <QuestionMediaPlayer
-                        media={activeMedia}
-                        role="host"
-                        playback={mediaPlayback}
-                        mountKey={finalJeopardy.mediaRevealed ? 1 : 0}
-                        mediaActive={showMedia}
-                        className={`question-overlay-media${showMedia ? '' : ' question-overlay-media--pending'}`}
-                      />
-                    ) : undefined
-                  }
-                />
-              </div>
-            )}
-
-            {focusPlayer && finalJeopardy.revealedPlayerIds.includes(focusPlayer.id) && (
-              <div className="final-jeopardy-reveal panel p-3 flex flex-col gap-2">
-                <div className="font-condensed font-bold text-lg">{focusPlayer.name}</div>
-                <div className="font-display text-xl" style={{ color: 'var(--gold-bright)' }}>
-                  Wager: {formatScore(finalJeopardy.wagers[focusPlayer.id] ?? 0)}
+          ) : (
+            <>
+              <div className="text-center flex-shrink-0">
+                <div
+                  className="font-condensed text-xs uppercase tracking-widest mb-1"
+                  style={{ color: 'var(--gold)', opacity: 0.7 }}
+                >
+                  Category
                 </div>
-                <div className="font-condensed text-base">
-                  {finalJeopardy.answers[focusPlayer.id] ?? '(no answer)'}
+                <div className="font-display text-3xl" style={{ color: 'var(--gold-bright)' }}>
+                  {categoryName}
                 </div>
-                {finalJeopardy.judged[focusPlayer.id] == null ? (
-                  <div className="flex gap-2 mt-1">
-                    <button
-                      type="button"
-                      className="btn-gold flex-1 btn-with-icon justify-center"
-                      onClick={() => handleJudge(focusPlayer.id, true)}
-                    >
-                      <Check size={16} aria-hidden />
-                      <span>Correct</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-ghost flex-1 btn-with-icon justify-center"
-                      style={{ color: 'var(--red)', borderColor: 'var(--red)' }}
-                      onClick={() => handleJudge(focusPlayer.id, false)}
-                    >
-                      <X size={16} aria-hidden />
-                      <span>Wrong</span>
-                    </button>
+              </div>
+
+              <div className="final-jeopardy-stage flex-1 min-h-0 flex flex-col gap-3">
+                {showClue && (
+                  <div className="final-jeopardy-clue-text font-condensed">
+                    {question.question}
                   </div>
-                ) : (
-                  <div
-                    className="font-condensed text-sm"
-                    style={{
-                      color: finalJeopardy.judged[focusPlayer.id] ? 'var(--success)' : 'var(--red)',
-                    }}
-                  >
-                    {finalJeopardy.judged[focusPlayer.id] ? 'Marked correct' : 'Marked wrong'}
+                )}
+                {showMedia && activeMedia && (
+                  <div className="final-jeopardy-media flex-1 min-h-0">
+                    <QuestionMediaPlayer
+                      media={activeMedia}
+                      role="host"
+                      playback={mediaPlayback}
+                      mountKey={1}
+                      mediaActive
+                      className="question-overlay-media"
+                    />
+                  </div>
+                )}
+                {!showClue && !showMedia && (
+                  <div className="flex-1 flex items-center justify-center font-condensed text-sm animate-pulse" style={{ color: '#4a5580' }}>
+                    Waiting to reveal clue or media…
+                  </div>
+                )}
+                {finalJeopardy.answerRevealed && (
+                  <div className="final-jeopardy-correct-answer flex-shrink-0">
+                    <div
+                      className="font-condensed text-xs uppercase tracking-widest mb-1"
+                      style={{ color: 'var(--gold)', opacity: 0.7 }}
+                    >
+                      Answer
+                    </div>
+                    <div className="font-condensed text-xl" style={{ color: 'var(--gold-bright)' }}>
+                      {question.answer || '—'}
+                    </div>
                   </div>
                 )}
               </div>
-            )}
-          </>
-        )}
-      </div>
+            </>
+          )}
+        </div>
 
-      {finalJeopardy.categoryRevealed && (
-        <div className="flex-shrink-0 panel p-3 flex flex-col gap-3">
-          <div className="flex flex-wrap gap-2">
-            {!finalJeopardy.clueRevealed && hasClue && (
-              <button type="button" className="btn-gold btn-with-icon" onClick={handleRevealClue}>
-                <Eye size={14} aria-hidden />
-                <span>Reveal clue</span>
-              </button>
-            )}
-            {!finalJeopardy.mediaRevealed && hasMedia && (
-              <button type="button" className="btn-gold btn-with-icon" onClick={handleRevealMedia}>
-                <Eye size={14} aria-hidden />
-                <span>Reveal media</span>
-              </button>
-            )}
-          </div>
+        {finalJeopardy.categoryRevealed && (
+          <aside className="final-jeopardy-side panel p-3 flex flex-col gap-3 min-h-0">
+            <div className="flex flex-col gap-2 flex-shrink-0">
+              {!finalJeopardy.clueRevealed && hasClue && (
+                <button type="button" className="btn-gold w-full btn-with-icon justify-center" onClick={handleRevealClue}>
+                  <Eye size={14} aria-hidden />
+                  <span>Reveal clue</span>
+                </button>
+              )}
+              {!finalJeopardy.mediaRevealed && hasMedia && (
+                <button type="button" className="btn-outline w-full btn-with-icon justify-center" onClick={handleRevealMedia}>
+                  <Eye size={14} aria-hidden />
+                  <span>Reveal media</span>
+                </button>
+              )}
+              {(finalJeopardy.clueRevealed || finalJeopardy.mediaRevealed) &&
+                !finalJeopardy.answerRevealed && (
+                <button type="button" className="btn-outline w-full btn-with-icon justify-center" onClick={handleRevealAnswer}>
+                  <Eye size={14} aria-hidden />
+                  <span>Reveal answer</span>
+                </button>
+              )}
+            </div>
 
-          <div className="font-condensed text-xs uppercase tracking-wider" style={{ color: 'var(--gold)', opacity: 0.7 }}>
-            Players
-            {allEligibleWagered ? ' · all wagers in' : ''}
-            {timerActive && !timerDone ? ' · answering…' : ''}
-            {canRevealPlayers && !allJudged ? ' · ready to reveal' : ''}
-          </div>
-
-          <div className="flex flex-col gap-1 max-h-40 overflow-auto">
-            {eligible.length === 0 && (
-              <div className="text-sm" style={{ color: '#4a5580' }}>
-                No players with a positive score
-              </div>
-            )}
-            {eligible.map((p) => {
-              const wagered = finalJeopardy.wagers[p.id] != null
-              const answered = finalJeopardy.submittedAnswerIds.includes(p.id)
-              const revealed = finalJeopardy.revealedPlayerIds.includes(p.id)
-              const judged = finalJeopardy.judged[p.id]
-              return (
-                <div
-                  key={p.id}
-                  className="flex items-center gap-2 py-1 px-2 rounded"
-                  style={{ background: 'rgba(255,255,255,0.04)' }}
-                >
-                  <span className="font-condensed font-bold flex-1 truncate">{p.name}</span>
-                  <span className="text-xs tabular-nums" style={{ color: '#8a93b2' }}>
-                    {formatScore(p.score)}
-                  </span>
-                  {wagered ? (
-                    <span className="text-xs" style={{ color: 'var(--gold)' }}>
-                      {formatScore(finalJeopardy.wagers[p.id]!)}
-                    </span>
+            <div
+              className="final-jeopardy-judge-slot flex-shrink-0"
+              aria-live="polite"
+            >
+              {focusPlayer && finalJeopardy.revealedPlayerIds.includes(focusPlayer.id) ? (
+                <div className="final-jeopardy-reveal flex flex-col gap-2">
+                  <div className="font-condensed font-bold text-lg">{focusPlayer.name}</div>
+                  <div className="font-display text-xl" style={{ color: 'var(--gold-bright)' }}>
+                    Wager: {formatScore(finalJeopardy.wagers[focusPlayer.id] ?? 0)}
+                  </div>
+                  <div className="font-condensed text-base break-words">
+                    {finalJeopardy.answers[focusPlayer.id] ?? '(no answer)'}
+                  </div>
+                  {finalJeopardy.judged[focusPlayer.id] == null ? (
+                    <div className="flex gap-2 mt-1">
+                      <button
+                        type="button"
+                        className="btn-gold flex-1 btn-with-icon justify-center"
+                        onClick={() => handleJudge(focusPlayer.id, true)}
+                      >
+                        <Check size={16} aria-hidden />
+                        <span>Correct</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-ghost flex-1 btn-with-icon justify-center"
+                        style={{ color: 'var(--red)', borderColor: 'var(--red)' }}
+                        onClick={() => handleJudge(focusPlayer.id, false)}
+                      >
+                        <X size={16} aria-hidden />
+                        <span>Wrong</span>
+                      </button>
+                    </div>
                   ) : (
-                    <span className="text-xs" style={{ color: '#4a5580' }}>
-                      no wager
-                    </span>
-                  )}
-                  {timerActive && (
-                    answered ? (
-                      <CheckCircle size={14} style={{ color: 'var(--success)' }} aria-label="Answer submitted" />
-                    ) : (
-                      <span className="text-xs" style={{ color: '#4a5580' }}>…</span>
-                    )
-                  )}
-                  {canRevealPlayers && wagered && !revealed && (
-                    <button
-                      type="button"
-                      className="btn-ghost text-xs py-0.5 px-2"
-                      onClick={() => handleRevealPlayer(p.id)}
+                    <div
+                      className="font-condensed text-sm"
+                      style={{
+                        color: finalJeopardy.judged[focusPlayer.id] ? 'var(--success)' : 'var(--red)',
+                      }}
                     >
-                      Reveal
-                    </button>
-                  )}
-                  {judged != null && (
-                    <span
-                      className="text-xs font-condensed"
-                      style={{ color: judged ? 'var(--success)' : 'var(--red)' }}
-                    >
-                      {judged ? '✓' : '✗'}
-                    </span>
+                      {finalJeopardy.judged[focusPlayer.id] ? 'Marked correct' : 'Marked wrong'}
+                    </div>
                   )}
                 </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
+              ) : (
+                <div className="font-condensed text-sm" style={{ color: '#4a5580' }}>
+                  {canRevealPlayers
+                    ? 'Reveal a player to show their wager and answer'
+                    : 'Player reveals appear here'}
+                </div>
+              )}
+            </div>
+
+            <div className="font-condensed text-xs uppercase tracking-wider flex-shrink-0" style={{ color: 'var(--gold)', opacity: 0.7 }}>
+              Players
+              {allEligibleWagered ? ' · all wagers in' : ''}
+              {showTimer ? ' · answering…' : ''}
+              {canRevealPlayers && !allJudged ? ' · ready to reveal' : ''}
+            </div>
+
+            <div className="flex flex-col gap-1 flex-1 min-h-0 overflow-auto">
+              {eligible.length === 0 && (
+                <div className="text-sm" style={{ color: '#4a5580' }}>
+                  No players with a positive score
+                </div>
+              )}
+              {eligible.map((p) => {
+                const wagered = finalJeopardy.wagers[p.id] != null
+                const answered = finalJeopardy.submittedAnswerIds.includes(p.id)
+                const revealed = finalJeopardy.revealedPlayerIds.includes(p.id)
+                const judged = finalJeopardy.judged[p.id]
+                return (
+                  <div
+                    key={p.id}
+                    className="flex items-center gap-2 py-1 px-2 rounded"
+                    style={{ background: 'rgba(255,255,255,0.04)' }}
+                  >
+                    <span className="font-condensed font-bold flex-1 truncate">{p.name}</span>
+                    <span className="text-xs tabular-nums" style={{ color: '#8a93b2' }}>
+                      {formatScore(p.score)}
+                    </span>
+                    {wagered ? (
+                      <span className="text-xs" style={{ color: 'var(--gold)' }}>
+                        {formatScore(finalJeopardy.wagers[p.id]!)}
+                      </span>
+                    ) : (
+                      <span className="text-xs" style={{ color: '#4a5580' }}>
+                        no wager
+                      </span>
+                    )}
+                    {timerActive && (
+                      answered ? (
+                        <CheckCircle size={14} style={{ color: 'var(--success)' }} aria-label="Answer submitted" />
+                      ) : (
+                        <span className="text-xs" style={{ color: '#4a5580' }}>…</span>
+                      )
+                    )}
+                    {canRevealPlayers && wagered && !revealed && (
+                      <button
+                        type="button"
+                        className="btn-ghost text-xs py-0.5 px-2"
+                        onClick={() => handleRevealPlayer(p.id)}
+                      >
+                        Reveal
+                      </button>
+                    )}
+                    {judged != null && (
+                      <span
+                        className="text-xs font-condensed"
+                        style={{ color: judged ? 'var(--success)' : 'var(--red)' }}
+                      >
+                        {judged ? '✓' : '✗'}
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </aside>
+        )}
+      </div>
     </div>
   )
 }
