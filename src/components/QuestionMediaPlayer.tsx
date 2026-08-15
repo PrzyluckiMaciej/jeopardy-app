@@ -129,6 +129,11 @@ function MediaSeekBar({ value, max, onChange, ariaLabel = 'Seek' }: MediaSeekBar
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
+    // Space must not reach the media element (native play/pause).
+    if (e.key === ' ' || e.key === 'Spacebar') {
+      e.preventDefault()
+      return
+    }
     if (max <= 0) return
     const step = Math.max(0.1, max / 100)
     if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
@@ -553,6 +558,80 @@ export default function QuestionMediaPlayer({
     lastPlaybackRef.current = playback
   }, [playback])
 
+  // Players may only adjust local volume; block native media keyboard shortcuts
+  // (Space / K / media keys) so they cannot pause or seek independently of the host.
+  useEffect(() => {
+    if (isHost || !mediaActive || media.type === 'image') return
+
+    const isPlaybackKey = (key: string) =>
+      key === ' ' ||
+      key === 'Spacebar' ||
+      key === 'k' ||
+      key === 'K' ||
+      key === 'j' ||
+      key === 'J' ||
+      key === 'l' ||
+      key === 'L' ||
+      key === 'MediaPlayPause' ||
+      key === 'MediaTrackNext' ||
+      key === 'MediaTrackPrevious' ||
+      key === 'MediaFastForward' ||
+      key === 'MediaRewind'
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!isPlaybackKey(e.key)) return
+      const target = e.target
+      if (target instanceof HTMLElement) {
+        const inUiControl = target.closest(
+          'input, textarea, select, button, [contenteditable="true"]',
+        )
+        // Allow Space/letters in form fields and on buttons (mute, buzz); still block OS media keys.
+        if (inUiControl && !e.key.startsWith('Media')) return
+      }
+      e.preventDefault()
+      e.stopPropagation()
+    }
+
+    window.addEventListener('keydown', onKeyDown, true)
+
+    const resyncFromSession = () => {
+      const el = mediaRef.current
+      const synced = lastPlaybackRef.current
+      if (!el || !synced) return
+      applyPlaybackToElement(el, synced, applyingRef)
+    }
+
+    const sessionActions = [
+      'play',
+      'pause',
+      'seekbackward',
+      'seekforward',
+      'seekto',
+    ] as const
+    if ('mediaSession' in navigator) {
+      for (const action of sessionActions) {
+        try {
+          navigator.mediaSession.setActionHandler(action, resyncFromSession)
+        } catch {
+          /* unsupported action in this browser */
+        }
+      }
+    }
+
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, true)
+      if ('mediaSession' in navigator) {
+        for (const action of sessionActions) {
+          try {
+            navigator.mediaSession.setActionHandler(action, null)
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    }
+  }, [isHost, mediaActive, media.type])
+
   useEffect(() => {
     const el = mediaRef.current
     if (!el || media.type === 'image') return
@@ -676,12 +755,25 @@ export default function QuestionMediaPlayer({
     }
 
     const onPlayerTamper = () => {
-      if (isHost || applyingRef.current || !mediaActive) return
-      const synced = lastPlaybackRef.current
-      if (synced) {
+      if (isHost || !mediaActive) return
+
+      const resyncIfDrifted = () => {
+        if (applyingRef.current) {
+          requestAnimationFrame(resyncIfDrifted)
+          return
+        }
+        const synced = lastPlaybackRef.current
+        if (!synced) return
+        const drifted =
+          el.paused !== synced.paused ||
+          Math.abs(el.currentTime - synced.currentTime) > 0.35 ||
+          el.playbackRate !== synced.playbackRate
+        if (!drifted) return
         const controller = new AbortController()
         applyPlaybackWhenReady(el, synced, applyingRef, getLatestPlayback, controller.signal)
       }
+
+      resyncIfDrifted()
     }
 
     el.addEventListener('timeupdate', onTimeUpdate)
