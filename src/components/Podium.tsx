@@ -16,7 +16,7 @@ const PODIUM_HEIGHTS = [220, 160, 120]
 const PODIUM_ORDER = [1, 0, 2]
 
 export default function Podium({ players, highlightId }: Props) {
-  const sorted = [...players].sort((a, b) => b.score - a.score)
+  const sorted = [...players].filter((p) => !p.isSpectator).sort((a, b) => b.score - a.score)
   const top3 = sorted.slice(0, 3)
 
   if (top3.length === 0) {

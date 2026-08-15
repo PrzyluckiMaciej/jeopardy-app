@@ -832,6 +832,7 @@ interface GameStore {
   removePlayer: (id: string) => void
   updatePlayer: (player: Player) => void
   setPlayerConnected: (id: string, connected: boolean) => void
+  setPlayerSpectator: (id: string, isSpectator: boolean) => void
   setBoardControl: (id: string | null) => void
   openCard: (categoryId: string, question: Question, mediaDataUrl?: string, reveal?: { clue?: boolean; media?: boolean }) => void
   closeCard: () => void
@@ -902,7 +903,16 @@ export const useGameStore = create<GameStore>()(
       setIsHost: (v) => set({ isHost: v }),
       setRoomCode: (code) => set({ roomCode: code }),
       setMyPlayerId: (id) => set({ myPlayerId: id }),
-      setState: (state) => set({ state }),
+      setState: (state) =>
+        set({
+          state: {
+            ...state,
+            players: state.players.map((p) => ({
+              ...p,
+              isSpectator: p.isSpectator === true,
+            })),
+          },
+        }),
       setSettings: (settings) => set({ settings }),
       patchState: (patch) => set((s) => ({ state: { ...s.state, ...patch } })),
 
@@ -912,7 +922,7 @@ export const useGameStore = create<GameStore>()(
             ...s.state,
             players: s.state.players.some((p) => p.id === player.id)
               ? s.state.players
-              : [...s.state.players, player],
+              : [...s.state.players, { ...player, isSpectator: player.isSpectator === true }],
           },
         })),
 
@@ -931,7 +941,9 @@ export const useGameStore = create<GameStore>()(
         set((s) => ({
           state: {
             ...s.state,
-            players: s.state.players.map((p) => (p.id === player.id ? player : p)),
+            players: s.state.players.map((p) =>
+              p.id === player.id ? { ...player, isSpectator: player.isSpectator === true } : p
+            ),
           },
         })),
 
@@ -944,6 +956,33 @@ export const useGameStore = create<GameStore>()(
             ),
           },
         })),
+
+      setPlayerSpectator: (id, isSpectator) =>
+        set((s) => {
+          const exists = s.state.players.some((p) => p.id === id)
+          if (!exists) return s
+          if (isSpectator) {
+            return {
+              state: {
+                ...s.state,
+                players: s.state.players.map((p) =>
+                  p.id === id ? { ...p, isSpectator: true, score: 0 } : p
+                ),
+                buzzQueue: s.state.buzzQueue.filter((pid) => pid !== id),
+                boardControlId:
+                  s.state.boardControlId === id ? null : s.state.boardControlId,
+              },
+            }
+          }
+          return {
+            state: {
+              ...s.state,
+              players: s.state.players.map((p) =>
+                p.id === id ? { ...p, isSpectator: false } : p
+              ),
+            },
+          }
+        }),
 
       setBoardControl: (id) =>
         set((s) => ({ state: { ...s.state, boardControlId: id } })),
@@ -1000,6 +1039,8 @@ export const useGameStore = create<GameStore>()(
 
       addBuzz: (playerId) =>
         set((s) => {
+          const player = s.state.players.find((p) => p.id === playerId)
+          if (!player || player.isSpectator) return s
           if (s.state.buzzQueue.includes(playerId)) return s
           return {
             state: {
@@ -1013,20 +1054,24 @@ export const useGameStore = create<GameStore>()(
         set((s) => ({ state: { ...s.state, buzzQueue: [], phase: 'buzzing' } })),
 
       judgeAnswer: (playerId, correct, pointDelta) =>
-        set((s) => ({
-          state: {
-            ...s.state,
-            // Keep answer visible if it was already revealed (e.g. incorrect after reveal)
-            phase: correct || s.state.phase === 'revealed' ? 'revealed' : 'buzzing',
-            players: s.state.players.map((p) =>
-              p.id === playerId ? { ...p, score: p.score + pointDelta } : p
-            ),
-            buzzQueue: correct
-              ? s.state.buzzQueue
-              : s.state.buzzQueue.filter((id) => id !== playerId),
-            ...(correct && { boardControlId: playerId }),
-          },
-        })),
+        set((s) => {
+          const player = s.state.players.find((p) => p.id === playerId)
+          if (!player || player.isSpectator) return s
+          return {
+            state: {
+              ...s.state,
+              // Keep answer visible if it was already revealed (e.g. incorrect after reveal)
+              phase: correct || s.state.phase === 'revealed' ? 'revealed' : 'buzzing',
+              players: s.state.players.map((p) =>
+                p.id === playerId ? { ...p, score: p.score + pointDelta } : p
+              ),
+              buzzQueue: correct
+                ? s.state.buzzQueue
+                : s.state.buzzQueue.filter((id) => id !== playerId),
+              ...(correct && { boardControlId: playerId }),
+            },
+          }
+        }),
 
       revealAnswer: () =>
         set((s) => ({ state: { ...s.state, phase: 'revealed' } })),
@@ -1214,7 +1259,7 @@ export const useGameStore = create<GameStore>()(
           if (!fj || !fj.categoryRevealed) return s
           if (fj.clueRevealed || fj.mediaRevealed) return s
           const player = s.state.players.find((p) => p.id === playerId)
-          if (!player || player.score <= 0) return s
+          if (!player || player.isSpectator || player.score <= 0) return s
           if (fj.wagers[playerId] != null) return s
           const clamped = Math.max(0, Math.min(Math.floor(wager), player.score))
           return {
@@ -1311,6 +1356,8 @@ export const useGameStore = create<GameStore>()(
           if (!fj || fj.wagers[playerId] == null) return s
           if (fj.submittedAnswerIds.includes(playerId)) return s
           if (fj.timerEndsAt != null && Date.now() > fj.timerEndsAt) return s
+          const player = s.state.players.find((p) => p.id === playerId)
+          if (!player || player.isSpectator) return s
           const trimmed = text.trim()
           if (!trimmed) return s
           return {

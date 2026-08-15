@@ -30,6 +30,24 @@ export function orderPlayersForDisplay(
   return [players[meIndex], ...players.slice(0, meIndex), ...players.slice(meIndex + 1)]
 }
 
+/** Connected and not in spectator mode — eligible for play, board control, scores. */
+export function isParticipating(p: Player): boolean {
+  return p.isConnected && !p.isSpectator
+}
+
+export function participatingPlayers(players: Player[]): Player[] {
+  return players.filter(isParticipating)
+}
+
+/** Normalize players from sync/join so missing isSpectator is treated as false. */
+export function normalizePlayer(p: Player): Player {
+  return { ...p, isSpectator: p.isSpectator === true }
+}
+
+export function normalizePlayers(players: Player[]): Player[] {
+  return players.map(normalizePlayer)
+}
+
 export function formatScore(score: number): string {
   if (score < 0) return `-$${Math.abs(score).toLocaleString()}`
   return `$${score.toLocaleString()}`

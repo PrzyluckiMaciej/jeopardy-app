@@ -141,6 +141,7 @@ export interface Player {
   name: string
   score: number
   isConnected: boolean
+  isSpectator: boolean
 }
 
 export interface MediaPlaybackState {
@@ -218,6 +219,7 @@ export type NetMessage =
   | { type: 'UPDATE_PLAYER'; player: Player }
   | { type: 'REMOVE_PLAYER'; playerId: string }
   | { type: 'SET_BOARD_CONTROL'; playerId: string | null }
+  | { type: 'SET_SPECTATOR'; isSpectator: boolean }
   | { type: 'UPDATE_SETTINGS'; settings: GameSettings }
   | { type: 'MEDIA_MANIFEST'; items: Array<{ mediaId: string; mimeType: string; size: number }> }
   | { type: 'MEDIA_ACK'; mediaId: string }

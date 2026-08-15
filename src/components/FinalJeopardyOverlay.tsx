@@ -25,7 +25,7 @@ export default function FinalJeopardyOverlay({ state, settings }: Props) {
   const categoryName = category?.name ?? 'Final Jeopardy'
   const hasClue = !!question.question.trim()
   const hasMedia = !!question.mediaId || !!activeMedia
-  const eligible = players.filter((p) => p.isConnected && p.score > 0)
+  const eligible = players.filter((p) => p.isConnected && !p.isSpectator && p.score > 0)
   const wageredIds = Object.keys(finalJeopardy.wagers)
   const allEligibleWagered =
     eligible.length > 0 && eligible.every((p) => finalJeopardy.wagers[p.id] != null)
