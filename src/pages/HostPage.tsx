@@ -13,7 +13,7 @@ import { buildItemPathString, resolveFolderOrItemPath } from '../lib/folderPath'
 import * as net from '../lib/network'
 import type { Board, BoardFolder, Game, GameFolder, Player, NetMessage, Question, GameSettings, PlayerSyncStatus } from '../types'
 import { createDefaultBoard, createDefaultFinalJeopardy, cellId, getDailyDoubleQuestionIds, isFinalBoard } from '../lib/utils'
-import { getCategoryGameplaySettings } from '../lib/settings'
+import { getCategoryGameplaySettings, savePersistedSettings } from '../lib/settings'
 import { duplicateBoard } from '../lib/duplicateBoard'
 import { duplicateFolder } from '../lib/duplicateFolder'
 import { duplicateGameFolder } from '../lib/duplicateGameFolder'
@@ -1084,6 +1084,7 @@ export default function HostPage() {
 
   function handleSettingsChange(s: GameSettings) {
     setSettings(s)
+    savePersistedSettings(s)
     net.broadcast({ type: 'UPDATE_SETTINGS', settings: s })
   }
 
