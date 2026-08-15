@@ -420,7 +420,7 @@ export default function QuestionMediaPlayer({
   const mediaRef = useRef<HTMLMediaElement | null>(null)
   const applyingRef = useRef(false)
   const lastPlaybackRef = useRef<MediaPlaybackState | null>(playback)
-  const lastPlaybackAtRef = useRef(performance.now())
+  const lastPlaybackAtRef = useRef(0)
   const prevBuzzQueueLengthRef = useRef<number | null>(null)
   const setMediaPlayback = useGameStore((s) => s.setMediaPlayback)
   const pauseMediaOnBuzz = useGameStore((s) => {
