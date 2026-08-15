@@ -292,10 +292,10 @@ export default function SettingsPanel({
                           <span
                             className="inline-flex items-center gap-1"
                             style={{ color: 'var(--green)', fontSize: '0.75rem' }}
-                            title="All media synced"
+                            title={`${sync.synced} of ${sync.total} media files synced`}
                           >
                             <Check size={12} aria-hidden />
-                            <span className="font-condensed">synced</span>
+                            <span className="font-condensed">synced {sync.synced}/{sync.total}</span>
                           </span>
                         )
                       }
