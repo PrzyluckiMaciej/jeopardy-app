@@ -48,15 +48,28 @@ function stopMediaElement(el: HTMLMediaElement) {
   el.currentTime = 0
 }
 
+/** Extrapolate host timeline between discrete MEDIA_PLAYBACK updates. */
+function expectedCurrentTime(playback: MediaPlaybackState, capturedAtMs: number): number {
+  if (playback.paused) return playback.currentTime
+  const elapsedSec = (performance.now() - capturedAtMs) / 1000
+  return Math.max(0, playback.currentTime + elapsedSec * (playback.playbackRate || 1))
+}
+
 function applyPlaybackToElement(
   el: HTMLMediaElement,
   playback: MediaPlaybackState,
   applyingRef: React.MutableRefObject<boolean>,
+  options?: { capturedAtMs?: number; syncTime?: boolean },
 ) {
+  const syncTime = options?.syncTime !== false
+  const capturedAtMs = options?.capturedAtMs ?? performance.now()
   applyingRef.current = true
   el.playbackRate = playback.playbackRate
-  if (Math.abs(el.currentTime - playback.currentTime) > 0.25) {
-    el.currentTime = playback.currentTime
+  if (syncTime) {
+    const targetTime = expectedCurrentTime(playback, capturedAtMs)
+    if (Math.abs(el.currentTime - targetTime) > 0.25) {
+      el.currentTime = targetTime
+    }
   }
   if (playback.paused) {
     el.pause()
@@ -74,18 +87,24 @@ function applyPlaybackWhenReady(
   applyingRef: React.MutableRefObject<boolean>,
   getLatestPlayback: () => MediaPlaybackState | null,
   signal: AbortSignal,
+  getCapturedAtMs?: () => number,
 ) {
   const apply = () => {
     if (signal.aborted) return
     const latest = getLatestPlayback() ?? playback
-    applyPlaybackToElement(el, latest, applyingRef)
+    const capturedAtMs = getCapturedAtMs?.() ?? performance.now()
+    applyPlaybackToElement(el, latest, applyingRef, { capturedAtMs })
     if (!latest.paused && el.paused) {
       el.addEventListener(
         'canplay',
         () => {
           if (signal.aborted) return
           const current = getLatestPlayback()
-          if (current) applyPlaybackToElement(el, current, applyingRef)
+          if (current) {
+            applyPlaybackToElement(el, current, applyingRef, {
+              capturedAtMs: getCapturedAtMs?.() ?? performance.now(),
+            })
+          }
         },
         { once: true, signal },
       )
@@ -401,6 +420,7 @@ export default function QuestionMediaPlayer({
   const mediaRef = useRef<HTMLMediaElement | null>(null)
   const applyingRef = useRef(false)
   const lastPlaybackRef = useRef<MediaPlaybackState | null>(playback)
+  const lastPlaybackAtRef = useRef(performance.now())
   const prevBuzzQueueLengthRef = useRef<number | null>(null)
   const setMediaPlayback = useGameStore((s) => s.setMediaPlayback)
   const pauseMediaOnBuzz = useGameStore((s) => {
@@ -545,6 +565,7 @@ export default function QuestionMediaPlayer({
   }, [clearHideTimeout, clearLeaveTimeout])
 
   const getLatestPlayback = useCallback(() => lastPlaybackRef.current, [])
+  const getPlaybackCapturedAtMs = useCallback(() => lastPlaybackAtRef.current, [])
 
   const applyVolume = useCallback((el: HTMLMediaElement, v: number) => {
     el.volume = v
@@ -556,6 +577,7 @@ export default function QuestionMediaPlayer({
 
   useEffect(() => {
     lastPlaybackRef.current = playback
+    lastPlaybackAtRef.current = performance.now()
   }, [playback])
 
   // Players may only adjust local volume; block native media keyboard shortcuts
@@ -598,7 +620,11 @@ export default function QuestionMediaPlayer({
       const el = mediaRef.current
       const synced = lastPlaybackRef.current
       if (!el || !synced) return
-      applyPlaybackToElement(el, synced, applyingRef)
+      // Resume/pause in place — never seek from a stale host timestamp.
+      applyPlaybackToElement(el, synced, applyingRef, {
+        capturedAtMs: lastPlaybackAtRef.current,
+        syncTime: false,
+      })
     }
 
     const sessionActions = [
@@ -648,9 +674,16 @@ export default function QuestionMediaPlayer({
     if (isHost) return
 
     const controller = new AbortController()
-    applyPlaybackWhenReady(el, playback, applyingRef, getLatestPlayback, controller.signal)
+    applyPlaybackWhenReady(
+      el,
+      playback,
+      applyingRef,
+      getLatestPlayback,
+      controller.signal,
+      getPlaybackCapturedAtMs,
+    )
     return () => controller.abort()
-  }, [playback, isHost, media.type, mountKey, mediaActive, getLatestPlayback])
+  }, [playback, isHost, media.type, mountKey, mediaActive, getLatestPlayback, getPlaybackCapturedAtMs])
 
   useEffect(() => {
     prevBuzzQueueLengthRef.current = null
@@ -742,6 +775,7 @@ export default function QuestionMediaPlayer({
           applyingRef,
           getLatestPlayback,
           controller.signal,
+          getPlaybackCapturedAtMs,
         )
       }
     }
@@ -764,13 +798,18 @@ export default function QuestionMediaPlayer({
         }
         const synced = lastPlaybackRef.current
         if (!synced) return
-        const drifted =
-          el.paused !== synced.paused ||
-          Math.abs(el.currentTime - synced.currentTime) > 0.35 ||
-          el.playbackRate !== synced.playbackRate
-        if (!drifted) return
-        const controller = new AbortController()
-        applyPlaybackWhenReady(el, synced, applyingRef, getLatestPlayback, controller.signal)
+        const expectedTime = expectedCurrentTime(synced, lastPlaybackAtRef.current)
+        const pauseOrRateDrifted =
+          el.paused !== synced.paused || el.playbackRate !== synced.playbackRate
+        const timeDrifted = Math.abs(el.currentTime - expectedTime) > 0.35
+        if (!pauseOrRateDrifted && !timeDrifted) return
+        // Pause/media-key recovery must not seek (host currentTime is only updated on
+        // discrete events and would jump playback back). Only correct the timeline when
+        // the player actually seeked away from the host position.
+        applyPlaybackToElement(el, synced, applyingRef, {
+          capturedAtMs: lastPlaybackAtRef.current,
+          syncTime: timeDrifted,
+        })
       }
 
       resyncIfDrifted()
@@ -804,7 +843,7 @@ export default function QuestionMediaPlayer({
         el.removeEventListener('ratechange', onPlayerTamper)
       }
     }
-  }, [isHost, media.type, media.dataUrl, mountKey, mediaActive, publishPlayback, getLatestPlayback])
+  }, [isHost, media.type, media.dataUrl, mountKey, mediaActive, publishPlayback, getLatestPlayback, getPlaybackCapturedAtMs])
 
   useEffect(() => {
     return () => {
