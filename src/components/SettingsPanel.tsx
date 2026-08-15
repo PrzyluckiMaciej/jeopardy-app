@@ -170,6 +170,12 @@ export default function SettingsPanel({
               value={settings.autoRevealMedia}
               onChange={() => toggle('autoRevealMedia')}
             />
+            <SettingsToggle
+              label="Auto-start Final Jeopardy timer"
+              description="Start the answering timer when the clue or media is revealed. When off, use the Start timer button instead"
+              value={settings.autoStartFinalTimer}
+              onChange={() => toggle('autoStartFinalTimer')}
+            />
           </div>
         </div>
 

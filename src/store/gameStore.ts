@@ -859,6 +859,7 @@ interface GameStore {
   setFinalWager: (playerId: string, wager: number) => void
   revealFinalClue: (timerEndsAt?: number) => void
   revealFinalMedia: (timerEndsAt?: number) => void
+  startFinalTimer: (timerEndsAt?: number) => void
   stopFinalTimer: (timerEndsAt?: number) => void
   submitFinalAnswer: (playerId: string, text: string) => void
   markFinalAnswerSubmitted: (playerId: string) => void
@@ -898,6 +899,7 @@ const defaultSettings: GameSettings = {
   pauseMediaOnBuzz: false,
   autoRevealClue: false,
   autoRevealMedia: false,
+  autoStartFinalTimer: true,
 }
 
 export const useGameStore = create<GameStore>()(
@@ -1242,10 +1244,7 @@ export const useGameStore = create<GameStore>()(
         set((s) => {
           const fj = s.state.finalJeopardy
           if (!fj) return s
-          const endsAt =
-            fj.timerEndsAt ??
-            timerEndsAt ??
-            Date.now() + FINAL_JEOPARDY_TIMER_MS
+          const endsAt = fj.timerEndsAt ?? timerEndsAt ?? null
           return {
             state: {
               ...s.state,
@@ -1263,10 +1262,7 @@ export const useGameStore = create<GameStore>()(
         set((s) => {
           const fj = s.state.finalJeopardy
           if (!fj) return s
-          const endsAt =
-            fj.timerEndsAt ??
-            timerEndsAt ??
-            Date.now() + FINAL_JEOPARDY_TIMER_MS
+          const endsAt = fj.timerEndsAt ?? timerEndsAt ?? null
           return {
             state: {
               ...s.state,
@@ -1278,6 +1274,22 @@ export const useGameStore = create<GameStore>()(
               finalJeopardy: {
                 ...fj,
                 mediaRevealed: true,
+                timerEndsAt: endsAt,
+              },
+            },
+          }
+        }),
+
+      startFinalTimer: (timerEndsAt) =>
+        set((s) => {
+          const fj = s.state.finalJeopardy
+          if (!fj || fj.timerEndsAt != null) return s
+          const endsAt = timerEndsAt ?? Date.now() + FINAL_JEOPARDY_TIMER_MS
+          return {
+            state: {
+              ...s.state,
+              finalJeopardy: {
+                ...fj,
                 timerEndsAt: endsAt,
               },
             },

@@ -14,6 +14,7 @@ const globalOn: GameSettings = {
   pauseMediaOnBuzz: true,
   autoRevealClue: true,
   autoRevealMedia: true,
+  autoStartFinalTimer: true,
 }
 
 const globalOff: GameSettings = {
@@ -26,6 +27,7 @@ const globalOff: GameSettings = {
   pauseMediaOnBuzz: false,
   autoRevealClue: false,
   autoRevealMedia: false,
+  autoStartFinalTimer: false,
 }
 
 function category(partial: Partial<Category> = {}): Category {
