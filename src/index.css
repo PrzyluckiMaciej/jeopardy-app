@@ -3303,6 +3303,19 @@ body.board-picker-reordering * {
 .player-topbar__exit {
   justify-self: end;
 }
+.player-topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  justify-self: end;
+}
+.player-topbar__spectator {
+  color: #8899cc;
+}
+.player-topbar__spectator:hover {
+  color: var(--gold-bright);
+}
 @media (min-width: 768px) {
   .player-topbar {
     padding-left: max(24px, env(safe-area-inset-left, 0px));
@@ -3564,6 +3577,10 @@ body.board-picker-reordering * {
   background: rgba(0, 200, 180, 0.08);
   border: 1px solid rgba(0, 200, 180, 0.35);
   color: #40e0d0;
+}
+.settings-board-control-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 .settings-board-control-btn--active {
   background: rgba(0, 200, 180, 0.2);

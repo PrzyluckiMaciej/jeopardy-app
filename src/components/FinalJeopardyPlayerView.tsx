@@ -37,7 +37,7 @@ export default function FinalJeopardyPlayerView({
 
   const myPlayer = players.find((p) => p.id === myId)
   const myScore = myPlayer?.score ?? 0
-  const eligible = myScore > 0
+  const eligible = !myPlayer?.isSpectator && myScore > 0
   const myWager = finalJeopardy?.wagers[myId]
   const hasWagered = myWager != null
   const hasAnswered = !!finalJeopardy?.submittedAnswerIds.includes(myId)

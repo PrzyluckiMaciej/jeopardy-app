@@ -1,8 +1,8 @@
-import { formatScore, formatBoardTimestamp, cellId, generateRoomCode, generateId, createDefaultBoard, createDefaultFinalJeopardy, isFinalBoard, orderPlayersForDisplay, getDailyDoubleQuestionIds } from '../utils'
+import { formatScore, formatBoardTimestamp, cellId, generateRoomCode, generateId, createDefaultBoard, createDefaultFinalJeopardy, isFinalBoard, orderPlayersForDisplay, getDailyDoubleQuestionIds, isParticipating, participatingPlayers, normalizePlayer, normalizePlayers } from '../utils'
 import type { Board, Player } from '../../types'
 
 function player(id: string, name: string): Player {
-  return { id, name, score: 0, isConnected: true }
+  return { id, name, score: 0, isConnected: true, isSpectator: false }
 }
 
 describe('orderPlayersForDisplay', () => {
@@ -26,6 +26,31 @@ describe('orderPlayersForDisplay', () => {
 
   it('returns the array unchanged when myPlayerId is not found', () => {
     expect(orderPlayersForDisplay(players, 'missing')).toEqual(players)
+  })
+})
+
+describe('isParticipating / participatingPlayers', () => {
+  it('excludes disconnected and spectator players', () => {
+    const connected = player('a', 'Alice')
+    const offline = { ...player('b', 'Bob'), isConnected: false }
+    const spectator = { ...player('c', 'Carol'), isSpectator: true }
+    expect(isParticipating(connected)).toBe(true)
+    expect(isParticipating(offline)).toBe(false)
+    expect(isParticipating(spectator)).toBe(false)
+    expect(participatingPlayers([connected, offline, spectator])).toEqual([connected])
+  })
+})
+
+describe('normalizePlayer / normalizePlayers', () => {
+  it('treats missing isSpectator as false', () => {
+    const legacy = { id: 'a', name: 'Alice', score: 0, isConnected: true } as Player
+    expect(normalizePlayer(legacy).isSpectator).toBe(false)
+    expect(normalizePlayers([legacy])[0].isSpectator).toBe(false)
+  })
+
+  it('preserves isSpectator true', () => {
+    const spectator = { ...player('a', 'Alice'), isSpectator: true }
+    expect(normalizePlayer(spectator).isSpectator).toBe(true)
   })
 })
 

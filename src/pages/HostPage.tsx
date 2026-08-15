@@ -12,7 +12,7 @@ import {
 import { buildItemPathString, resolveFolderOrItemPath } from '../lib/folderPath'
 import * as net from '../lib/network'
 import type { Board, BoardFolder, Game, GameFolder, Player, NetMessage, Question, GameSettings, PlayerSyncStatus } from '../types'
-import { createDefaultBoard, createDefaultFinalJeopardy, cellId, getDailyDoubleQuestionIds, isFinalBoard } from '../lib/utils'
+import { createDefaultBoard, createDefaultFinalJeopardy, cellId, getDailyDoubleQuestionIds, isFinalBoard, participatingPlayers, normalizePlayer } from '../lib/utils'
 import { getCategoryGameplaySettings, savePersistedSettings } from '../lib/settings'
 import { duplicateBoard } from '../lib/duplicateBoard'
 import { duplicateFolder } from '../lib/duplicateFolder'
@@ -72,7 +72,7 @@ export default function HostPage() {
   const navigate = useNavigate()
   const store = useGameStore()
   const { state, settings, roomCode, setSettings, addPlayer, removePlayer, updatePlayer,
-    openCard, patchState, setPlayerConnected, addBuzz, resetBoard, setBoardControl,
+    openCard, patchState, setPlayerConnected, setPlayerSpectator, addBuzz, resetBoard, setBoardControl,
     startDailyDouble, setDailyDoubleBet, selectGame, setBoardTransition, showPodium,
     startFinalJeopardy, setFinalWager, submitFinalAnswer, stopFinalTimer } = store
   const boardStore = useBoardStore()
@@ -368,7 +368,7 @@ export default function HostPage() {
           return
         }
 
-        const player: Player = { ...msg.player, id: playerId, isConnected: true }
+        const player: Player = { ...normalizePlayer(msg.player), id: playerId, isConnected: true }
         addPlayer(player)
         mediaSyncMap.current.set(playerId, new Set())
         updateSyncStatusState()
@@ -390,8 +390,16 @@ export default function HostPage() {
       if (msg.type === 'BUZZ') {
         const clientId = peerToClient.current.get(peerId)
         if (!clientId) return
+        const buzzPlayer = useGameStore.getState().state.players.find((p) => p.id === clientId)
+        if (!buzzPlayer || buzzPlayer.isSpectator) return
         addBuzz(clientId)
         net.broadcast({ type: 'BUZZ', playerId: clientId, playerName: msg.playerName })
+      }
+      if (msg.type === 'SET_SPECTATOR') {
+        const clientId = peerToClient.current.get(peerId)
+        if (!clientId) return
+        setPlayerSpectator(clientId, msg.isSpectator)
+        net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
       }
       if (msg.type === 'DAILY_DOUBLE_BET') {
         const clientId = peerToClient.current.get(peerId)
@@ -399,7 +407,7 @@ export default function HostPage() {
         const gs = useGameStore.getState()
         if (!gs.state.dailyDouble || gs.state.dailyDouble.playerId !== clientId) return
         const player = gs.state.players.find(p => p.id === clientId)
-        if (!player) return
+        if (!player || player.isSpectator) return
         const maxPointValue = Math.max(...(gs.state.board?.pointValues ?? [0]))
         const maxWager = player.score > maxPointValue ? player.score : maxPointValue
         const configuredMin = Math.max(0, gs.settings.dailyDoubleMinWager)
@@ -411,6 +419,8 @@ export default function HostPage() {
       if (msg.type === 'FINAL_JEOPARDY_WAGER') {
         const clientId = peerToClient.current.get(peerId)
         if (!clientId) return
+        const wagerPlayer = useGameStore.getState().state.players.find((p) => p.id === clientId)
+        if (!wagerPlayer || wagerPlayer.isSpectator) return
         setFinalWager(clientId, msg.wager)
         const locked = useGameStore.getState().state.finalJeopardy?.wagers[clientId]
         if (locked == null) return
@@ -424,6 +434,8 @@ export default function HostPage() {
       if (msg.type === 'FINAL_JEOPARDY_SUBMIT_ANSWER') {
         const clientId = peerToClient.current.get(peerId)
         if (!clientId) return
+        const answerPlayer = useGameStore.getState().state.players.find((p) => p.id === clientId)
+        if (!answerPlayer || answerPlayer.isSpectator) return
         submitFinalAnswer(clientId, msg.text)
         if (!useGameStore.getState().state.finalJeopardy?.submittedAnswerIds.includes(clientId)) {
           return
@@ -506,7 +518,7 @@ export default function HostPage() {
   function handleSelectBoard(board: Board) {
     const b = { ...board }
     setActiveBoard(b)
-    const connectedPlayers = useGameStore.getState().state.players.filter(p => p.isConnected)
+    const connectedPlayers = participatingPlayers(useGameStore.getState().state.players)
     const randomControl = connectedPlayers.length > 0 ? pickRandom(connectedPlayers).id : null
     if (isFinalBoard(b)) {
       patchState({
@@ -551,7 +563,7 @@ export default function HostPage() {
   function handleEditBoard(board: Board) {
     const b = { ...board }
     setActiveBoard(b)
-    const connectedPlayers = useGameStore.getState().state.players.filter(p => p.isConnected)
+    const connectedPlayers = participatingPlayers(useGameStore.getState().state.players)
     const randomControl = connectedPlayers.length > 0 ? pickRandom(connectedPlayers).id : null
     patchState({
       board: b,
@@ -845,7 +857,7 @@ export default function HostPage() {
     if (!manifestCoversBoard(b)) void startPreTransfer(b)
 
     setTimeout(() => {
-      const connectedPlayers = useGameStore.getState().state.players.filter(p => p.isConnected)
+      const connectedPlayers = participatingPlayers(useGameStore.getState().state.players)
       const randomControl = connectedPlayers.length > 0 ? pickRandom(connectedPlayers).id : null
       setBoardTransitionExiting(true)
       patchState({ boardControlId: randomControl })
@@ -893,7 +905,7 @@ export default function HostPage() {
     if (!manifestCoversBoard(b)) void startPreTransfer(b)
 
     setTimeout(() => {
-      const connectedPlayers = useGameStore.getState().state.players.filter(p => p.isConnected)
+      const connectedPlayers = participatingPlayers(useGameStore.getState().state.players)
       const randomControl = connectedPlayers.length > 0 ? pickRandom(connectedPlayers).id : null
       setBoardTransitionExiting(true)
       patchState({ boardControlId: randomControl })
@@ -958,7 +970,7 @@ export default function HostPage() {
     if (!manifestCoversBoard(b)) void startPreTransfer(b)
 
     setTimeout(() => {
-      const connectedPlayers = useGameStore.getState().state.players.filter(p => p.isConnected)
+      const connectedPlayers = participatingPlayers(useGameStore.getState().state.players)
       const randomControl = connectedPlayers.length > 0 ? pickRandom(connectedPlayers).id : null
       setBoardTransitionExiting(true)
       patchState({ boardControlId: randomControl })
@@ -1052,7 +1064,7 @@ export default function HostPage() {
     if (isDailyDouble) {
       const { boardControlId, players } = useGameStore.getState().state
       const ddPlayerId =
-        boardControlId && players.some((p) => p.id === boardControlId)
+        boardControlId && players.some((p) => p.id === boardControlId && !p.isSpectator)
           ? boardControlId
           : null
       if (!ddPlayerId) {
@@ -1089,6 +1101,10 @@ export default function HostPage() {
   }
 
   function handleAssignBoardControl(playerId: string | null) {
+    if (playerId) {
+      const player = state.players.find((p) => p.id === playerId)
+      if (!player || player.isSpectator) return
+    }
     setBoardControl(playerId)
     net.broadcast({ type: 'SET_BOARD_CONTROL', playerId })
   }
@@ -1528,7 +1544,7 @@ export default function HostPage() {
                 <div className="font-condensed text-sm" style={{ color: '#8899cc' }}>
                   {state.gameBoardIds.length} board{state.gameBoardIds.length !== 1 ? 's' : ''}
                   {' · '}
-                  {state.players.filter(p => p.isConnected).length} player{state.players.filter(p => p.isConnected).length !== 1 ? 's' : ''} connected
+                  {participatingPlayers(state.players).length} player{participatingPlayers(state.players).length !== 1 ? 's' : ''} connected
                 </div>
                 <button className="btn-gold text-xl px-12 py-4 flex items-center gap-3" onClick={handleStartGame}>
                   <Play size={24} />
@@ -1543,7 +1559,7 @@ export default function HostPage() {
             {/* Podium view */}
             {state.phase === 'podium' && (
               <div className="flex-1 flex flex-col items-center justify-center gap-6 p-4 overflow-auto w-full min-w-0">
-                <Podium players={state.players} />
+                <Podium players={state.players.filter((p) => !p.isSpectator)} />
                 <button className="btn-gold text-sm mt-4" onClick={handleEndGame}>
                   Back to lobby
                 </button>
@@ -1709,12 +1725,12 @@ export default function HostPage() {
                         aria-expanded={mobilePlayersOpen}
                       >
                         <Users size={14} aria-hidden />
-                        <span>Players ({state.players.filter(p => p.isConnected).length})</span>
+                        <span>Players ({participatingPlayers(state.players).length})</span>
                         {mobilePlayersOpen ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
                       </button>
                       <div className={`mobile-players-collapsible${mobilePlayersOpen ? ' mobile-players-collapsible--open' : ''}`}>
                         <div className="mobile-players-collapsible__inner">
-                          {state.players.some(p => p.isConnected) && (
+                          {participatingPlayers(state.players).length > 0 && (
                             <div className="flex justify-end mb-2">
                               <button
                                 className="font-condensed text-xs px-2 py-1 rounded btn-with-icon"
@@ -1725,7 +1741,7 @@ export default function HostPage() {
                                 }}
                                 title="Randomly select a player to have board control"
                                 onClick={() => {
-                                  const connected = state.players.filter(p => p.isConnected)
+                                  const connected = participatingPlayers(state.players)
                                   if (connected.length === 0) return
                                   const pick = pickRandom(connected)
                                   setBoardControl(pick.id)
@@ -1738,7 +1754,7 @@ export default function HostPage() {
                             </div>
                           )}
                           <Scoreboard
-                            players={state.players}
+                            players={state.players.filter((p) => !p.isSpectator)}
                             buzzQueue={state.buzzQueue}
                             boardControlId={state.boardControlId}
                             activeEmojis={activeEmojis}

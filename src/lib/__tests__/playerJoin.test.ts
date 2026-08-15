@@ -6,6 +6,7 @@ function player(overrides: Partial<Player> & Pick<Player, 'id' | 'name'>): Playe
   return {
     score: 0,
     isConnected: true,
+    isSpectator: false,
     ...overrides,
   }
 }

@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { LogOut, Users, ChevronUp, ChevronDown } from 'lucide-react'
+import { LogOut, Users, ChevronUp, ChevronDown, Eye, EyeOff } from 'lucide-react'
 import PlayerActionZone from '../components/PlayerActionZone'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useGameStore } from '../store/gameStore'
 import * as net from '../lib/network'
 import type { NetMessage, Player } from '../types'
 import { initialMediaPlaybackForType, questionMediaAutoplay } from '../types'
-import { generateId, formatScore, isFinalBoard } from '../lib/utils'
+import { generateId, formatScore, isFinalBoard, participatingPlayers, normalizePlayers } from '../lib/utils'
 import { getCategoryGameplaySettings } from '../lib/settings'
 import { logEvent } from '../lib/logger'
 import { setCachedMedia, resolveActiveMedia, clearCache } from '../lib/mediaCache'
@@ -48,6 +48,7 @@ export default function PlayerPage() {
   const [buzzQueuePopupActive, setBuzzQueuePopupActive] = useState(false)
   const [mobilePlayersOpen, setMobilePlayersOpen] = useState(false)
   const [showExitConfirm, setShowExitConfirm] = useState(false)
+  const [showSpectatorConfirm, setShowSpectatorConfirm] = useState(false)
   const [isMobileViewport, setIsMobileViewport] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches,
   )
@@ -133,15 +134,19 @@ export default function PlayerPage() {
           useGameStore.getState().myPlayerId ??
           msg.state.players.find((p) => p.name === playerName && p.isConnected)?.id ??
           myId
-        setState(sanitizeGameStateForPlayer(msg.state, myIdForSync))
-        const me = msg.state.players.find(
+        const synced = {
+          ...sanitizeGameStateForPlayer(msg.state, myIdForSync),
+          players: normalizePlayers(msg.state.players),
+        }
+        setState(synced)
+        const me = synced.players.find(
           (p) => p.name === playerName && p.isConnected
         )
         if (me) setMyPlayerId(me.id)
         setConnected(true)
         if (!hasAnnouncedJoin.current && hostPeerId.current) {
           hasAnnouncedJoin.current = true
-          const meJoin: Player = { id: myId, name: playerName, score: 0, isConnected: true }
+          const meJoin: Player = { id: myId, name: playerName, score: 0, isConnected: true, isSpectator: false }
           net.send({ type: 'PLAYER_JOIN', player: meJoin }, hostPeerId.current)
         }
         if (!hasLoggedJoin.current) {
@@ -502,7 +507,7 @@ export default function PlayerPage() {
   const boardFill = true
 
   function handleBuzz() {
-    if (hasBuzzed || state.phase !== 'buzzing') return
+    if (myPlayer?.isSpectator || hasBuzzed || state.phase !== 'buzzing') return
     setHasBuzzed(true)
     if (hostPeerId.current) {
       net.send({ type: 'BUZZ', playerId: myId, playerName: myPlayer?.name ?? playerName }, hostPeerId.current)
@@ -533,6 +538,17 @@ export default function PlayerPage() {
     setShowExitConfirm(true)
   }
 
+  function handleSpectatorToggle() {
+    setShowSpectatorConfirm(true)
+  }
+
+  function confirmSpectatorToggle() {
+    setShowSpectatorConfirm(false)
+    if (!hostPeerId.current) return
+    const next = !(myPlayer?.isSpectator === true)
+    net.send({ type: 'SET_SPECTATOR', isSpectator: next }, hostPeerId.current)
+  }
+
   function confirmExitRoom() {
     setShowExitConfirm(false)
     net.leaveRoom()
@@ -542,6 +558,7 @@ export default function PlayerPage() {
   }
 
   const myScore = myPlayer?.score ?? 0
+  const isSpectator = myPlayer?.isSpectator === true
   const isInBuzzQueue = state.buzzQueue.includes(myId)
   if (isInBuzzQueue) wasInBuzzQueueRef.current = true
   const buzzPending = hasBuzzed && !isInBuzzQueue && !wasInBuzzQueueRef.current
@@ -607,7 +624,8 @@ export default function PlayerPage() {
   const keepSidebarDuringQuestion =
     !isDD && ['question', 'buzzing', 'revealed'].includes(uiPhase)
   const showPlayerActionZone =
-    judgeResult != null || canShowBuzzDock || keepSidebarDuringQuestion
+    !isSpectator &&
+    (judgeResult != null || canShowBuzzDock || keepSidebarDuringQuestion)
   const showDdMobileCompact =
     isMobileViewport && isDD && uiPhase === 'dailyDouble'
   const showPlayerClueContent =
@@ -847,25 +865,40 @@ export default function PlayerPage() {
             <span className="player-topbar__name font-condensed font-bold" style={{ color: 'var(--white)' }}>
               {myPlayer?.name ?? playerName}
             </span>
-            <span className="player-topbar__sep" aria-hidden>·</span>
-            <span
-              className={`player-topbar__score font-display${scorePulsing ? ' score-pulse' : ''}`}
-              style={{ color: myScore < 0 ? '#e07070' : 'var(--gold-bright)' }}
-              onAnimationEnd={() => setScorePulsing(false)}
-            >
-              {formatScore(myScore)}
-            </span>
+            {!isSpectator && (
+              <>
+                <span className="player-topbar__sep" aria-hidden>·</span>
+                <span
+                  className={`player-topbar__score font-display${scorePulsing ? ' score-pulse' : ''}`}
+                  style={{ color: myScore < 0 ? '#e07070' : 'var(--gold-bright)' }}
+                  onAnimationEnd={() => setScorePulsing(false)}
+                >
+                  {formatScore(myScore)}
+                </span>
+              </>
+            )}
           </div>
         </div>
-        <button
-          type="button"
-          className="btn-icon-exit player-topbar__exit"
-          onClick={handleExitRoom}
-          title="Exit room"
-          aria-label="Exit room"
-        >
-          <LogOut size={22} />
-        </button>
+        <div className="player-topbar__actions">
+          <button
+            type="button"
+            className="btn-icon player-topbar__spectator"
+            onClick={handleSpectatorToggle}
+            title={isSpectator ? 'Exit Spectator mode' : 'Enter Spectator mode'}
+            aria-label={isSpectator ? 'Exit Spectator mode' : 'Enter Spectator mode'}
+          >
+            {isSpectator ? <EyeOff size={22} /> : <Eye size={22} />}
+          </button>
+          <button
+            type="button"
+            className="btn-icon-exit player-topbar__exit"
+            onClick={handleExitRoom}
+            title="Exit room"
+            aria-label="Exit room"
+          >
+            <LogOut size={22} />
+          </button>
+        </div>
       </header>
 
       {/* Main content */}
@@ -876,7 +909,7 @@ export default function PlayerPage() {
         {/* Podium view */}
         {state.phase === 'podium' && (
           <div className="flex-1 flex flex-col items-center justify-center p-4 overflow-auto w-full min-w-0">
-            <Podium players={state.players} highlightId={myId} />
+            <Podium players={state.players.filter((p) => !p.isSpectator)} highlightId={myId} />
           </div>
         )}
 
@@ -955,13 +988,13 @@ export default function PlayerPage() {
                 aria-expanded={mobilePlayersOpen}
               >
                 <Users size={14} aria-hidden />
-                <span>Players ({state.players.filter(p => p.isConnected).length})</span>
+                <span>Players ({participatingPlayers(state.players).length})</span>
                 {mobilePlayersOpen ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
               </button>
               <div className={`mobile-players-collapsible${mobilePlayersOpen ? ' mobile-players-collapsible--open' : ''}`}>
                 <div className="mobile-players-collapsible__inner">
                   <Scoreboard
-                    players={state.players}
+                    players={state.players.filter((p) => !p.isSpectator)}
                     buzzQueue={state.buzzQueue}
                     highlightId={myId}
                     boardControlId={state.boardControlId}
@@ -1224,6 +1257,20 @@ export default function PlayerPage() {
           danger
           onConfirm={confirmExitRoom}
           onCancel={() => setShowExitConfirm(false)}
+        />
+      )}
+
+      {showSpectatorConfirm && (
+        <ConfirmModal
+          title={isSpectator ? 'Exit spectator mode?' : 'Enter spectator mode?'}
+          message={
+            isSpectator
+              ? 'You will rejoin as a player with a $0 score.'
+              : 'You will leave the scoreboard, your score will be cleared, and you cannot buzz or hold board control.'
+          }
+          confirmLabel={isSpectator ? 'Exit' : 'Enter'}
+          onConfirm={confirmSpectatorToggle}
+          onCancel={() => setShowSpectatorConfirm(false)}
         />
       )}
     </div>

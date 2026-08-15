@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pencil, Trash2, Crown, Check, X, RefreshCw } from 'lucide-react'
+import { Pencil, Trash2, Crown, Check, X, RefreshCw, Eye } from 'lucide-react'
 import type { GameSettings, Player, PlayerSyncStatus } from '../types'
 import { formatScore } from '../lib/utils'
 import SettingsToggle from './SettingsToggle'
@@ -195,7 +195,7 @@ export default function SettingsPanel({
             disabled={players.length === 0}
           >
             <option value="">None</option>
-            {players.map((p) => (
+            {players.filter((p) => !p.isSpectator).map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
                 {!p.isConnected ? ' (offline)' : ''}
@@ -275,15 +275,27 @@ export default function SettingsPanel({
                 />
                 <div className="flex-1 min-w-0">
                   <div
-                    className="font-condensed font-bold truncate min-w-0"
+                    className="font-condensed font-bold truncate min-w-0 flex items-center gap-2"
                     style={{ fontSize: '1.0625rem' }}
                   >
-                    {p.name}
+                    <span className="truncate">{p.name}</span>
+                    {p.isSpectator && (
+                      <span
+                        className="inline-flex items-center gap-1 flex-shrink-0 font-condensed"
+                        style={{ color: '#8899cc', fontSize: '0.75rem' }}
+                        title="Spectator"
+                      >
+                        <Eye size={12} aria-hidden />
+                        <span>Spectator</span>
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2" style={{ marginTop: 2 }}>
-                    <span style={{ color: p.score < 0 ? '#e07070' : 'var(--gold)', fontSize: '0.9375rem' }}>
-                      {formatScore(p.score)}
-                    </span>
+                    {!p.isSpectator && (
+                      <span style={{ color: p.score < 0 ? '#e07070' : 'var(--gold)', fontSize: '0.9375rem' }}>
+                        {formatScore(p.score)}
+                      </span>
+                    )}
                     {(() => {
                       const sync = mediaSyncStatus?.get(p.id)
                       if (!sync || sync.total === 0) return null
@@ -316,13 +328,20 @@ export default function SettingsPanel({
                   type="button"
                   className={`btn-icon-only rounded settings-board-control-btn${boardControlId === p.id ? ' settings-board-control-btn--active' : ''}`}
                   aria-pressed={boardControlId === p.id}
+                  disabled={p.isSpectator}
                   title={
-                    boardControlId === p.id
-                      ? 'Remove board control from this player'
-                      : 'Give this player board control'
+                    p.isSpectator
+                      ? 'Spectators cannot hold board control'
+                      : boardControlId === p.id
+                        ? 'Remove board control from this player'
+                        : 'Give this player board control'
                   }
                   aria-label={
-                    boardControlId === p.id ? 'Remove board control' : 'Assign board control'
+                    p.isSpectator
+                      ? 'Spectators cannot hold board control'
+                      : boardControlId === p.id
+                        ? 'Remove board control'
+                        : 'Assign board control'
                   }
                   onClick={() =>
                     onAssignBoardControl(boardControlId === p.id ? null : p.id)

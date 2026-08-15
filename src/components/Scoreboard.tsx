@@ -166,7 +166,10 @@ export default function Scoreboard({
     }
     return null
   }
-  const displayPlayers = orderPlayersForDisplay(players, myPlayerId)
+  const displayPlayers = orderPlayersForDisplay(
+    players.filter((p) => !p.isSpectator),
+    myPlayerId,
+  )
 
   const prevScores = useRef<Record<string, number>>({})
   const [pulsingIds, setPulsingIds] = useState<Set<string>>(new Set())

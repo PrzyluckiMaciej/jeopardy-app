@@ -19,6 +19,7 @@ function makePlayer(overrides: Partial<Player> = {}): Player {
     name: 'Alice',
     score: 0,
     isConnected: true,
+    isSpectator: false,
     ...overrides,
   }
 }
@@ -508,6 +509,34 @@ describe('useGameStore', () => {
     })
   })
 
+  describe('setPlayerSpectator', () => {
+    it('enters spectator mode, zeroes score, clears buzz and board control', () => {
+      useGameStore.getState().addPlayer(makePlayer({ score: 800 }))
+      useGameStore.getState().addPlayer(makePlayer({ id: 'player-2', name: 'Bob' }))
+      useGameStore.getState().setBoardControl('player-1')
+      useGameStore.getState().addBuzz('player-1')
+      useGameStore.getState().addBuzz('player-2')
+
+      useGameStore.getState().setPlayerSpectator('player-1', true)
+
+      const { state } = useGameStore.getState()
+      const spectator = state.players.find((p) => p.id === 'player-1')
+      expect(spectator?.isSpectator).toBe(true)
+      expect(spectator?.score).toBe(0)
+      expect(state.buzzQueue).not.toContain('player-1')
+      expect(state.buzzQueue).toContain('player-2')
+      expect(state.boardControlId).toBeNull()
+    })
+
+    it('exits spectator mode without changing score', () => {
+      useGameStore.getState().addPlayer(makePlayer({ isSpectator: true, score: 0 }))
+      useGameStore.getState().setPlayerSpectator('player-1', false)
+      const player = useGameStore.getState().state.players[0]
+      expect(player.isSpectator).toBe(false)
+      expect(player.score).toBe(0)
+    })
+  })
+
   describe('openCard', () => {
     it('sets phase to question and populates activeQuestion', () => {
       const question = makeQuestion()
@@ -605,6 +634,12 @@ describe('useGameStore', () => {
   })
 
   describe('addBuzz', () => {
+    beforeEach(() => {
+      useGameStore.getState().addPlayer(makePlayer())
+      useGameStore.getState().addPlayer(makePlayer({ id: 'player-2', name: 'Bob' }))
+      useGameStore.getState().addPlayer(makePlayer({ id: 'player-3', name: 'Carol' }))
+    })
+
     it('appends a player to the buzz queue', () => {
       useGameStore.getState().addBuzz('player-1')
       expect(useGameStore.getState().state.buzzQueue).toEqual(['player-1'])
@@ -626,10 +661,22 @@ describe('useGameStore', () => {
         'player-3',
       ])
     })
+
+    it('ignores spectators', () => {
+      useGameStore.getState().setPlayerSpectator('player-1', true)
+      useGameStore.getState().addBuzz('player-1')
+      expect(useGameStore.getState().state.buzzQueue).toEqual([])
+    })
+
+    it('ignores unknown player ids', () => {
+      useGameStore.getState().addBuzz('missing')
+      expect(useGameStore.getState().state.buzzQueue).toEqual([])
+    })
   })
 
   describe('clearBuzzQueue', () => {
     it('empties the queue and stays in buzzing phase', () => {
+      useGameStore.getState().addPlayer(makePlayer())
       useGameStore.getState().addBuzz('player-1')
       useGameStore.getState().clearBuzzQueue()
       const { state } = useGameStore.getState()
@@ -717,6 +764,12 @@ describe('useGameStore', () => {
     it('rejects wagers from players with score <= 0', () => {
       useGameStore.getState().setFinalWager('p2', 50)
       expect(useGameStore.getState().state.finalJeopardy?.wagers.p2).toBeUndefined()
+    })
+
+    it('rejects wagers from spectators', () => {
+      useGameStore.getState().setPlayerSpectator('p1', true)
+      useGameStore.getState().setFinalWager('p1', 100)
+      expect(useGameStore.getState().state.finalJeopardy?.wagers.p1).toBeUndefined()
     })
 
     it('clamps wagers to [0, player score]', () => {
@@ -815,6 +868,7 @@ describe('useGameStore', () => {
 
   describe('markAnswered', () => {
     it('adds cell id and resets phase/question/buzz/media', () => {
+      useGameStore.getState().addPlayer(makePlayer())
       useGameStore.getState().openCard('cat-1', makeQuestion(), 'data:image/png;base64,abc')
       useGameStore.getState().addBuzz('player-1')
       useGameStore.getState().markAnswered('cat-1-q-1')
