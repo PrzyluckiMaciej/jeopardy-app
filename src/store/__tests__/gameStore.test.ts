@@ -741,13 +741,34 @@ describe('useGameStore', () => {
       expect(useGameStore.getState().state.finalJeopardy?.wagers.p1).toBeUndefined()
     })
 
-    it('starts the 30s timer on first clue or media reveal', () => {
+    it('starts the 30s timer when reveal passes timerEndsAt', () => {
       const before = Date.now()
+      const timerEndsAt = before + 30_000
+      useGameStore.getState().revealFinalClue(timerEndsAt)
+      const endsAt = useGameStore.getState().state.finalJeopardy?.timerEndsAt
+      expect(endsAt).toBe(timerEndsAt)
+      useGameStore.getState().revealFinalMedia()
+      expect(useGameStore.getState().state.finalJeopardy?.timerEndsAt).toBe(endsAt)
+    })
+
+    it('leaves the timer unset when reveal omits timerEndsAt', () => {
       useGameStore.getState().revealFinalClue()
+      expect(useGameStore.getState().state.finalJeopardy?.timerEndsAt).toBeNull()
+      useGameStore.getState().revealFinalMedia()
+      expect(useGameStore.getState().state.finalJeopardy?.timerEndsAt).toBeNull()
+    })
+
+    it('startFinalTimer starts the 30s timer and is a no-op when already running', () => {
+      useGameStore.getState().revealFinalClue()
+      expect(useGameStore.getState().state.finalJeopardy?.timerEndsAt).toBeNull()
+
+      const before = Date.now()
+      useGameStore.getState().startFinalTimer()
       const endsAt = useGameStore.getState().state.finalJeopardy?.timerEndsAt
       expect(endsAt).toBeGreaterThanOrEqual(before + 29_000)
       expect(endsAt).toBeLessThanOrEqual(before + 31_000)
-      useGameStore.getState().revealFinalMedia()
+
+      useGameStore.getState().startFinalTimer(Date.now() + 60_000)
       expect(useGameStore.getState().state.finalJeopardy?.timerEndsAt).toBe(endsAt)
     })
 

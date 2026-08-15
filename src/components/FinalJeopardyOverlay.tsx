@@ -42,6 +42,10 @@ export default function FinalJeopardyOverlay({ state, settings }: Props) {
   const canRevealBoth =
     (!finalJeopardy.clueRevealed && hasClue) ||
     (!finalJeopardy.mediaRevealed && hasMedia)
+  const showStartTimer =
+    !settings.autoStartFinalTimer &&
+    !timerActive &&
+    (finalJeopardy.clueRevealed || finalJeopardy.mediaRevealed)
 
   function handleRevealCategory() {
     store.revealFinalCategory()
@@ -52,20 +56,25 @@ export default function FinalJeopardyOverlay({ state, settings }: Props) {
     return finalJeopardy!.timerEndsAt ?? Date.now() + FINAL_JEOPARDY_TIMER_MS
   }
 
+  function timerEndsAtForReveal(): number | undefined {
+    if (!settings.autoStartFinalTimer) return undefined
+    return ensureTimerEndsAt()
+  }
+
   function handleRevealClue() {
-    const timerEndsAt = ensureTimerEndsAt()
+    const timerEndsAt = timerEndsAtForReveal()
     store.revealFinalClue(timerEndsAt)
     net.broadcast({ type: 'FINAL_JEOPARDY_REVEAL_CLUE', timerEndsAt })
   }
 
   function handleRevealMedia() {
-    const timerEndsAt = ensureTimerEndsAt()
+    const timerEndsAt = timerEndsAtForReveal()
     store.revealFinalMedia(timerEndsAt)
     net.broadcast({ type: 'FINAL_JEOPARDY_REVEAL_MEDIA', timerEndsAt })
   }
 
   function handleRevealBoth() {
-    const timerEndsAt = ensureTimerEndsAt()
+    const timerEndsAt = timerEndsAtForReveal()
     if (hasClue && !finalJeopardy!.clueRevealed) {
       store.revealFinalClue(timerEndsAt)
       net.broadcast({ type: 'FINAL_JEOPARDY_REVEAL_CLUE', timerEndsAt })
@@ -74,6 +83,13 @@ export default function FinalJeopardyOverlay({ state, settings }: Props) {
       store.revealFinalMedia(timerEndsAt)
       net.broadcast({ type: 'FINAL_JEOPARDY_REVEAL_MEDIA', timerEndsAt })
     }
+  }
+
+  function handleStartTimer() {
+    if (finalJeopardy!.timerEndsAt != null) return
+    const timerEndsAt = Date.now() + FINAL_JEOPARDY_TIMER_MS
+    store.startFinalTimer(timerEndsAt)
+    net.broadcast({ type: 'FINAL_JEOPARDY_TIMER_START', timerEndsAt })
   }
 
   function handleRevealAnswer() {
@@ -114,6 +130,8 @@ export default function FinalJeopardyOverlay({ state, settings }: Props) {
     finalJeopardy.mediaRevealed ? 'm' : '',
     finalJeopardy.answerRevealed ? 'a' : '',
     canRevealPlayers ? 'r' : '',
+    showStartTimer ? 's' : '',
+    timerActive ? 't' : '',
   ].join('')
 
   return (
@@ -246,6 +264,11 @@ export default function FinalJeopardyOverlay({ state, settings }: Props) {
                   <button type="button" className="btn-outline w-full btn-with-icon justify-center" onClick={handleRevealAnswer}>
                     <Eye size={14} aria-hidden />
                     <span>Reveal answer</span>
+                  </button>
+                )}
+                {showStartTimer && (
+                  <button type="button" className="btn-gold w-full btn-with-icon justify-center" onClick={handleStartTimer}>
+                    <span>Start timer</span>
                   </button>
                 )}
               </div>

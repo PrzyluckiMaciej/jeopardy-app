@@ -231,10 +231,11 @@ export type NetMessage =
   | { type: 'FINAL_JEOPARDY_REVEAL_CATEGORY' }
   | { type: 'FINAL_JEOPARDY_WAGER'; playerId: string; wager: number }
   | { type: 'FINAL_JEOPARDY_WAGER_LOCKED'; playerId: string }
-  | { type: 'FINAL_JEOPARDY_REVEAL_CLUE'; timerEndsAt: number }
-  | { type: 'FINAL_JEOPARDY_REVEAL_MEDIA'; timerEndsAt: number }
+  | { type: 'FINAL_JEOPARDY_REVEAL_CLUE'; timerEndsAt?: number }
+  | { type: 'FINAL_JEOPARDY_REVEAL_MEDIA'; timerEndsAt?: number }
   | { type: 'FINAL_JEOPARDY_SUBMIT_ANSWER'; playerId: string; text: string }
   | { type: 'FINAL_JEOPARDY_ANSWER_LOCKED'; playerId: string }
+  | { type: 'FINAL_JEOPARDY_TIMER_START'; timerEndsAt: number }
   | { type: 'FINAL_JEOPARDY_TIMER_STOP'; timerEndsAt: number }
   | { type: 'FINAL_JEOPARDY_REVEAL_PLAYER'; playerId: string; wager: number; answer: string }
   | { type: 'FINAL_JEOPARDY_REVEAL_ANSWER' }
@@ -251,6 +252,7 @@ export interface GameSettings {
   pauseMediaOnBuzz: boolean
   autoRevealClue: boolean
   autoRevealMedia: boolean
+  autoStartFinalTimer: boolean
 }
 
 export interface PlayerSyncStatus {
