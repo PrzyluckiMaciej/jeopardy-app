@@ -46,11 +46,11 @@ export default function Podium({ players, highlightId }: Props) {
             <div key={placeIdx} className="flex flex-col items-center flex-1 min-w-0">
               <div className={`podium-name ${nameDelayClass} flex flex-col items-center mb-2 w-full`}>
                 <div
-                  className="font-condensed font-bold text-sm sm:text-lg truncate max-w-full text-center px-0.5"
+                  className="font-condensed font-bold text-sm sm:text-lg max-w-full px-0.5 inline-flex items-baseline justify-center gap-1.5"
                   style={{ color: isHighlighted ? 'var(--gold-bright)' : 'var(--white)' }}
                 >
-                  {player.name}
-                  {isHighlighted && <span className="text-xs ml-1" style={{ color: 'var(--gold)' }}>(you)</span>}
+                  <span className="truncate min-w-0">{player.name}</span>
+                  {isHighlighted && <span className="text-xs shrink-0" style={{ color: 'var(--gold)' }}>(you)</span>}
                 </div>
                 <div
                   className="font-display text-base sm:text-xl"
@@ -94,9 +94,12 @@ export default function Podium({ players, highlightId }: Props) {
                 className="flex justify-between items-center px-3 py-1.5 rounded"
                 style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)' }}
               >
-                <span className="font-condensed text-sm" style={{ color: highlightId === p.id ? 'var(--gold-bright)' : undefined }}>
-                  {i + 4}. {p.name}
-                  {highlightId === p.id && <span className="text-xs ml-1" style={{ color: 'var(--gold)' }}>(you)</span>}
+                <span
+                  className="font-condensed text-sm inline-flex items-baseline gap-1.5 min-w-0"
+                  style={{ color: highlightId === p.id ? 'var(--gold-bright)' : undefined }}
+                >
+                  <span className="truncate min-w-0">{i + 4}. {p.name}</span>
+                  {highlightId === p.id && <span className="text-xs shrink-0" style={{ color: 'var(--gold)' }}>(you)</span>}
                 </span>
                 <span className="font-display text-sm" style={{ color: p.score < 0 ? '#e07070' : 'var(--gold-bright)' }}>
                   {formatScore(p.score)}
