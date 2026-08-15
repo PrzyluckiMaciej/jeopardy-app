@@ -1,6 +1,12 @@
+import { beforeEach, describe, expect, it } from 'vitest'
 import {
   categorySettingsFromGlobal,
+  defaultGameSettings,
   getCategoryGameplaySettings,
+  loadPersistedSettings,
+  mergeGameSettings,
+  savePersistedSettings,
+  SETTINGS_STORAGE_KEY,
 } from '../settings'
 import type { Category, CategorySettings, GameSettings } from '../../types'
 
@@ -111,5 +117,53 @@ describe('getCategoryGameplaySettings', () => {
         globalOn,
       ).autoBuzzQueueOnMedia,
     ).toBe(true)
+  })
+})
+
+describe('mergeGameSettings', () => {
+  it('returns defaults for null/undefined', () => {
+    expect(mergeGameSettings(null)).toEqual(defaultGameSettings)
+    expect(mergeGameSettings(undefined)).toEqual(defaultGameSettings)
+  })
+
+  it('fills missing fields from defaults', () => {
+    expect(mergeGameSettings({ pointDeduction: true, autoBuzzQueue: true })).toEqual({
+      ...defaultGameSettings,
+      pointDeduction: true,
+      autoBuzzQueue: true,
+    })
+  })
+})
+
+describe('persisted settings', () => {
+  beforeEach(() => {
+    localStorage.removeItem(SETTINGS_STORAGE_KEY)
+  })
+
+  it('loadPersistedSettings returns defaults when nothing stored', () => {
+    expect(loadPersistedSettings()).toEqual(defaultGameSettings)
+  })
+
+  it('savePersistedSettings writes and loadPersistedSettings restores', () => {
+    savePersistedSettings(globalOn)
+    expect(JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY)!)).toEqual(globalOn)
+    expect(loadPersistedSettings()).toEqual(globalOn)
+  })
+
+  it('loadPersistedSettings merges legacy partial snapshots onto defaults', () => {
+    localStorage.setItem(
+      SETTINGS_STORAGE_KEY,
+      JSON.stringify({ pointDeduction: true, autoBuzzQueue: true }),
+    )
+    expect(loadPersistedSettings()).toEqual({
+      ...defaultGameSettings,
+      pointDeduction: true,
+      autoBuzzQueue: true,
+    })
+  })
+
+  it('loadPersistedSettings returns defaults for invalid JSON', () => {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, '{not-json')
+    expect(loadPersistedSettings()).toEqual(defaultGameSettings)
   })
 })

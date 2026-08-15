@@ -17,6 +17,7 @@ import {
   initialMediaPlaybackForType,
   questionMediaAutoplay,
 } from '../types'
+import { loadPersistedSettings } from '../lib/settings'
 
 type FolderLike = { id: string; name: string; parentId: string | null; trashedAt?: number | null }
 
@@ -889,24 +890,11 @@ const defaultState: GameState = {
   mediaRevealed: false,
 }
 
-const defaultSettings: GameSettings = {
-  pointDeduction: false,
-  allowNegativeScore: false,
-  dailyDoubleMinWager: 5,
-  autoBuzzQueue: false,
-  autoBuzzQueueOnMedia: false,
-  blurClueOnBuzz: false,
-  pauseMediaOnBuzz: false,
-  autoRevealClue: false,
-  autoRevealMedia: false,
-  autoStartFinalTimer: true,
-}
-
 export const useGameStore = create<GameStore>()(
   persist(
     (set) => ({
       state: defaultState,
-      settings: defaultSettings,
+      settings: loadPersistedSettings(),
       isHost: false,
       roomCode: null,
       myPlayerId: null,
