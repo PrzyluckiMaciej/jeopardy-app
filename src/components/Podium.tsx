@@ -50,7 +50,7 @@ export default function Podium({ players, highlightId }: Props) {
                   style={{ color: isHighlighted ? 'var(--gold-bright)' : 'var(--white)' }}
                 >
                   {player.name}
-                  {isHighlighted && <span className="text-xs ml-1" style={{ color: 'var(--gold)' }}>(you)</span>}
+                  {isHighlighted && <span className="text-xs ml-2" style={{ color: 'var(--gold)' }}>(you)</span>}
                 </div>
                 <div
                   className="font-display text-base sm:text-xl"
@@ -96,7 +96,7 @@ export default function Podium({ players, highlightId }: Props) {
               >
                 <span className="font-condensed text-sm" style={{ color: highlightId === p.id ? 'var(--gold-bright)' : undefined }}>
                   {i + 4}. {p.name}
-                  {highlightId === p.id && <span className="text-xs ml-1" style={{ color: 'var(--gold)' }}>(you)</span>}
+                  {highlightId === p.id && <span className="text-xs ml-2" style={{ color: 'var(--gold)' }}>(you)</span>}
                 </span>
                 <span className="font-display text-sm" style={{ color: p.score < 0 ? '#e07070' : 'var(--gold-bright)' }}>
                   {formatScore(p.score)}
