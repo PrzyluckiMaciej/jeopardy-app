@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type AnimationEvent as ReactAnimationEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
-import { Settings, Trash2, Copy, Layers, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, RotateCcw, Shuffle, X, Users, CircleHelp, Menu, ArrowLeft, Pencil, GripVertical, Trophy } from 'lucide-react'
+import { Settings, Trash2, Copy, Layers, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, RotateCcw, Shuffle, X, Users, CircleHelp, Menu, ArrowLeft, Pencil, GripVertical, Trophy, Check } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import {
   useGameStore,
@@ -84,6 +84,7 @@ export default function HostPage() {
   const [showDdNoControlAlert, setShowDdNoControlAlert] = useState(false)
   const [renameFolderId, setRenameFolderId] = useState<string | null>(null)
   const [renameBoardId, setRenameBoardId] = useState<string | null>(null)
+  const [renameBoardDraft, setRenameBoardDraft] = useState('')
   const [boardContextMenu, setBoardContextMenu] = useState<{
     x: number
     y: number
@@ -123,6 +124,7 @@ export default function HostPage() {
   const gameBoardDragOffsetRef = useRef({ x: 0, y: 0 })
   const gameBoardDragOriginRef = useRef({ x: 0, y: 0 })
   const gameBoardDragMovedRef = useRef(false)
+  const skipGameBoardRenameCommitRef = useRef(false)
   const [activeEmojis, setActiveEmojis] = useState<Record<string, { emoji: string; seq: number }>>({})
   const [mobilePlayersOpen, setMobilePlayersOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
@@ -601,6 +603,14 @@ export default function HostPage() {
       items: [
         { id: 'edit', label: 'Edit', onSelect: () => handleEditBoard(board) },
         {
+          id: 'rename',
+          label: 'Rename',
+          onSelect: () => {
+            setRenameBoardId(board.id)
+            setRenameBoardDraft(board.name)
+          },
+        },
+        {
           id: 'duplicate',
           label: 'Duplicate',
           onSelect: () => { void handleDuplicateBoard(board) },
@@ -638,6 +648,24 @@ export default function HostPage() {
       clearMediaSync()
       net.broadcast({ type: 'SYNC_STATE', state: useGameStore.getState().state })
     }
+  }
+
+  function commitInGameBoardRename(board: Board) {
+    if (skipGameBoardRenameCommitRef.current) {
+      skipGameBoardRenameCommitRef.current = false
+      setRenameBoardId(null)
+      return
+    }
+    const name = renameBoardDraft.trim()
+    if (name && name !== board.name) {
+      const next = { ...board, name, updatedAt: Date.now() }
+      boardStore.saveBoard(next)
+      if (activeBoard?.id === board.id) {
+        setActiveBoard(next)
+        patchState({ board: next })
+      }
+    }
+    setRenameBoardId(null)
   }
 
   function handleTrashBoard(id: string) {
@@ -1376,7 +1404,7 @@ export default function HostPage() {
   }
 
   function handleGameBoardPointerDown(e: ReactPointerEvent<HTMLElement>, boardId: string) {
-    if (!pickerGameId || e.button !== 0) return
+    if (!pickerGameId || e.button !== 0 || renameBoardId === boardId) return
     e.preventDefault()
     e.stopPropagation()
 
@@ -1856,14 +1884,14 @@ export default function HostPage() {
                           ? 'Right-click an item to restore it or delete it permanently. Right-click Trash to empty it.'
                           : pickerIsGames
                             ? 'Click a folder to open it. Right-click empty space or a folder to create items, or a game/folder to rename or delete.'
-                            : 'Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, duplicate, or delete.'
+                            : 'Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, rename, duplicate, or delete.'
                       }
                       aria-label={
                         pickerIsTrash
                           ? 'Right-click an item to restore it or delete it permanently. Right-click Trash to empty it.'
                           : pickerIsGames
                             ? 'Click a folder to open it. Right-click empty space or a folder to create items, or a game/folder to rename or delete.'
-                            : 'Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, duplicate, or delete.'
+                            : 'Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, rename, duplicate, or delete.'
                       }
                       tabIndex={0}
                     >
@@ -1976,6 +2004,7 @@ export default function HostPage() {
                       !dropIsNoOp &&
                       idx === pickerBoards.length - 1 &&
                       gameBoardDropIndex === pickerBoards.length
+                    const isRenaming = renameBoardId === b.id
                     return (
                       <div
                         key={b.id}
@@ -1983,7 +2012,10 @@ export default function HostPage() {
                         className={`board-picker-board-row${isDragging ? ' board-picker-board-row--dragging' : ''}${
                           showDropBefore ? ' board-picker-board-row--drop-before' : ''
                         }${showDropAfter ? ' board-picker-board-row--drop-after' : ''}`}
-                        onContextMenu={(e) => openBoardRowContextMenu(e, b)}
+                        onContextMenu={(e) => {
+                          if (isRenaming) return
+                          openBoardRowContextMenu(e, b)
+                        }}
                       >
                         <span
                           className="board-picker-drag-handle"
@@ -1996,24 +2028,64 @@ export default function HostPage() {
                         >
                           <GripVertical size={14} aria-hidden />
                         </span>
-                        <button
-                          type="button"
-                          className="board-picker-board-btn"
-                          onClick={() => handleSelectBoard(b)}
-                        >
-                          <span
-                            className={`board-picker-board-order${idx === 0 ? ' board-picker-board-order--first' : ''}`}
-                            aria-label={`Board position ${idx + 1}`}
+                        {isRenaming ? (
+                          <div className="flex items-center gap-1 flex-1 min-w-0">
+                            <span
+                              className={`board-picker-board-order${idx === 0 ? ' board-picker-board-order--first' : ''}`}
+                              aria-label={`Board position ${idx + 1}`}
+                            >
+                              {idx + 1}
+                            </span>
+                            {isFinalBoard(b) ? (
+                              <Trophy size={14} className="board-picker-object-icon board-picker-object-icon--final" />
+                            ) : (
+                              <LayoutGrid size={14} className="board-picker-object-icon board-picker-object-icon--board" />
+                            )}
+                            <input
+                              className="board-picker-input"
+                              value={renameBoardDraft}
+                              onChange={(e) => setRenameBoardDraft(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') commitInGameBoardRename(b)
+                                if (e.key === 'Escape') {
+                                  skipGameBoardRenameCommitRef.current = true
+                                  setRenameBoardId(null)
+                                }
+                              }}
+                              onBlur={() => commitInGameBoardRename(b)}
+                              autoFocus
+                              onFocus={(e) => e.target.select()}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <button
+                              type="button"
+                              className="board-picker-save-btn"
+                              onClick={() => commitInGameBoardRename(b)}
+                              title="Save"
+                            >
+                              <Check size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            className="board-picker-board-btn"
+                            onClick={() => handleSelectBoard(b)}
                           >
-                            {idx + 1}
-                          </span>
-                          {isFinalBoard(b) ? (
-                            <Trophy size={14} className="board-picker-object-icon board-picker-object-icon--final" />
-                          ) : (
-                            <LayoutGrid size={14} className="board-picker-object-icon board-picker-object-icon--board" />
-                          )}
-                          <span className="font-condensed font-bold truncate">{b.name}</span>
-                        </button>
+                            <span
+                              className={`board-picker-board-order${idx === 0 ? ' board-picker-board-order--first' : ''}`}
+                              aria-label={`Board position ${idx + 1}`}
+                            >
+                              {idx + 1}
+                            </span>
+                            {isFinalBoard(b) ? (
+                              <Trophy size={14} className="board-picker-object-icon board-picker-object-icon--final" />
+                            ) : (
+                              <LayoutGrid size={14} className="board-picker-object-icon board-picker-object-icon--board" />
+                            )}
+                            <span className="font-condensed font-bold truncate">{b.name}</span>
+                          </button>
+                        )}
                         <div className="board-picker-board-row__actions">
                           <button
                             type="button"

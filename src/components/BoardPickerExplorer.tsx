@@ -538,6 +538,11 @@ export default function BoardPickerExplorer({
           onSelect: () => onEditBoard(board),
         },
         {
+          id: 'rename',
+          label: 'Rename',
+          onSelect: () => setEditingBoardId(board.id, board.name),
+        },
+        {
           id: 'duplicate',
           label: 'Duplicate',
           onSelect: () => onDuplicateBoard(board),
