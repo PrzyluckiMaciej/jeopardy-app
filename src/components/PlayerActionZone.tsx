@@ -3,6 +3,8 @@ import type { Player } from '../types'
 
 export interface PlayerActionZoneProps {
   canShowBuzzDock: boolean
+  /** Keep the action slot mounted during question phases (e.g. while judge feedback is pending). */
+  keepVisible?: boolean
   revealedPhase?: boolean
   judgeResult: 'correct' | 'wrong' | null
   buzzingOpen: boolean
@@ -23,6 +25,7 @@ export interface PlayerActionZoneProps {
 
 export default function PlayerActionZone({
   canShowBuzzDock,
+  keepVisible = false,
   revealedPhase = false,
   judgeResult,
   buzzingOpen,
@@ -40,10 +43,10 @@ export default function PlayerActionZone({
   players,
   myId,
 }: PlayerActionZoneProps) {
-  const showSlot = canShowBuzzDock || judgeResult != null || revealedPhase
+  const showSlot = canShowBuzzDock || judgeResult != null || revealedPhase || keepVisible
   if (!showSlot) return null
 
-  const showBuzzButton = canShowBuzzDock && !(revealedPhase && !judgeResult)
+  const showBuzzButton = canShowBuzzDock && !judgeResult && !(revealedPhase && !judgeResult)
 
   const buzzHint = revealedPhase && !judgeResult
     ? '\u00a0'
@@ -69,64 +72,36 @@ export default function PlayerActionZone({
             <div className="buzz-queue-panel__label font-condensed text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--gold)', opacity: 0.7 }}>
               Buzz queue
             </div>
-            {buzzQueue.map((pid, idx) => {
-              const p = players.find((pl) => pl.id === pid)
-              if (!p) return null
-              return (
-                <div key={pid} className="buzz-queue-entry">
-                  <span className="buzz-queue-entry__score text-xs">
-                    {p.score < 0 ? `-$${Math.abs(p.score)}` : `$${p.score}`}
-                  </span>
-                  <span
-                    className="buzz-queue-entry__name font-condensed font-bold text-sm"
-                    style={{ color: pid === myId ? 'var(--gold-bright)' : undefined }}
-                  >
-                    {p.name}{pid === myId ? ' (you)' : ''}
-                  </span>
-                  <span className="buzz-queue-entry__rank text-xs">#{idx + 1}</span>
-                </div>
-              )
-            })}
+            {buzzQueue.length === 0 ? (
+              <div className="font-condensed text-xs text-center" style={{ color: '#4a5580' }}>
+                No one in queue
+              </div>
+            ) : (
+              buzzQueue.map((pid, idx) => {
+                const p = players.find((pl) => pl.id === pid)
+                if (!p) return null
+                return (
+                  <div key={pid} className="buzz-queue-entry">
+                    <span className="buzz-queue-entry__score text-xs">
+                      {p.score < 0 ? `-$${Math.abs(p.score)}` : `$${p.score}`}
+                    </span>
+                    <span
+                      className="buzz-queue-entry__name font-condensed font-bold text-sm"
+                      style={{ color: pid === myId ? 'var(--gold-bright)' : undefined }}
+                    >
+                      {p.name}{pid === myId ? ' (you)' : ''}
+                    </span>
+                    <span className="buzz-queue-entry__rank text-xs">#{idx + 1}</span>
+                  </div>
+                )
+              })
+            )}
           </div>
         )}
         <div className="player-action-zone__row">
           <div className="player-action-zone__slot">
             <div className="player-action-zone__stack">
-              {showBuzzButton ? (
-                <button
-                  type="button"
-                  className={[
-                    'player-buzz-btn font-display',
-                    judgeResult ? 'player-buzz-btn--under-result' : '',
-                    !buzzingOpen
-                      ? 'player-buzz-btn--waiting'
-                      : hasBuzzed
-                        ? isMyTurn
-                          ? 'player-buzz-btn--my-turn'
-                          : 'player-buzz-btn--queued'
-                        : 'player-buzz-btn--ready buzz-btn',
-                  ].join(' ')}
-                  onClick={onBuzz}
-                  disabled={!buzzingOpen || hasBuzzed || !!judgeResult}
-                  aria-disabled={!buzzingOpen || hasBuzzed || !!judgeResult}
-                  tabIndex={judgeResult ? -1 : undefined}
-                  aria-hidden={judgeResult ? true : undefined}
-                >
-                  {hasBuzzed
-                    ? isMyTurn
-                      ? (
-                        <span className="player-buzz-btn__turn-label">
-                          <span>Your</span>
-                          <span>turn</span>
-                        </span>
-                      )
-                      : `#${myQueuePosition} in queue`
-                    : 'BUZZ!'}
-                </button>
-              ) : (
-                <div className="player-buzz-btn player-buzz-btn--placeholder" aria-hidden />
-              )}
-              {judgeResult && (
+              {judgeResult ? (
                 <div
                   key={judgeResult}
                   className="player-judge-result player-judge-result--enter font-display text-center"
@@ -146,6 +121,36 @@ export default function PlayerActionZone({
                     </span>
                   )}
                 </div>
+              ) : showBuzzButton ? (
+                <button
+                  type="button"
+                  className={[
+                    'player-buzz-btn font-display',
+                    !buzzingOpen
+                      ? 'player-buzz-btn--waiting'
+                      : hasBuzzed
+                        ? isMyTurn
+                          ? 'player-buzz-btn--my-turn'
+                          : 'player-buzz-btn--queued'
+                        : 'player-buzz-btn--ready buzz-btn',
+                  ].join(' ')}
+                  onClick={onBuzz}
+                  disabled={!buzzingOpen || hasBuzzed}
+                  aria-disabled={!buzzingOpen || hasBuzzed}
+                >
+                  {hasBuzzed
+                    ? isMyTurn
+                      ? (
+                        <span className="player-buzz-btn__turn-label">
+                          <span>Your</span>
+                          <span>turn</span>
+                        </span>
+                      )
+                      : `#${myQueuePosition} in queue`
+                    : 'BUZZ!'}
+                </button>
+              ) : (
+                <div className="player-buzz-btn player-buzz-btn--placeholder" aria-hidden />
               )}
             </div>
             <div className="player-buzz-dock__hint font-condensed text-sm text-center" aria-hidden={judgeResult ? true : undefined}>
