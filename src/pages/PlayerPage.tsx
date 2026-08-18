@@ -646,14 +646,15 @@ export default function PlayerPage() {
       keepSidebarDuringQuestion)
   const showBuzzQueuePanel = !isDD && state.buzzQueue.length > 0
   const showBuzzQueueInSidebar = showBuzzQueuePanel && !isMobileViewport
-  const showBuzzQueueMobileToggle = showBuzzQueuePanel && isMobileViewport
+  const showBuzzQueueMobileToggle =
+    isMobileViewport && !isDD && ['question', 'buzzing', 'revealed'].includes(uiPhase)
   const showSidebar = showSidebarPanel || showBuzzQueueInSidebar
-  const buzzQueuePopupVisible = buzzQueuePopupOpen && showBuzzQueuePanel
+  const buzzQueuePopupVisible = buzzQueuePopupOpen && showBuzzQueueMobileToggle
 
-  const [prevShowBuzzQueuePanel, setPrevShowBuzzQueuePanel] = useState(showBuzzQueuePanel)
-  if (showBuzzQueuePanel !== prevShowBuzzQueuePanel) {
-    setPrevShowBuzzQueuePanel(showBuzzQueuePanel)
-    if (!showBuzzQueuePanel) {
+  const [prevShowBuzzQueueMobileToggle, setPrevShowBuzzQueueMobileToggle] = useState(showBuzzQueueMobileToggle)
+  if (showBuzzQueueMobileToggle !== prevShowBuzzQueueMobileToggle) {
+    setPrevShowBuzzQueueMobileToggle(showBuzzQueueMobileToggle)
+    if (!showBuzzQueueMobileToggle) {
       setBuzzQueuePopupOpen(false)
       setBuzzQueuePopupActive(false)
     }
@@ -688,6 +689,7 @@ export default function PlayerPage() {
 
   const playerActionZoneProps = {
     canShowBuzzDock,
+    keepVisible: keepSidebarDuringQuestion,
     revealedPhase: uiPhase === 'revealed',
     judgeResult,
     buzzingOpen,
