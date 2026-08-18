@@ -80,7 +80,7 @@ export default function SettingsPanel({
 
   return (
     <div className="settings-grid">
-      {/* Left column: Game Settings + Board Control */}
+      {/* Left column: Game Settings */}
       <div className="flex flex-col gap-8">
         {/* Game Settings */}
         <div className="panel">
@@ -188,7 +188,10 @@ export default function SettingsPanel({
             />
           </div>
         </div>
+      </div>
 
+      {/* Right column: Board Control + Players */}
+      <div className="flex flex-col gap-8">
         {/* Board Control */}
         <div className="panel">
           <div className="font-condensed font-bold uppercase mb-4" style={sectionTitleStyle}>
@@ -213,10 +216,9 @@ export default function SettingsPanel({
             ))}
           </select>
         </div>
-      </div>
 
-      {/* Right column: Players */}
-      <div className="panel flex flex-col gap-5">
+        {/* Players */}
+        <div className="panel flex flex-col gap-5">
         <div className="font-condensed font-bold uppercase" style={sectionTitleStyle}>
           Players
         </div>
@@ -394,6 +396,7 @@ export default function SettingsPanel({
               Players appear here when they join with a room code.
             </div>
           )}
+        </div>
         </div>
       </div>
     </div>
