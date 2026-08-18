@@ -22,6 +22,21 @@ const sectionTitleStyle = {
   letterSpacing: '0.12em',
 } as const
 
+/** Returns a sanitized integer string, or null if the keystroke should be ignored. */
+function sanitizeIntegerInput(raw: string, allowNegative: boolean): string | null {
+  if (raw === '') return ''
+  if (allowNegative && raw === '-') return '-'
+  const pattern = allowNegative ? /^-?\d+$/ : /^\d+$/
+  if (!pattern.test(raw)) return null
+  return String(parseInt(raw, 10))
+}
+
+function parseIntegerOrZero(raw: string, allowNegative: boolean): number {
+  const n = parseInt(raw, 10)
+  if (Number.isNaN(n)) return 0
+  return allowNegative ? n : Math.max(0, n)
+}
+
 export default function SettingsPanel({
   settings,
   players,
@@ -56,11 +71,13 @@ export default function SettingsPanel({
   function startEdit(p: Player) {
     setEditingId(p.id)
     setEditName(p.name)
-    setEditScore(String(p.score))
+    const score = settings.allowNegativeScore ? p.score : Math.max(0, p.score)
+    setEditScore(String(score))
   }
 
   function saveEdit(p: Player) {
-    onUpdatePlayer({ ...p, name: editName.trim() || p.name, score: parseInt(editScore) || 0 })
+    const score = parseIntegerOrZero(editScore, settings.allowNegativeScore)
+    onUpdatePlayer({ ...p, name: editName.trim() || p.name, score })
     setEditingId(null)
   }
 
@@ -114,13 +131,9 @@ export default function SettingsPanel({
                   setMinWagerText(String(settings.dailyDoubleMinWager))
                 }}
                 onChange={(e) => {
-                  const raw = e.target.value
-                  if (raw === '') {
-                    setMinWagerText('')
-                    return
-                  }
-                  if (!/^\d+$/.test(raw)) return
-                  setMinWagerText(String(parseInt(raw, 10)))
+                  const next = sanitizeIntegerInput(e.target.value, false)
+                  if (next === null) return
+                  setMinWagerText(next)
                 }}
                 onBlur={() => {
                   commitMinWager(minWagerText)
@@ -232,9 +245,15 @@ export default function SettingsPanel({
                 />
                 <input
                   value={editScore}
-                  onChange={(e) => setEditScore(e.target.value)}
+                  onChange={(e) => {
+                    const next = sanitizeIntegerInput(e.target.value, settings.allowNegativeScore)
+                    if (next === null) return
+                    setEditScore(next)
+                  }}
                   placeholder="Score"
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
+                  pattern={settings.allowNegativeScore ? '-?[0-9]*' : '[0-9]*'}
                   className="w-full"
                   style={{ fontSize: '1rem' }}
                 />
