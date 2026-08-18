@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type AnimationEvent } from 'react'
-import { Check, ChevronDown, Layers } from 'lucide-react'
+import { useRef, useState, type AnimationEvent } from 'react'
+import { Layers } from 'lucide-react'
+import StyledDropdown from './StyledDropdown'
 
 interface GameOption {
   id: string
@@ -26,29 +27,12 @@ export default function AddToGameModal({
   const [selectedGameId, setSelectedGameId] = useState(games[0]?.id ?? '')
   const [creating, setCreating] = useState(games.length === 0)
   const [newGameName, setNewGameName] = useState('')
-  const [dropdownOpen, setDropdownOpen] = useState(false)
-  const [dropdownExiting, setDropdownExiting] = useState(false)
   const [exiting, setExiting] = useState(false)
   const pendingCloseAction = useRef<(() => void) | null>(null)
-  const dropdownRef = useRef<HTMLDivElement>(null)
-
-  const selectedGame = games.find((g) => g.id === selectedGameId)
-  const dropdownVisible = dropdownOpen || dropdownExiting
-  const dropdownActive = dropdownOpen && !dropdownExiting
 
   const canAdd =
     boardIds.length > 0 &&
     (creating ? newGameName.trim().length > 0 : selectedGameId.length > 0)
-
-  function openDropdown() {
-    setDropdownExiting(false)
-    setDropdownOpen(true)
-  }
-
-  const closeDropdown = useCallback(() => {
-    if (!dropdownOpen || dropdownExiting) return
-    setDropdownExiting(true)
-  }, [dropdownOpen, dropdownExiting])
 
   function requestClose(afterClose?: () => void) {
     if (exiting) return
@@ -64,32 +48,6 @@ export default function AddToGameModal({
     pendingCloseAction.current = null
     action?.()
   }
-
-  function handleMenuAnimationEnd(e: AnimationEvent<HTMLUListElement>) {
-    if (!dropdownExiting) return
-    if (e.target !== e.currentTarget) return
-    if (e.animationName !== 'addToGameDropdownOut') return
-    setDropdownOpen(false)
-    setDropdownExiting(false)
-  }
-
-  useEffect(() => {
-    if (!dropdownActive || exiting) return
-    function handlePointerDown(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        closeDropdown()
-      }
-    }
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') closeDropdown()
-    }
-    document.addEventListener('mousedown', handlePointerDown)
-    document.addEventListener('keydown', handleKeyDown)
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown)
-      document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [dropdownActive, exiting, closeDropdown])
 
   function handleAdd() {
     if (!canAdd || exiting) return
@@ -166,67 +124,19 @@ export default function AddToGameModal({
             <span className="font-condensed text-sm text-muted" id="add-to-game-select-label">
               Game
             </span>
-            <div className="add-to-game-dropdown" ref={dropdownRef}>
-              <button
-                type="button"
-                className={`add-to-game-dropdown__trigger${dropdownActive ? ' add-to-game-dropdown__trigger--open' : ''}`}
-                aria-haspopup="listbox"
-                aria-expanded={dropdownActive}
-                aria-labelledby="add-to-game-select-label"
-                onClick={() => {
-                  if (dropdownActive) closeDropdown()
-                  else openDropdown()
-                }}
-              >
-                <span className="add-to-game-dropdown__value">
-                  <Layers size={14} className="flex-shrink-0 opacity-70" />
-                  <span className="truncate">{selectedGame?.name ?? 'Select a game'}</span>
-                </span>
-                <ChevronDown
-                  size={16}
-                  className={`add-to-game-dropdown__chevron${dropdownActive ? ' add-to-game-dropdown__chevron--open' : ''}`}
-                />
-              </button>
-              {dropdownVisible && (
-                <ul
-                  className={`add-to-game-dropdown__menu${dropdownExiting ? ' add-to-game-dropdown__menu--exit' : ' add-to-game-dropdown__menu--enter'}`}
-                  role="listbox"
-                  aria-labelledby="add-to-game-select-label"
-                  onAnimationEnd={handleMenuAnimationEnd}
-                >
-                  {games.map((g) => {
-                    const selected = g.id === selectedGameId
-                    return (
-                      <li key={g.id} role="presentation">
-                        <button
-                          type="button"
-                          role="option"
-                          aria-selected={selected}
-                          className={`add-to-game-dropdown__option${selected ? ' add-to-game-dropdown__option--selected' : ''}`}
-                          onClick={() => {
-                            setSelectedGameId(g.id)
-                            closeDropdown()
-                          }}
-                        >
-                          <span className="add-to-game-dropdown__option-label">
-                            <Layers size={12} className="flex-shrink-0 opacity-70" />
-                            <span className="truncate">{g.name}</span>
-                          </span>
-                          {selected && <Check size={14} className="flex-shrink-0 text-gold" />}
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-            </div>
+            <StyledDropdown
+              value={selectedGameId}
+              onChange={setSelectedGameId}
+              placeholder="Select a game"
+              ariaLabelledBy="add-to-game-select-label"
+              triggerIcon={<Layers size={14} className="flex-shrink-0 opacity-70" />}
+              optionIcon={<Layers size={12} className="flex-shrink-0 opacity-70" />}
+              options={games.map((g) => ({ value: g.id, label: g.name }))}
+            />
             <button
               type="button"
               className="btn-ghost w-full"
-              onClick={() => {
-                closeDropdown()
-                setCreating(true)
-              }}
+              onClick={() => setCreating(true)}
             >
               Create new game
             </button>

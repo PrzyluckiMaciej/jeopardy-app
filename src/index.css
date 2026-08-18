@@ -2337,6 +2337,14 @@ body.board-picker-reordering * {
   background: rgba(255, 255, 255, 0.04);
   border-color: var(--border-emphasis);
 }
+.add-to-game-dropdown__trigger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.add-to-game-dropdown__trigger:disabled:hover {
+  background: var(--navy);
+  border-color: var(--border-default);
+}
 .add-to-game-dropdown__trigger--open,
 .add-to-game-dropdown__trigger:focus-visible {
   border-color: var(--gold);
