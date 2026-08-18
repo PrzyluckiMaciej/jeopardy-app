@@ -22,6 +22,20 @@ const sectionTitleStyle = {
   letterSpacing: '0.12em',
 } as const
 
+/** Returns a sanitized integer string, or null if the keystroke should be ignored. */
+function sanitizeIntegerInput(raw: string, allowNegative: boolean): string | null {
+  if (raw === '') return ''
+  if (allowNegative && (raw === '-' || raw === '0-' || /^-0+$/.test(raw))) return '-'
+  const pattern = allowNegative ? /^-?\d+$/ : /^\d+$/
+  if (!pattern.test(raw)) return null
+  return String(parseInt(raw, 10))
+}
+
+function parseIntegerOrZero(raw: string): number {
+  const n = parseInt(raw, 10)
+  return Number.isNaN(n) ? 0 : n
+}
+
 export default function SettingsPanel({
   settings,
   players,
@@ -60,7 +74,7 @@ export default function SettingsPanel({
   }
 
   function saveEdit(p: Player) {
-    onUpdatePlayer({ ...p, name: editName.trim() || p.name, score: parseInt(editScore) || 0 })
+    onUpdatePlayer({ ...p, name: editName.trim() || p.name, score: parseIntegerOrZero(editScore) })
     setEditingId(null)
   }
 
@@ -114,13 +128,9 @@ export default function SettingsPanel({
                   setMinWagerText(String(settings.dailyDoubleMinWager))
                 }}
                 onChange={(e) => {
-                  const raw = e.target.value
-                  if (raw === '') {
-                    setMinWagerText('')
-                    return
-                  }
-                  if (!/^\d+$/.test(raw)) return
-                  setMinWagerText(String(parseInt(raw, 10)))
+                  const next = sanitizeIntegerInput(e.target.value, false)
+                  if (next === null) return
+                  setMinWagerText(next)
                 }}
                 onBlur={() => {
                   commitMinWager(minWagerText)
@@ -232,9 +242,15 @@ export default function SettingsPanel({
                 />
                 <input
                   value={editScore}
-                  onChange={(e) => setEditScore(e.target.value)}
+                  onChange={(e) => {
+                    const next = sanitizeIntegerInput(e.target.value, true)
+                    if (next === null) return
+                    setEditScore(next)
+                  }}
                   placeholder="Score"
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="-?[0-9]*"
                   className="w-full"
                   style={{ fontSize: '1rem' }}
                 />
