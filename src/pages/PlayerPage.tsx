@@ -1265,8 +1265,8 @@ export default function PlayerPage() {
           title={isSpectator ? 'Exit spectator mode?' : 'Enter spectator mode?'}
           message={
             isSpectator
-              ? 'You will rejoin as a player with a $0 score.'
-              : 'You will leave the scoreboard, your score will be cleared, and you cannot buzz or hold board control.'
+              ? 'You will rejoin as a player with your existing score.'
+              : 'You will leave the scoreboard and cannot buzz or hold board control. Your score will be kept if you rejoin.'
           }
           confirmLabel={isSpectator ? 'Exit' : 'Enter'}
           onConfirm={confirmSpectatorToggle}
