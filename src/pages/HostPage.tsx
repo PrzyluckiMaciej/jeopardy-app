@@ -9,7 +9,7 @@ import {
   isGameFolderTrashed,
   isGameTrashed,
 } from '../store/gameStore'
-import { buildItemPathString, resolveFolderOrItemPath } from '../lib/folderPath'
+import { buildItemPathString, buildPathString, resolveFolderOrItemPath } from '../lib/folderPath'
 import * as net from '../lib/network'
 import type { Board, BoardFolder, Game, GameFolder, Player, NetMessage, Question, GameSettings, PlayerSyncStatus } from '../types'
 import { createDefaultBoard, createDefaultFinalJeopardy, cellId, getDailyDoubleQuestionIds, isFinalBoard, participatingPlayers, normalizePlayer } from '../lib/utils'
@@ -2185,7 +2185,14 @@ export default function HostPage() {
         <AddToGameModal
           boardIds={addToGameTarget.boardIds}
           label={addToGameTarget.label}
-          games={libraryGames.map((g) => ({ id: g.id, name: g.name }))}
+          games={libraryGames.map((g) => ({
+            id: g.id,
+            name: g.name,
+            path: buildPathString(
+              boardStore.gameFolders.filter((f) => !isGameFolderTrashed(f)),
+              g.folderId ?? null,
+            ),
+          }))}
           onConfirm={handleAddToGameConfirm}
           onCreateAndConfirm={handleAddToGameCreateAndConfirm}
           onCancel={() => setAddToGameTarget(null)}

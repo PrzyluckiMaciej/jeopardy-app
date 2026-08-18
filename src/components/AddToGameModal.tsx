@@ -5,6 +5,7 @@ import StyledDropdown from './StyledDropdown'
 interface GameOption {
   id: string
   name: string
+  path?: string
 }
 
 interface Props {
@@ -131,7 +132,11 @@ export default function AddToGameModal({
               ariaLabelledBy="add-to-game-select-label"
               triggerIcon={<Layers size={14} className="flex-shrink-0 opacity-70" />}
               optionIcon={<Layers size={12} className="flex-shrink-0 opacity-70" />}
-              options={games.map((g) => ({ value: g.id, label: g.name }))}
+              options={games.map((g) => ({
+                value: g.id,
+                label: g.name,
+                description: g.path,
+              }))}
             />
             <button
               type="button"
