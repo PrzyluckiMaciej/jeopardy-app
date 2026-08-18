@@ -25,7 +25,7 @@ const sectionTitleStyle = {
 /** Returns a sanitized integer string, or null if the keystroke should be ignored. */
 function sanitizeIntegerInput(raw: string, allowNegative: boolean): string | null {
   if (raw === '') return ''
-  if (allowNegative && raw === '-') return '-'
+  if (allowNegative && (raw === '-' || raw === '0-' || /^-0+$/.test(raw))) return '-'
   const pattern = allowNegative ? /^-?\d+$/ : /^\d+$/
   if (!pattern.test(raw)) return null
   return String(parseInt(raw, 10))
