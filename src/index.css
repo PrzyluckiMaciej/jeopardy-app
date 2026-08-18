@@ -3628,6 +3628,9 @@ body.board-picker-reordering * {
 .mobile-players-toggle {
   display: none;
 }
+.mobile-players-backdrop {
+  display: none;
+}
 
 @media (max-width: 767px) {
   .app-page {
@@ -3697,6 +3700,74 @@ body.board-picker-reordering * {
   }
   .mobile-players-collapsible--open .mobile-players-collapsible__inner {
     overflow: visible;
+  }
+
+  /* Player board: overlay the list on the board instead of shrinking it */
+  .player-main {
+    position: relative;
+  }
+  .player-main .mobile-players-backdrop {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 15;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    background: rgba(6, 11, 40, 0.45);
+    backdrop-filter: blur(1px);
+    cursor: pointer;
+    animation: overlayFadeIn 0.18s ease-out forwards;
+  }
+  .player-main .mobile-players-collapsible {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 6px);
+    z-index: 30;
+    display: block;
+    grid-template-rows: unset;
+    max-height: min(50dvh, calc(100dvh - 8rem));
+    overflow-y: auto;
+    padding: 8px;
+    border-radius: 8px;
+    background: rgba(13, 27, 80, 0.96);
+    border: 1px solid var(--border-default);
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.45);
+    transform-origin: bottom center;
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+    pointer-events: none;
+    visibility: hidden;
+    transition:
+      opacity 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+      visibility 0.28s step-end;
+  }
+  .player-main .mobile-players-collapsible--open {
+    grid-template-rows: unset;
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+    visibility: visible;
+    transition:
+      opacity 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.32s cubic-bezier(0.34, 1.2, 0.64, 1),
+      visibility 0s step-start;
+  }
+  .player-main .mobile-players-collapsible__inner,
+  .player-main .mobile-players-collapsible--open .mobile-players-collapsible__inner {
+    overflow: visible;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .player-main .mobile-players-backdrop {
+      animation: none;
+    }
+    .player-main .mobile-players-collapsible,
+    .player-main .mobile-players-collapsible--open {
+      transition: none;
+      transform: none;
+    }
   }
 }
 
