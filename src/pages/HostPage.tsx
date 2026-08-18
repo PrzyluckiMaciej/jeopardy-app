@@ -1836,7 +1836,7 @@ export default function HostPage() {
                   >
                     <LayoutGrid size={14} className="board-picker-object-icon board-picker-object-icon--board" aria-hidden />
                     <span className="board-picker-nav-item__text">
-                      <span className="truncate">All Boards</span>
+                      <span className="truncate">Boards</span>
                       <span className="board-picker-nav-item__count">({libraryBoards.length})</span>
                     </span>
                   </button>
