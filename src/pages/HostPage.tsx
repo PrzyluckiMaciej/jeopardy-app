@@ -16,6 +16,7 @@ import { createDefaultBoard, createDefaultFinalJeopardy, cellId, getDailyDoubleQ
 import { getCategoryGameplaySettings, savePersistedSettings } from '../lib/settings'
 import { duplicateBoard } from '../lib/duplicateBoard'
 import { duplicateFolder } from '../lib/duplicateFolder'
+import { duplicateGame } from '../lib/duplicateGame'
 import { duplicateGameFolder } from '../lib/duplicateGameFolder'
 import { collectFolderSubtree } from '../lib/folderSubtree'
 import { getMedia, blobToDataUrl } from '../lib/db'
@@ -1052,6 +1053,10 @@ export default function HostPage() {
     )
   }
 
+  function handleDuplicateGame(game: Game) {
+    duplicateGame(game, boardStore.createGame, boardStore.addBoardToGame)
+  }
+
   function handleNewBoard(folderId: string | null = null) {
     const b = { ...createDefaultBoard(), folderId }
     boardStore.saveBoard(b)
@@ -1883,14 +1888,14 @@ export default function HostPage() {
                         pickerIsTrash
                           ? 'Right-click an item to restore it or delete it permanently. Right-click Trash to empty it.'
                           : pickerIsGames
-                            ? 'Click a folder to open it. Right-click empty space or a folder to create items, or a game/folder to rename or delete.'
+                            ? 'Click a folder to open it. Right-click empty space or a folder to create items, or a game/folder to rename, duplicate, or delete.'
                             : 'Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, rename, duplicate, or delete.'
                       }
                       aria-label={
                         pickerIsTrash
                           ? 'Right-click an item to restore it or delete it permanently. Right-click Trash to empty it.'
                           : pickerIsGames
-                            ? 'Click a folder to open it. Right-click empty space or a folder to create items, or a game/folder to rename or delete.'
+                            ? 'Click a folder to open it. Right-click empty space or a folder to create items, or a game/folder to rename, duplicate, or delete.'
                             : 'Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, rename, duplicate, or delete.'
                       }
                       tabIndex={0}
@@ -1936,6 +1941,7 @@ export default function HostPage() {
                     folders={boardStore.gameFolders}
                     onSelectGame={handleOpenGame}
                     onDeleteGame={handleTrashGame}
+                    onDuplicateGame={handleDuplicateGame}
                     onDuplicateFolder={handleDuplicateGameFolder}
                     onRequestDeleteFolder={handleTrashGameFolder}
                     renameFolderId={renameGameFolderId}
