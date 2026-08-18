@@ -1103,7 +1103,7 @@ export default function PlayerPage() {
                       displayClueRevealed && clueBlurred
                         ? {
                             color: 'var(--white)',
-                            filter: 'blur(8px)',
+                            filter: 'blur(1em)',
                             transition: 'filter 0.3s ease',
                             userSelect: 'none',
                           }
@@ -1124,7 +1124,7 @@ export default function PlayerPage() {
                           style={
                             clueBlurred
                               ? {
-                                  filter: 'blur(8px)',
+                                  filter: 'blur(24px)',
                                   transition: 'filter 0.3s ease',
                                 }
                               : undefined
