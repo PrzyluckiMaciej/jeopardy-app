@@ -31,10 +31,9 @@ function sanitizeIntegerInput(raw: string, allowNegative: boolean): string | nul
   return String(parseInt(raw, 10))
 }
 
-function parseIntegerOrZero(raw: string, allowNegative: boolean): number {
+function parseIntegerOrZero(raw: string): number {
   const n = parseInt(raw, 10)
-  if (Number.isNaN(n)) return 0
-  return allowNegative ? n : Math.max(0, n)
+  return Number.isNaN(n) ? 0 : n
 }
 
 export default function SettingsPanel({
@@ -71,13 +70,11 @@ export default function SettingsPanel({
   function startEdit(p: Player) {
     setEditingId(p.id)
     setEditName(p.name)
-    const score = settings.allowNegativeScore ? p.score : Math.max(0, p.score)
-    setEditScore(String(score))
+    setEditScore(String(p.score))
   }
 
   function saveEdit(p: Player) {
-    const score = parseIntegerOrZero(editScore, settings.allowNegativeScore)
-    onUpdatePlayer({ ...p, name: editName.trim() || p.name, score })
+    onUpdatePlayer({ ...p, name: editName.trim() || p.name, score: parseIntegerOrZero(editScore) })
     setEditingId(null)
   }
 
@@ -246,14 +243,14 @@ export default function SettingsPanel({
                 <input
                   value={editScore}
                   onChange={(e) => {
-                    const next = sanitizeIntegerInput(e.target.value, settings.allowNegativeScore)
+                    const next = sanitizeIntegerInput(e.target.value, true)
                     if (next === null) return
                     setEditScore(next)
                   }}
                   placeholder="Score"
                   type="text"
                   inputMode="numeric"
-                  pattern={settings.allowNegativeScore ? '-?[0-9]*' : '[0-9]*'}
+                  pattern="-?[0-9]*"
                   className="w-full"
                   style={{ fontSize: '1rem' }}
                 />
