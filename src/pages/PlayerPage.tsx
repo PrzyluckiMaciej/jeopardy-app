@@ -981,6 +981,14 @@ export default function PlayerPage() {
               )}
             </div>
 
+            {mobilePlayersOpen && (
+              <button
+                type="button"
+                className="mobile-players-backdrop"
+                aria-label="Close player list"
+                onClick={() => setMobilePlayersOpen(false)}
+              />
+            )}
             <div className="flex-shrink-0 relative z-20 overflow-visible">
               <button
                 className="mobile-players-toggle"
@@ -989,7 +997,7 @@ export default function PlayerPage() {
               >
                 <Users size={14} aria-hidden />
                 <span>Players ({participatingPlayers(state.players).length})</span>
-                {mobilePlayersOpen ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
+                {mobilePlayersOpen ? <ChevronDown size={14} aria-hidden /> : <ChevronUp size={14} aria-hidden />}
               </button>
               <div className={`mobile-players-collapsible${mobilePlayersOpen ? ' mobile-players-collapsible--open' : ''}`}>
                 <div className="mobile-players-collapsible__inner">
