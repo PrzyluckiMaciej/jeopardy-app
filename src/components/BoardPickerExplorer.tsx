@@ -925,7 +925,7 @@ export default function BoardPickerExplorer({
         onContextMenu={(e) => openGameMenu(e, game)}
       >
         <div className="board-picker-explorer-row__name">
-          <button type="button" className="board-picker-board-btn" disabled>
+          <button type="button" className="board-picker-board-btn">
             <Layers size={14} className="board-picker-object-icon board-picker-object-icon--game" />
             <span className="font-condensed font-bold truncate">{game.name}</span>
           </button>
