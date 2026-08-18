@@ -864,6 +864,17 @@ select:focus-visible {
   gap: var(--space-xs);
   flex-shrink: 0;
 }
+.host-board-toolbar__game-badge {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.75rem;
+  line-height: 1;
+  padding: 0.3125rem 0.625rem;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  background: rgba(212, 160, 23, 0.12);
+  border: 1px solid rgba(212, 160, 23, 0.3);
+  color: var(--gold);
+}
 
 /* Board editor — edit mode toolbar */
 .board-editor-toolbar {
