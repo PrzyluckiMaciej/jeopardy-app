@@ -510,7 +510,7 @@ describe('useGameStore', () => {
   })
 
   describe('setPlayerSpectator', () => {
-    it('enters spectator mode, zeroes score, clears buzz and board control', () => {
+    it('enters spectator mode, preserves score, clears buzz and board control', () => {
       useGameStore.getState().addPlayer(makePlayer({ score: 800 }))
       useGameStore.getState().addPlayer(makePlayer({ id: 'player-2', name: 'Bob' }))
       useGameStore.getState().setBoardControl('player-1')
@@ -522,18 +522,19 @@ describe('useGameStore', () => {
       const { state } = useGameStore.getState()
       const spectator = state.players.find((p) => p.id === 'player-1')
       expect(spectator?.isSpectator).toBe(true)
-      expect(spectator?.score).toBe(0)
+      expect(spectator?.score).toBe(800)
       expect(state.buzzQueue).not.toContain('player-1')
       expect(state.buzzQueue).toContain('player-2')
       expect(state.boardControlId).toBeNull()
     })
 
-    it('exits spectator mode without changing score', () => {
-      useGameStore.getState().addPlayer(makePlayer({ isSpectator: true, score: 0 }))
+    it('preserves score across spectator toggle round-trip', () => {
+      useGameStore.getState().addPlayer(makePlayer({ score: -400 }))
+      useGameStore.getState().setPlayerSpectator('player-1', true)
       useGameStore.getState().setPlayerSpectator('player-1', false)
       const player = useGameStore.getState().state.players[0]
       expect(player.isSpectator).toBe(false)
-      expect(player.score).toBe(0)
+      expect(player.score).toBe(-400)
     })
   })
 

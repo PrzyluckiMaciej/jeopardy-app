@@ -966,7 +966,7 @@ export const useGameStore = create<GameStore>()(
               state: {
                 ...s.state,
                 players: s.state.players.map((p) =>
-                  p.id === id ? { ...p, isSpectator: true, score: 0 } : p
+                  p.id === id ? { ...p, isSpectator: true } : p
                 ),
                 buzzQueue: s.state.buzzQueue.filter((pid) => pid !== id),
                 boardControlId:
