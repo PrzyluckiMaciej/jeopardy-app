@@ -4,6 +4,7 @@ import { Check, ChevronDown } from 'lucide-react'
 export interface StyledDropdownOption {
   value: string
   label: string
+  description?: string
 }
 
 interface Props {
@@ -91,6 +92,11 @@ export default function StyledDropdown({
         <span className="add-to-game-dropdown__value">
           {triggerIcon}
           <span className="truncate">{selectedOption?.label ?? placeholder}</span>
+          {selectedOption?.description && (
+            <span className="add-to-game-dropdown__path truncate" title={selectedOption.description}>
+              {selectedOption.description}
+            </span>
+          )}
         </span>
         <ChevronDown
           size={16}
@@ -121,6 +127,11 @@ export default function StyledDropdown({
                   <span className="add-to-game-dropdown__option-label">
                     {optionIcon}
                     <span className="truncate">{o.label}</span>
+                    {o.description && (
+                      <span className="add-to-game-dropdown__path truncate" title={o.description}>
+                        {o.description}
+                      </span>
+                    )}
                   </span>
                   {showCheckOnSelected && selected && (
                     <Check size={14} className="flex-shrink-0 text-gold" />

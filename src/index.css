@@ -2439,6 +2439,17 @@ body.board-picker-reordering * {
   min-width: 0;
   flex: 1;
 }
+.add-to-game-dropdown__path {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: #6b7db3;
+}
+.add-to-game-dropdown__option--selected .add-to-game-dropdown__path {
+  color: rgba(212, 160, 23, 0.55);
+}
 
 /* ── Context menu ───────────────────────────────────────────── */
 .context-menu {
