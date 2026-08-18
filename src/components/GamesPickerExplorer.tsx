@@ -29,6 +29,7 @@ interface Props {
   folders: GameFolder[]
   onSelectGame: (game: Game) => void
   onDeleteGame: (game: Game) => void
+  onDuplicateGame: (game: Game) => void
   onDuplicateFolder: (folder: GameFolder) => void
   onRequestDeleteFolder: (folder: GameFolder) => void
   /** When set, start inline rename for this folder id (e.g. after create). */
@@ -83,6 +84,7 @@ export default function GamesPickerExplorer({
   folders,
   onSelectGame,
   onDeleteGame,
+  onDuplicateGame,
   onDuplicateFolder,
   onRequestDeleteFolder,
   renameFolderId: controlledRenameFolderId,
@@ -379,6 +381,11 @@ export default function GamesPickerExplorer({
           id: 'rename',
           label: 'Rename',
           onSelect: () => setEditingGameId(game.id, game.name),
+        },
+        {
+          id: 'duplicate',
+          label: 'Duplicate',
+          onSelect: () => onDuplicateGame(game),
         },
         {
           id: 'delete',
