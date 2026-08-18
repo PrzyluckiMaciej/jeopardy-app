@@ -3,6 +3,7 @@ import { Pencil, Trash2, Crown, Check, X, RefreshCw, Eye } from 'lucide-react'
 import type { GameSettings, Player, PlayerSyncStatus } from '../types'
 import { formatScore } from '../lib/utils'
 import SettingsToggle from './SettingsToggle'
+import StyledDropdown from './StyledDropdown'
 
 interface Props {
   settings: GameSettings
@@ -80,7 +81,7 @@ export default function SettingsPanel({
 
   return (
     <div className="settings-grid">
-      {/* Left column: Game Settings + Board Control */}
+      {/* Left column: Game Settings */}
       <div className="flex flex-col gap-8">
         {/* Game Settings */}
         <div className="panel">
@@ -188,7 +189,10 @@ export default function SettingsPanel({
             />
           </div>
         </div>
+      </div>
 
+      {/* Right column: Board Control + Players */}
+      <div className="flex flex-col gap-4">
         {/* Board Control */}
         <div className="panel">
           <div className="font-condensed font-bold uppercase mb-4" style={sectionTitleStyle}>
@@ -197,26 +201,27 @@ export default function SettingsPanel({
           <p className="mb-4 leading-relaxed" style={{ color: '#6b7db3', fontSize: '0.9375rem' }}>
             The selected player picks the next clue (required for Daily Doubles).
           </p>
-          <select
-            className="w-full"
-            style={{ fontSize: '1rem', padding: '12px 14px' }}
+          <StyledDropdown
             value={boardControlId ?? ''}
-            onChange={(e) => onAssignBoardControl(e.target.value || null)}
+            onChange={(v) => onAssignBoardControl(v || null)}
+            placeholder="None"
             disabled={players.length === 0}
-          >
-            <option value="">None</option>
-            {players.filter((p) => !p.isSpectator).map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-                {!p.isConnected ? ' (offline)' : ''}
-              </option>
-            ))}
-          </select>
+            triggerIcon={<Crown size={14} className="flex-shrink-0 opacity-70" />}
+            optionIcon={<Crown size={12} className="flex-shrink-0 opacity-70" />}
+            options={[
+              { value: '', label: 'None' },
+              ...players
+                .filter((p) => !p.isSpectator)
+                .map((p) => ({
+                  value: p.id,
+                  label: `${p.name}${!p.isConnected ? ' (offline)' : ''}`,
+                })),
+            ]}
+          />
         </div>
-      </div>
 
-      {/* Right column: Players */}
-      <div className="panel flex flex-col gap-5">
+        {/* Players */}
+        <div className="panel flex flex-col gap-5">
         <div className="font-condensed font-bold uppercase" style={sectionTitleStyle}>
           Players
         </div>
@@ -394,6 +399,7 @@ export default function SettingsPanel({
               Players appear here when they join with a room code.
             </div>
           )}
+        </div>
         </div>
       </div>
     </div>
