@@ -236,7 +236,7 @@ export default function FinalJeopardyEditor({ board, onChange, onClose, onDelete
             className="font-condensed text-xs uppercase tracking-wider mb-1 block"
             style={{ color: 'var(--gold)', opacity: 0.7 }}
           >
-            Question (clue)
+            Clue
           </label>
           <textarea
             className="w-full"
@@ -252,7 +252,7 @@ export default function FinalJeopardyEditor({ board, onChange, onClose, onDelete
             className="font-condensed text-xs uppercase tracking-wider mb-1 block"
             style={{ color: 'var(--gold)', opacity: 0.7 }}
           >
-            Answer (in Jeopardy form)
+            Answer
           </label>
           <textarea
             className="w-full"
