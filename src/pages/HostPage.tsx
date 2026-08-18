@@ -1602,10 +1602,7 @@ export default function HostPage() {
                         </span>
                       )}
                       {inGame && activeGameData && (
-                        <span
-                          className="font-condensed text-xs px-2 py-1 rounded"
-                          style={{ background: 'rgba(212,160,23,0.12)', border: '1px solid rgba(212,160,23,0.3)', color: 'var(--gold)' }}
-                        >
+                        <span className="host-board-toolbar__game-badge">
                           {activeGameData.name} — Board {state.currentBoardIndex + 1}/{state.gameBoardIds.length}
                         </span>
                       )}
