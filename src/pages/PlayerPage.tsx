@@ -846,7 +846,7 @@ export default function PlayerPage() {
         <div className="font-condensed text-lg animate-pulse" style={{ color: '#4a5580' }}>
           Connecting to room <span style={{ color: 'var(--gold)' }}>{roomCode}</span>…
         </div>
-        <div className="text-sm" style={{ color: '#4a5580' }}>Waiting for host to accept players</div>
+        <div className="text-sm" style={{ color: '#4a5580' }}>Waiting to connect to the host</div>
       </div>
     )
   }
