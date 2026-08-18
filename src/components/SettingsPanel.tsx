@@ -192,7 +192,7 @@ export default function SettingsPanel({
       </div>
 
       {/* Right column: Board Control + Players */}
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-4">
         {/* Board Control */}
         <div className="panel">
           <div className="font-condensed font-bold uppercase mb-4" style={sectionTitleStyle}>
