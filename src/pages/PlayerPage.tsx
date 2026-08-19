@@ -11,6 +11,7 @@ import { getCategoryGameplaySettings } from '../lib/settings'
 import { logEvent } from '../lib/logger'
 import { setCachedMedia, resolveActiveMedia, clearCache } from '../lib/mediaCache'
 import { sanitizeGameStateForPlayer } from '../lib/finalJeopardySync'
+import { acceptHostHello, HOST_DISCONNECT_GRACE_MS } from '../lib/hostSession'
 import ConfirmModal from '../components/ConfirmModal'
 import FinalJeopardyPlayerView from '../components/FinalJeopardyPlayerView'
 import GameBoard from '../components/GameBoard'
@@ -35,6 +36,8 @@ export default function PlayerPage() {
   const wasInBuzzQueueRef = useRef(false)
   const [judgeResult, setJudgeResult] = useState<'correct' | 'wrong' | null>(null)
   const [hostLeft, setHostLeft] = useState(false)
+  const [hostDisconnected, setHostDisconnected] = useState(false)
+  const [sessionReady, setSessionReady] = useState(() => useGameStore.persist.hasHydrated())
   const [ddWagerInput, setDdWagerInput] = useState('')
   const [ddWagerError, setDdWagerError] = useState('')
   const [ddWagerSubmitted, setDdWagerSubmitted] = useState(false)
@@ -55,6 +58,8 @@ export default function PlayerPage() {
   const [mediaLoading, setMediaLoading] = useState(false)
   const pendingMediaRequest = useRef<string | null>(null)
   const hostPeerId = useRef<string | null>(null)
+  const hostSecret = useRef<string | null>(null)
+  const hostLeaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const emojiTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const prevPhaseRef = useRef(state.phase)
   const prevScoreRef = useRef<number | undefined>(undefined)
@@ -82,19 +87,53 @@ export default function PlayerPage() {
   const hasAnnouncedJoin = useRef(false)
 
   useEffect(() => {
+    const unsub = useGameStore.persist.onFinishHydration(() => setSessionReady(true))
+    setSessionReady(useGameStore.persist.hasHydrated())
+    return unsub
+  }, [])
+
+  useEffect(() => {
+    if (!sessionReady) return
     if (!roomCode) { navigate('/'); return }
 
     net.joinGameRoom(roomCode)
     setMyPlayerId(myId)
 
-    net.onPeerJoin(() => {
+    const clearHostLeaveTimer = () => {
+      if (hostLeaveTimer.current) {
+        clearTimeout(hostLeaveTimer.current)
+        hostLeaveTimer.current = null
+      }
+    }
+
+    const announceJoin = (peerId: string) => {
+      const meJoin: Player = {
+        id: myId,
+        name: playerName,
+        score: 0,
+        isConnected: true,
+        isSpectator: false,
+      }
+      net.send({ type: 'PLAYER_JOIN', player: meJoin }, peerId)
+      hasAnnouncedJoin.current = true
+    }
+
+    net.onPeerJoin((peerId) => {
       setConnected(true)
+      if (peerId === hostPeerId.current) {
+        clearHostLeaveTimer()
+        setHostDisconnected(false)
+      }
     })
 
     net.onPeerLeave((peerId) => {
-      if (peerId === hostPeerId.current) {
-        setHostLeft(true)
-      }
+      if (peerId !== hostPeerId.current) return
+      clearHostLeaveTimer()
+      hostLeaveTimer.current = setTimeout(() => {
+        hostLeaveTimer.current = null
+        hasAnnouncedJoin.current = false
+        setHostDisconnected(true)
+      }, HOST_DISCONNECT_GRACE_MS)
     })
 
     net.onMedia((data, peerId, metadata) => {
@@ -128,7 +167,26 @@ export default function PlayerPage() {
     })
 
     net.onMessage((msg: NetMessage, peerId: string) => {
+      if (msg.type === 'HOST_HELLO') {
+        if (!acceptHostHello({ storedSecret: hostSecret.current, incomingSecret: msg.secret })) {
+          return
+        }
+        hostSecret.current = msg.secret
+        clearHostLeaveTimer()
+        hostPeerId.current = peerId
+        setHostDisconnected(false)
+        setConnected(true)
+        announceJoin(peerId)
+        return
+      }
+      if (msg.type === 'HOST_ENDED') {
+        clearHostLeaveTimer()
+        setHostDisconnected(false)
+        setHostLeft(true)
+        return
+      }
       if (msg.type === 'SYNC_STATE') {
+        if (hostPeerId.current && peerId !== hostPeerId.current) return
         if (!hostPeerId.current) hostPeerId.current = peerId
         const myIdForSync =
           useGameStore.getState().myPlayerId ??
@@ -145,9 +203,7 @@ export default function PlayerPage() {
         if (me) setMyPlayerId(me.id)
         setConnected(true)
         if (!hasAnnouncedJoin.current && hostPeerId.current) {
-          hasAnnouncedJoin.current = true
-          const meJoin: Player = { id: myId, name: playerName, score: 0, isConnected: true, isSpectator: false }
-          net.send({ type: 'PLAYER_JOIN', player: meJoin }, hostPeerId.current)
+          announceJoin(hostPeerId.current)
         }
         if (!hasLoggedJoin.current) {
           hasLoggedJoin.current = true
@@ -446,11 +502,12 @@ export default function PlayerPage() {
     })
 
     return () => {
+      if (hostLeaveTimer.current) clearTimeout(hostLeaveTimer.current)
       net.leaveRoom()
       clearCache()
       logEvent({ role: 'player', roomCode, actor: playerName, event: 'Left room' })
     }
-  }, [roomCode]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [roomCode, sessionReady]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const myPlayer = state.players.find((p) => p.id === myId)
 
@@ -507,7 +564,7 @@ export default function PlayerPage() {
   const boardFill = true
 
   function handleBuzz() {
-    if (myPlayer?.isSpectator || hasBuzzed || state.phase !== 'buzzing') return
+    if (hostDisconnected || myPlayer?.isSpectator || hasBuzzed || state.phase !== 'buzzing') return
     setHasBuzzed(true)
     if (hostPeerId.current) {
       net.send({ type: 'BUZZ', playerId: myId, playerName: myPlayer?.name ?? playerName }, hostPeerId.current)
@@ -530,6 +587,7 @@ export default function PlayerPage() {
   }
 
   function handleEmojiSelect(emoji: string) {
+    if (hostDisconnected) return
     net.broadcast({ type: 'EMOJI_REACT', playerId: myId, emoji })
     applyEmojiReaction(myId, emoji)
   }
@@ -539,12 +597,13 @@ export default function PlayerPage() {
   }
 
   function handleSpectatorToggle() {
+    if (hostDisconnected) return
     setShowSpectatorConfirm(true)
   }
 
   function confirmSpectatorToggle() {
     setShowSpectatorConfirm(false)
-    if (!hostPeerId.current) return
+    if (hostDisconnected || !hostPeerId.current) return
     const next = !(myPlayer?.isSpectator === true)
     net.send({ type: 'SET_SPECTATOR', isSpectator: next }, hostPeerId.current)
   }
@@ -755,7 +814,7 @@ export default function PlayerPage() {
         value={ddWagerInput}
         onChange={(e) => handleDdWagerChange(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && handleSubmitWager()}
-        disabled={ddWagerSubmitted}
+        disabled={ddWagerSubmitted || hostDisconnected}
         autoFocus
       />
       {ddWagerError && (
@@ -764,7 +823,7 @@ export default function PlayerPage() {
       <button
         className="btn-gold w-full py-3"
         onClick={handleSubmitWager}
-        disabled={ddWagerSubmitted}
+        disabled={ddWagerSubmitted || hostDisconnected}
       >
         {ddWagerSubmitted ? 'Wager submitted' : 'Submit wager'}
       </button>
@@ -772,6 +831,7 @@ export default function PlayerPage() {
   )
 
   function handleSubmitWager() {
+    if (hostDisconnected) return
     const error = getDdWagerError(ddWagerInput, true)
     if (error) {
       setDdWagerError(error)
@@ -786,14 +846,33 @@ export default function PlayerPage() {
   }
 
   useEffect(() => {
+    if (!hostDisconnected) return
+    logEvent({
+      role: 'player',
+      roomCode: roomCode ?? '',
+      actor: playerName,
+      event: 'Host disconnected, waiting to reconnect',
+    })
+  }, [hostDisconnected]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     if (!hostLeft) return
     logEvent({ role: 'player', roomCode: roomCode ?? '', actor: playerName, event: 'Host left the room' })
     const t = setTimeout(() => {
       net.leaveRoom()
+      useGameStore.getState().leaveRoom()
       navigate('/')
     }, 3000)
     return () => clearTimeout(t)
   }, [hostLeft]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!sessionReady) {
+    return (
+      <div className="flex min-h-screen items-center justify-center" style={{ background: 'var(--navy)' }}>
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--gold)] border-t-transparent" />
+      </div>
+    )
+  }
 
   if (hostLeft) {
     return (
@@ -809,6 +888,7 @@ export default function PlayerPage() {
           className="btn-outline mt-2"
           onClick={() => {
             net.leaveRoom()
+            useGameStore.getState().leaveRoom()
             navigate('/')
           }}
         >
@@ -946,6 +1026,7 @@ export default function PlayerPage() {
                   myId={myId}
                   hostPeerId={hostPeerId.current}
                   mediaLoading={mediaLoading}
+                  disabled={hostDisconnected}
                 />
               )}
 
@@ -1256,6 +1337,23 @@ export default function PlayerPage() {
           {showMobilePlayerDock && (
             <PlayerActionZone {...playerActionZoneProps} />
           )}
+        </div>
+      )}
+
+      {hostDisconnected && (
+        <div className="host-disconnected-overlay" role="alertdialog" aria-labelledby="host-disconnected-title" aria-describedby="host-disconnected-desc">
+          <div className="host-disconnected-overlay__card">
+            <div className="font-display text-4xl" style={{ color: 'var(--gold-bright)' }}>JEOPARDY!</div>
+            <div id="host-disconnected-title" className="font-condensed text-xl" style={{ color: 'var(--gold-light)' }}>
+              Host disconnected
+            </div>
+            <div id="host-disconnected-desc" className="text-sm text-center" style={{ color: '#8899cc' }}>
+              Waiting for the host to reconnect. Scores, answered questions, and the board will stay in this room.
+            </div>
+            <button type="button" className="btn-outline mt-2" onClick={handleExitRoom}>
+              Leave room
+            </button>
+          </div>
         </div>
       )}
 

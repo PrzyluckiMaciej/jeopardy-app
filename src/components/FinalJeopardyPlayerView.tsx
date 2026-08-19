@@ -10,6 +10,7 @@ interface Props {
   myId: string
   hostPeerId: string | null
   mediaLoading?: boolean
+  disabled?: boolean
 }
 
 export default function FinalJeopardyPlayerView({
@@ -17,6 +18,7 @@ export default function FinalJeopardyPlayerView({
   myId,
   hostPeerId,
   mediaLoading = false,
+  disabled = false,
 }: Props) {
   const { board, activeQuestion, activeMedia, mediaPlayback, finalJeopardy, players } = state
   const remaining = useCountdownSeconds(finalJeopardy?.timerEndsAt ?? null)
@@ -102,7 +104,7 @@ export default function FinalJeopardyPlayerView({
   }
 
   function submitWager() {
-    if (!eligible || hasWagered || contentRevealed || !hostPeerId) return
+    if (disabled || !eligible || hasWagered || contentRevealed || !hostPeerId) return
     const error = getFjWagerError(wagerInput, true)
     if (error) {
       setWagerError(error)
@@ -114,7 +116,7 @@ export default function FinalJeopardyPlayerView({
   }
 
   function submitAnswer() {
-    if (!canAnswer || !hostPeerId) return
+    if (disabled || !canAnswer || !hostPeerId) return
     const text = answerInput.trim()
     if (!text) return
     net.send({ type: 'FINAL_JEOPARDY_SUBMIT_ANSWER', playerId: myId, text }, hostPeerId)

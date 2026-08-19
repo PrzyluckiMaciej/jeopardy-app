@@ -27,6 +27,7 @@ import {
   normalizePlayerName,
   type NameSession,
 } from '../lib/playerJoin'
+import { generateHostSecret } from '../lib/hostSession'
 import AddBoardToGameList from '../components/AddBoardToGameList'
 import AddToGameModal from '../components/AddToGameModal'
 import ConfirmModal from '../components/ConfirmModal'
@@ -138,6 +139,7 @@ export default function HostPage() {
   const nameSessions = useRef(new Map<string, NameSession>())
   const emojiTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const copyFeedbackTimers = useRef<ReturnType<typeof setTimeout>[]>([])
+  const [sessionReady, setSessionReady] = useState(() => useGameStore.persist.hasHydrated())
 
   const mediaBlobCache = useRef(new Map<string, Blob>())
   const mediaSyncMap = useRef(new Map<string, Set<string>>())
@@ -272,6 +274,12 @@ export default function HostPage() {
   }, [])
 
   useEffect(() => {
+    const unsub = useGameStore.persist.onFinishHydration(() => setSessionReady(true))
+    setSessionReady(useGameStore.persist.hasHydrated())
+    return unsub
+  }, [])
+
+  useEffect(() => {
     if (!state.board) return
     const mediaIds = collectBoardMediaIds(state.board)
     const newIds = mediaIds.filter((id) => !currentManifestIds.current.includes(id))
@@ -279,7 +287,33 @@ export default function HostPage() {
   }, [state.board]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    if (!sessionReady) return
     if (!roomCode) { navigate('/'); return }
+
+    const restored = useGameStore.getState()
+    if (restored.state.players.some((p) => p.isConnected)) {
+      restored.patchState({
+        players: restored.state.players.map((p) => ({ ...p, isConnected: false })),
+      })
+    }
+    if (!restored.hostSecret) {
+      restored.setHostSecret(generateHostSecret())
+    }
+
+    async function restoreActiveMediaFromDb() {
+      const gs = useGameStore.getState().state
+      const question = gs.activeQuestion?.question
+      if (!question?.mediaId) return
+      const rec = await getMedia(question.mediaId)
+      if (!rec) return
+      mediaBlobCache.current.set(question.mediaId, rec.blob)
+      const dataUrl = await blobToDataUrl(rec.blob)
+      const type = question.mediaType ?? mimeTypeToMediaType(rec.mimeType)
+      useGameStore.getState().patchState({
+        activeMedia: { type, dataUrl },
+      })
+    }
+    void restoreActiveMediaFromDb()
 
     net.createRoom(roomCode)
 
@@ -289,6 +323,9 @@ export default function HostPage() {
 
     net.onPeerJoin((peerId) => {
       const current = useGameStore.getState()
+      if (current.hostSecret) {
+        net.send({ type: 'HOST_HELLO', secret: current.hostSecret }, peerId)
+      }
       net.send({ type: 'SYNC_STATE', state: current.state }, peerId)
     })
 
@@ -497,7 +534,7 @@ export default function HostPage() {
     })
 
     return () => net.leaveRoom()
-  }, [roomCode]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [roomCode, sessionReady]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function beginFinalJeopardyRound(b: Board) {
     const category = b.categories[0]
@@ -1221,9 +1258,12 @@ export default function HostPage() {
 
   function confirmExitRoom() {
     setShowExitConfirm(false)
-    net.leaveRoom()
-    store.reset()
-    navigate('/')
+    net.broadcast({ type: 'HOST_ENDED' })
+    window.setTimeout(() => {
+      net.leaveRoom()
+      store.reset()
+      navigate('/')
+    }, 150)
   }
 
   function resetPickerDrafts() {
@@ -1475,6 +1515,14 @@ export default function HostPage() {
     } else {
       clearGameBoardDrag()
     }
+  }
+
+  if (!sessionReady) {
+    return (
+      <div className="flex min-h-screen items-center justify-center" style={{ background: 'var(--navy)' }}>
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--gold)] border-t-transparent" />
+      </div>
+    )
   }
 
   return (
