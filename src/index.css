@@ -432,11 +432,10 @@ select:focus-visible {
   border: 1px solid var(--border-emphasis);
   border-radius: 10px;
   padding: 8px 10px;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(44px, 1fr));
   gap: 4px;
-  width: 176px;
-  justify-content: center;
+  width: max-content;
   z-index: 200;
   box-shadow: var(--shadow-lg);
 }

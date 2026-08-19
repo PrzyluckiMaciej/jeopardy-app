@@ -4,7 +4,7 @@ import { Smile, Crown } from 'lucide-react'
 import { formatScore, orderPlayersForDisplay } from '../lib/utils'
 import type { Player } from '../types'
 
-const EMOJIS = ['😂', '😎', '😠', '🤡', '😮', '🤨', '😴', '😍', '👍', '👎']
+const EMOJIS = ['😂', '😎', '😠', '🤡', '😮', '🤨', '😴', '😍', '💩', '👍', '👎', '👏']
 
 const badgeStyle = {
   fontSize: 9,
