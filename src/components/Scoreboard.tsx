@@ -276,6 +276,7 @@ export default function Scoreboard({
     players.filter((p) => !p.isSpectator),
     myPlayerId,
   )
+  const hasActiveEmojiReactions = Object.keys(activeEmojis).length > 0
 
   const prevScores = useRef<Record<string, number>>({})
   const [pulsingIds, setPulsingIds] = useState<Set<string>>(new Set())
@@ -311,11 +312,7 @@ export default function Scoreboard({
 
   useLayoutEffect(() => {
     const ids = Object.keys(activeEmojis)
-    if (ids.length === 0) {
-      setFloatPos({})
-      setDockBox(null)
-      return
-    }
+    if (ids.length === 0) return
 
     let rafId = 0
 
@@ -353,7 +350,7 @@ export default function Scoreboard({
       })
     }
 
-    applyMeasure()
+    scheduleMeasure()
 
     window.addEventListener('resize', scheduleMeasure)
     window.addEventListener('scroll', scheduleMeasure, true)
@@ -441,15 +438,18 @@ export default function Scoreboard({
       document.body,
     )
 
+  const layoutFloatPos = hasActiveEmojiReactions ? floatPos : {}
+  const layoutDockBox = hasActiveEmojiReactions ? dockBox : null
+
   const dockReactions = displayPlayers.filter(
-    (p) => activeEmojis[p.id] && !floatPos[p.id],
+    (p) => activeEmojis[p.id] && !layoutFloatPos[p.id],
   )
 
   const emojiReactionPortal = createPortal(
     <>
       {displayPlayers.map((p) => {
         const reaction = activeEmojis[p.id]
-        const pos = floatPos[p.id]
+        const pos = layoutFloatPos[p.id]
         if (!reaction || !pos) return null
         return (
           <div
@@ -465,13 +465,13 @@ export default function Scoreboard({
           </div>
         )
       })}
-      {dockBox && dockReactions.length > 0 && (
+      {layoutDockBox && dockReactions.length > 0 && (
         <div
           className="mobile-emoji-dock"
           style={{
-            bottom: dockBox.bottom,
-            left: dockBox.left,
-            width: dockBox.width,
+            bottom: layoutDockBox.bottom,
+            left: layoutDockBox.left,
+            width: layoutDockBox.width,
           }}
         >
           {dockReactions.map((p) => {
