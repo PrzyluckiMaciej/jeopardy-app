@@ -18,6 +18,7 @@ import {
   questionMediaAutoplay,
 } from '../types'
 import { loadPersistedSettings } from '../lib/settings'
+import { sanitizeStateForPersist } from '../lib/hostSession'
 
 type FolderLike = { id: string; name: string; parentId: string | null; trashedAt?: number | null }
 
@@ -813,17 +814,19 @@ export const useBoardStore = create<BoardStore>()(
   ),
 )
 
-// ---- Live game store (session-persisted: roomCode, isHost, myPlayerId only) ----
+// ---- Live game store (session-persisted: room, host secret, live state) ----
 interface GameStore {
   state: GameState
   settings: GameSettings
   isHost: boolean
   roomCode: string | null
   myPlayerId: string | null
+  hostSecret: string | null
 
   setIsHost: (v: boolean) => void
   setRoomCode: (code: string | null) => void
   setMyPlayerId: (id: string | null) => void
+  setHostSecret: (secret: string | null) => void
   setState: (state: GameState) => void
   setSettings: (settings: GameSettings) => void
   patchState: (patch: Partial<GameState>) => void
@@ -899,10 +902,12 @@ export const useGameStore = create<GameStore>()(
       isHost: false,
       roomCode: null,
       myPlayerId: null,
+      hostSecret: null,
 
       setIsHost: (v) => set({ isHost: v }),
       setRoomCode: (code) => set({ roomCode: code }),
       setMyPlayerId: (id) => set({ myPlayerId: id }),
+      setHostSecret: (secret) => set({ hostSecret: secret }),
       setState: (state) =>
         set({
           state: {
@@ -1467,6 +1472,7 @@ export const useGameStore = create<GameStore>()(
           isHost: false,
           roomCode: null,
           myPlayerId: null,
+          hostSecret: null,
         }),
 
       leaveRoom: () =>
@@ -1474,6 +1480,7 @@ export const useGameStore = create<GameStore>()(
           state: defaultState,
           isHost: false,
           roomCode: null,
+          hostSecret: null,
         }),
     }),
     {
@@ -1483,7 +1490,20 @@ export const useGameStore = create<GameStore>()(
         roomCode: s.roomCode,
         isHost: s.isHost,
         myPlayerId: s.myPlayerId,
+        hostSecret: s.hostSecret,
+        state: sanitizeStateForPersist(s.state),
       }),
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<GameStore>
+        return {
+          ...current,
+          ...p,
+          state: p.state
+            ? sanitizeStateForPersist({ ...current.state, ...p.state })
+            : current.state,
+          hostSecret: p.hostSecret ?? current.hostSecret ?? null,
+        }
+      },
     }
   )
 )

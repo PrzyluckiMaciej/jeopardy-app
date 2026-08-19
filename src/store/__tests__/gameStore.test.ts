@@ -888,6 +888,7 @@ describe('useGameStore', () => {
       useGameStore.getState().setIsHost(true)
       useGameStore.getState().setRoomCode('ABC123')
       useGameStore.getState().setMyPlayerId('player-1')
+      useGameStore.getState().setHostSecret('secret-1')
       useGameStore.getState().addPlayer(makePlayer())
       useGameStore.getState().reset()
 
@@ -902,6 +903,51 @@ describe('useGameStore', () => {
       expect(s.state.answeredCells).toEqual([])
       expect(s.state.activeQuestion).toBeNull()
       expect(s.state.activeMedia).toBeNull()
+      expect(s.hostSecret).toBeNull()
+    })
+  })
+
+  describe('leaveRoom', () => {
+    it('clears hostSecret and live room state', () => {
+      useGameStore.setState({
+        hostSecret: 'secret-1',
+        isHost: true,
+        roomCode: 'ABC123',
+      })
+      useGameStore.getState().addPlayer(makePlayer())
+      useGameStore.getState().leaveRoom()
+
+      const s = useGameStore.getState()
+      expect(s.hostSecret).toBeNull()
+      expect(s.isHost).toBe(false)
+      expect(s.roomCode).toBeNull()
+      expect(s.state.players).toEqual([])
+    })
+  })
+
+  describe('session persist', () => {
+    it('omits activeMedia from partialized state', () => {
+      useGameStore.setState({
+        hostSecret: 'secret-1',
+        isHost: true,
+        roomCode: 'ABC123',
+      })
+      useGameStore.getState().openCard('cat-1', makeQuestion(), 'data:image/png;base64,abc')
+      useGameStore.setState((s) => ({
+        state: { ...s.state, answeredCells: ['cat-1-q-1'] },
+      }))
+
+      const partialize = useGameStore.persist.getOptions().partialize
+      const partial = partialize!(useGameStore.getState()) as {
+        hostSecret?: string | null
+        roomCode?: string | null
+        state?: { answeredCells?: string[]; activeMedia?: unknown }
+      }
+      expect(partial.hostSecret).toBe('secret-1')
+      expect(partial.roomCode).toBe('ABC123')
+      expect(partial.state?.answeredCells).toEqual(['cat-1-q-1'])
+      expect(partial.state?.activeMedia).toBeNull()
+      expect(useGameStore.getState().state.activeMedia).not.toBeNull()
     })
   })
 })

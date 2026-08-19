@@ -205,6 +205,8 @@ export interface GameState {
 // ---- Network messages ----
 export type NetMessage =
   | { type: 'SYNC_STATE'; state: GameState }
+  | { type: 'HOST_HELLO'; secret: string }
+  | { type: 'HOST_ENDED' }
   | { type: 'PLAYER_JOIN'; player: Player }
   | { type: 'PLAYER_LEAVE'; playerId: string }
   | { type: 'OPEN_CARD'; categoryId: string; question: Question; mediaDataUrl?: string; clueRevealed?: boolean; mediaRevealed?: boolean }

@@ -2373,7 +2373,7 @@ body.board-picker-reordering * {
 .confirm-modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  z-index: 90;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2383,6 +2383,25 @@ body.board-picker-reordering * {
 .confirm-modal-overlay--exit {
   animation: overlayFadeOut 0.18s ease-in forwards;
   pointer-events: none;
+}
+
+/* ── Host disconnected (player wait) ────────────────────────── */
+.host-disconnected-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: var(--bg-overlay);
+}
+.host-disconnected-overlay__card {
+  max-width: 22rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 /* ── Add to game dropdown ───────────────────────────────────── */
