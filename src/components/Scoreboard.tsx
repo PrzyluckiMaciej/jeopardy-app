@@ -1,10 +1,113 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { Smile, Crown } from 'lucide-react'
 import { formatScore, orderPlayersForDisplay } from '../lib/utils'
 import type { Player } from '../types'
 
 const EMOJIS = ['😂', '😎', '😠', '🤡', '😮', '🤨', '😴', '😍', '💩', '👍', '👎', '👏']
+
+function isPainted(el: HTMLElement): boolean {
+  const rect = el.getBoundingClientRect()
+  if (rect.width < 2 || rect.height < 2) return false
+  let node: HTMLElement | null = el
+  while (node && node !== document.documentElement) {
+    const style = getComputedStyle(node)
+    if (style.display === 'none' || style.visibility === 'hidden') return false
+    const opacity = Number.parseFloat(style.opacity)
+    if (Number.isFinite(opacity) && opacity === 0) return false
+    if (node !== el) {
+      const clipsY = style.overflowY === 'hidden' || style.overflowY === 'auto' || style.overflowY === 'scroll'
+      const clipsX = style.overflowX === 'hidden' || style.overflowX === 'auto' || style.overflowX === 'scroll'
+      if (clipsX || clipsY) {
+        const parentRect = node.getBoundingClientRect()
+        const visibleH = Math.min(rect.bottom, parentRect.bottom) - Math.max(rect.top, parentRect.top)
+        const visibleW = Math.min(rect.right, parentRect.right) - Math.max(rect.left, parentRect.left)
+        if (visibleH < 8 || visibleW < 8) return false
+      }
+    }
+    node = node.parentElement
+  }
+  return true
+}
+
+function paintedQuery(selector: string, root: ParentNode = document): HTMLElement | null {
+  const nodes = root.querySelectorAll<HTMLElement>(selector)
+  for (const node of nodes) {
+    if (isPainted(node)) return node
+  }
+  return null
+}
+
+type AnchorPos = { x: number; y: number }
+type DockBox = { bottom: number; left: number; width: number }
+
+function findMobilePlayersToggle(root: HTMLElement | null): HTMLElement | null {
+  const panel = root?.closest('.mobile-players-collapsible')?.parentElement
+  const toggle = panel?.querySelector<HTMLElement>('.mobile-players-toggle')
+  return toggle && isPainted(toggle) ? toggle : null
+}
+
+function anchorPosForElement(anchor: HTMLElement): AnchorPos {
+  const rect = anchor.getBoundingClientRect()
+  let y = rect.top
+  if (anchor.closest('.player-topbar')) {
+    y = Math.max(y, 52)
+  }
+  return { x: rect.left + rect.width / 2, y }
+}
+
+function posNear(a: AnchorPos, b: AnchorPos): boolean {
+  return Math.abs(a.x - b.x) < 0.5 && Math.abs(a.y - b.y) < 0.5
+}
+
+function dockNear(a: DockBox, b: DockBox): boolean {
+  return (
+    Math.abs(a.bottom - b.bottom) < 0.5 &&
+    Math.abs(a.left - b.left) < 0.5 &&
+    Math.abs(a.width - b.width) < 0.5
+  )
+}
+
+function measureEmojiReactionLayout(
+  ids: string[],
+  root: HTMLElement | null,
+  myPlayerId: string | undefined,
+): { floatPos: Record<string, AnchorPos>; dockBox: DockBox | null } {
+  const floatPos: Record<string, AnchorPos> = {}
+  let needsDock = false
+
+  for (const id of ids) {
+    const playerEl = root ? paintedQuery(`[data-scoreboard-player="${id}"]`, root) : null
+    const nameEl = playerEl?.querySelector<HTMLElement>('[data-scoreboard-player-name]')
+    const selfTopbar = id === myPlayerId ? paintedQuery('.player-topbar') : null
+    const anchor =
+      nameEl && isPainted(nameEl) ? nameEl : playerEl && isPainted(playerEl) ? playerEl : selfTopbar
+    if (anchor) {
+      floatPos[id] = anchorPosForElement(anchor)
+    } else {
+      needsDock = true
+    }
+  }
+
+  if (!needsDock) {
+    return { floatPos, dockBox: null }
+  }
+
+  const toggle = findMobilePlayersToggle(root)
+  if (!toggle) {
+    return { floatPos, dockBox: null }
+  }
+
+  const rect = toggle.getBoundingClientRect()
+  return {
+    floatPos,
+    dockBox: {
+      bottom: window.innerHeight - rect.top + 8,
+      left: rect.left,
+      width: rect.width,
+    },
+  }
+}
 
 const badgeStyle = {
   fontSize: 9,
@@ -155,6 +258,9 @@ export default function Scoreboard({
 }: Props) {
   const [showPicker, setShowPicker] = useState(false)
   const [pickerPos, setPickerPos] = useState({ top: 0, left: 0 })
+  const [floatPos, setFloatPos] = useState<Record<string, AnchorPos>>({})
+  const [dockBox, setDockBox] = useState<DockBox | null>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
   const emojiBtnCardsRef = useRef<HTMLButtonElement>(null)
   const emojiBtnListRef = useRef<HTMLButtonElement>(null)
 
@@ -202,6 +308,79 @@ export default function Scoreboard({
     window.addEventListener('resize', updatePos)
     return () => window.removeEventListener('resize', updatePos)
   }, [showPicker])
+
+  useLayoutEffect(() => {
+    const ids = Object.keys(activeEmojis)
+    if (ids.length === 0) {
+      setFloatPos({})
+      setDockBox(null)
+      return
+    }
+
+    let rafId = 0
+
+    const applyMeasure = () => {
+      const { floatPos: next, dockBox: nextDock } = measureEmojiReactionLayout(
+        ids,
+        rootRef.current,
+        myPlayerId,
+      )
+
+      setFloatPos((prev) => {
+        const prevKeys = Object.keys(prev)
+        const nextKeys = Object.keys(next)
+        if (
+          prevKeys.length === nextKeys.length &&
+          nextKeys.every((k) => prev[k] && next[k] && posNear(prev[k], next[k]))
+        ) {
+          return prev
+        }
+        return next
+      })
+
+      setDockBox((prev) => {
+        if (!nextDock) return prev ? null : prev
+        if (prev && dockNear(prev, nextDock)) return prev
+        return nextDock
+      })
+    }
+
+    const scheduleMeasure = () => {
+      if (rafId) return
+      rafId = requestAnimationFrame(() => {
+        rafId = 0
+        applyMeasure()
+      })
+    }
+
+    applyMeasure()
+
+    window.addEventListener('resize', scheduleMeasure)
+    window.addEventListener('scroll', scheduleMeasure, true)
+
+    const collapsible = rootRef.current?.closest('.mobile-players-collapsible')
+    collapsible?.addEventListener('transitionend', scheduleMeasure)
+
+    const observed = new Set<Element>()
+    const resizeObserver = new ResizeObserver(scheduleMeasure)
+    const observe = (el: Element | null | undefined) => {
+      if (!el || observed.has(el)) return
+      observed.add(el)
+      resizeObserver.observe(el)
+    }
+
+    observe(rootRef.current)
+    observe(collapsible)
+    observe(document.querySelector('.player-topbar'))
+
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId)
+      window.removeEventListener('resize', scheduleMeasure)
+      window.removeEventListener('scroll', scheduleMeasure, true)
+      collapsible?.removeEventListener('transitionend', scheduleMeasure)
+      resizeObserver.disconnect()
+    }
+  }, [activeEmojis, myPlayerId])
 
   if (players.length === 0) {
     return (
@@ -262,17 +441,66 @@ export default function Scoreboard({
       document.body,
     )
 
+  const dockReactions = displayPlayers.filter(
+    (p) => activeEmojis[p.id] && !floatPos[p.id],
+  )
+
+  const emojiReactionPortal = createPortal(
+    <>
+      {displayPlayers.map((p) => {
+        const reaction = activeEmojis[p.id]
+        const pos = floatPos[p.id]
+        if (!reaction || !pos) return null
+        return (
+          <div
+            key={`${p.id}-${reaction.seq}`}
+            className="emoji-float emoji-float--fixed"
+            aria-hidden
+            style={{
+              '--emoji-x': `${pos.x}px`,
+              '--emoji-y': `${pos.y}px`,
+            } as CSSProperties}
+          >
+            {reaction.emoji}
+          </div>
+        )
+      })}
+      {dockBox && dockReactions.length > 0 && (
+        <div
+          className="mobile-emoji-dock"
+          style={{
+            bottom: dockBox.bottom,
+            left: dockBox.left,
+            width: dockBox.width,
+          }}
+        >
+          {dockReactions.map((p) => {
+            const reaction = activeEmojis[p.id]
+            if (!reaction) return null
+            return (
+              <div key={`${p.id}-${reaction.seq}`} className="mobile-emoji-dock__item">
+                <div className="emoji-float">{reaction.emoji}</div>
+                <span className="mobile-emoji-dock__name">{p.name}</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </>,
+    document.body,
+  )
+
   return (
-    <div className="scoreboard">
+    <div className="scoreboard" ref={rootRef}>
       {/* Desktop / tablet: horizontal cards */}
       <div className="scoreboard--cards">
         {displayPlayers.map((p) => {
           const st = playerState(p, buzzQueue, highlightId, boardControlId, myPlayerId)
-          const reaction = activeEmojis[p.id]
 
           return (
             <div
               key={p.id}
+              data-scoreboard-player={p.id}
               className={`flex ${st.cardStateClass}`}
               style={{
                 minWidth: 110,
@@ -284,15 +512,8 @@ export default function Scoreboard({
                 position: 'relative',
                 overflow: 'visible',
                 transition: 'border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease',
-                zIndex: reaction ? 10 : undefined,
               }}
             >
-              {reaction && (
-                <div key={reaction.seq} className="emoji-float">
-                  {reaction.emoji}
-                </div>
-              )}
-
               <div
                 className="scoreboard-card-stripe"
                 style={{
@@ -324,6 +545,7 @@ export default function Scoreboard({
 
                 <div
                   className="scoreboard-card__name text-center w-full truncate px-1"
+                  data-scoreboard-player-name
                   title={p.name}
                 >
                   {p.name}
@@ -378,15 +600,13 @@ export default function Scoreboard({
       <div className="scoreboard--list">
         {displayPlayers.map((p) => {
           const st = playerState(p, buzzQueue, highlightId, boardControlId, myPlayerId)
-          const reaction = activeEmojis[p.id]
 
           return (
-            <div key={p.id} className={`scoreboard-list-item ${st.listStateClass}`}>
-              {reaction && (
-                <div key={reaction.seq} className="emoji-float">
-                  {reaction.emoji}
-                </div>
-              )}
+            <div
+              key={p.id}
+              data-scoreboard-player={p.id}
+              className={`scoreboard-list-item ${st.listStateClass}`}
+            >
               <div
                 className="scoreboard-list-item__stripe"
                 style={{
@@ -405,7 +625,11 @@ export default function Scoreboard({
                       background: p.isConnected ? 'var(--success)' : '#3a3f5c',
                     }}
                   />
-                  <span className="scoreboard-list-item__name" title={p.name}>
+                  <span
+                    className="scoreboard-list-item__name"
+                    data-scoreboard-player-name
+                    title={p.name}
+                  >
                     {p.name}
                   </span>
                   {st.isMe && onEmojiSelect && (
@@ -450,6 +674,7 @@ export default function Scoreboard({
       </div>
 
       {emojiPickerPortal}
+      {emojiReactionPortal}
     </div>
   )
 }
