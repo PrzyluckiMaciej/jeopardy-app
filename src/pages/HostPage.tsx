@@ -28,6 +28,7 @@ import {
   type NameSession,
 } from '../lib/playerJoin'
 import { generateHostSecret } from '../lib/hostSession'
+import { useGameSessionHydrated } from '../hooks/useGameSessionHydrated'
 import AddBoardToGameList from '../components/AddBoardToGameList'
 import AddToGameModal from '../components/AddToGameModal'
 import ConfirmModal from '../components/ConfirmModal'
@@ -139,7 +140,7 @@ export default function HostPage() {
   const nameSessions = useRef(new Map<string, NameSession>())
   const emojiTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const copyFeedbackTimers = useRef<ReturnType<typeof setTimeout>[]>([])
-  const [sessionReady, setSessionReady] = useState(() => useGameStore.persist.hasHydrated())
+  const sessionReady = useGameSessionHydrated()
 
   const mediaBlobCache = useRef(new Map<string, Blob>())
   const mediaSyncMap = useRef(new Map<string, Set<string>>())
@@ -271,12 +272,6 @@ export default function HostPage() {
 
   useEffect(() => () => {
     copyFeedbackTimers.current.forEach(clearTimeout)
-  }, [])
-
-  useEffect(() => {
-    const unsub = useGameStore.persist.onFinishHydration(() => setSessionReady(true))
-    setSessionReady(useGameStore.persist.hasHydrated())
-    return unsub
   }, [])
 
   useEffect(() => {

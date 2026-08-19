@@ -12,6 +12,7 @@ import { logEvent } from '../lib/logger'
 import { setCachedMedia, resolveActiveMedia, clearCache } from '../lib/mediaCache'
 import { sanitizeGameStateForPlayer } from '../lib/finalJeopardySync'
 import { acceptHostHello, HOST_DISCONNECT_GRACE_MS } from '../lib/hostSession'
+import { useGameSessionHydrated } from '../hooks/useGameSessionHydrated'
 import ConfirmModal from '../components/ConfirmModal'
 import FinalJeopardyPlayerView from '../components/FinalJeopardyPlayerView'
 import GameBoard from '../components/GameBoard'
@@ -37,7 +38,7 @@ export default function PlayerPage() {
   const [judgeResult, setJudgeResult] = useState<'correct' | 'wrong' | null>(null)
   const [hostLeft, setHostLeft] = useState(false)
   const [hostDisconnected, setHostDisconnected] = useState(false)
-  const [sessionReady, setSessionReady] = useState(() => useGameStore.persist.hasHydrated())
+  const sessionReady = useGameSessionHydrated()
   const [ddWagerInput, setDdWagerInput] = useState('')
   const [ddWagerError, setDdWagerError] = useState('')
   const [ddWagerSubmitted, setDdWagerSubmitted] = useState(false)
@@ -85,12 +86,6 @@ export default function PlayerPage() {
   const [nameTaken, setNameTaken] = useState(false)
   const hasLoggedJoin = useRef(false)
   const hasAnnouncedJoin = useRef(false)
-
-  useEffect(() => {
-    const unsub = useGameStore.persist.onFinishHydration(() => setSessionReady(true))
-    setSessionReady(useGameStore.persist.hasHydrated())
-    return unsub
-  }, [])
 
   useEffect(() => {
     if (!sessionReady) return
