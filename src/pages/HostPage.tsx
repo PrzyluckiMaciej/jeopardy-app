@@ -27,6 +27,7 @@ import {
   normalizePlayerName,
   type NameSession,
 } from '../lib/playerJoin'
+import AddBoardToGameList from '../components/AddBoardToGameList'
 import AddToGameModal from '../components/AddToGameModal'
 import ConfirmModal from '../components/ConfirmModal'
 import BoardEditor from '../components/BoardEditor'
@@ -1321,6 +1322,7 @@ export default function HostPage() {
   const pickerGameId = !pickerIsAll && !pickerIsGames && !pickerIsTrash ? pickerNav : null
   const gamesNavActive = pickerIsGames || pickerGameId != null
   const libraryBoards = boardStore.boards.filter((b) => !isBoardTrashed(b))
+  const libraryBoardFolders = boardStore.folders.filter((f) => !isFolderTrashed(f))
   const libraryGames = boardStore.games.filter((g) => !isGameTrashed(g))
   const trashItemCount =
     boardStore.boards.filter((b) => isBoardTrashed(b)).length +
@@ -1996,6 +1998,7 @@ export default function HostPage() {
                     className={`board-picker-boards__scroll${gameBoardDragId ? ' board-picker-boards__scroll--reordering' : ''}`}
                   >
                   {pickerBoards.map((b, idx) => {
+                    const boardPath = buildPathString(libraryBoardFolders, b.folderId ?? null)
                     const isDragging = gameBoardDragId === b.id
                     const fromDisp = gameBoardDragId
                       ? pickerBoards.findIndex((x) => x.id === gameBoardDragId)
@@ -2090,6 +2093,9 @@ export default function HostPage() {
                               <LayoutGrid size={14} className="board-picker-object-icon board-picker-object-icon--board" />
                             )}
                             <span className="font-condensed font-bold truncate">{b.name}</span>
+                            <span className="add-to-game-dropdown__path truncate" title={boardPath}>
+                              {boardPath}
+                            </span>
                           </button>
                         )}
                         <div className="board-picker-board-row__actions">
@@ -2112,29 +2118,11 @@ export default function HostPage() {
                     </div>
                   )}
 
-                  {(() => {
-                    const unassigned = libraryBoards.filter(
-                      (b) => !pickerBoardIds.includes(b.id)
-                    )
-                    if (unassigned.length === 0) return null
-                    return (
-                      <div className="mt-2">
-                        <div className="board-picker-section-label text-muted">Add to game</div>
-                        {unassigned.map((b) => (
-                          <div key={b.id} className="board-picker-unassigned">
-                            <span className="flex-1 font-condensed text-sm text-subtle truncate">{b.name}</span>
-                            <button
-                              type="button"
-                              className="board-picker-add-btn"
-                              onClick={() => boardStore.addBoardToGame(pickerGameId!, b.id)}
-                            >
-                              + Add
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )
-                  })()}
+                  <AddBoardToGameList
+                    boards={libraryBoards.filter((b) => !pickerBoardIds.includes(b.id))}
+                    folders={libraryBoardFolders}
+                    onAdd={(boardId) => boardStore.addBoardToGame(pickerGameId!, boardId)}
+                  />
                   </div>
                 </>
                 )}
