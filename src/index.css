@@ -1871,10 +1871,10 @@ body.board-picker-reordering * {
 .board-picker-explorer-header,
 .board-picker-explorer-row {
   display: grid;
-  grid-template-columns: minmax(8rem, 1fr) 10.5rem 10.5rem;
+  grid-template-columns: minmax(8rem, 1fr) 10.5rem 10.5rem 1.75rem;
   align-items: center;
   column-gap: 10px;
-  min-width: 30rem;
+  min-width: 32rem;
 }
 .board-picker-explorer-header {
   position: sticky;
@@ -1962,6 +1962,35 @@ body.board-picker-reordering * {
   text-overflow: ellipsis;
   pointer-events: none;
   user-select: none;
+}
+.board-picker-explorer-header__menu,
+.board-picker-explorer-row__menu {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 1.75rem;
+  flex-shrink: 0;
+}
+.board-picker-row-menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: #8899cc;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.board-picker-row-menu-btn:hover,
+.board-picker-row-menu-btn:focus-visible {
+  color: var(--white);
+  background: rgba(255, 255, 255, 0.08);
+  outline: none;
 }
 .board-picker-add-board-search {
   display: flex;
@@ -2053,7 +2082,7 @@ body.board-picker-reordering * {
 }
 .board-picker-folder-row {
   display: grid;
-  grid-template-columns: minmax(8rem, 1fr) 10.5rem 10.5rem;
+  grid-template-columns: minmax(8rem, 1fr) 10.5rem 10.5rem 1.75rem;
   align-items: center;
   column-gap: 10px;
   padding: 6px 8px;
@@ -2061,7 +2090,7 @@ body.board-picker-reordering * {
   border: 1px solid transparent;
   cursor: grab;
   transition: background 0.15s ease, border-color 0.15s ease;
-  min-width: 30rem;
+  min-width: 32rem;
 }
 .board-picker-folder-row:hover {
   background: rgba(255, 255, 255, 0.04);

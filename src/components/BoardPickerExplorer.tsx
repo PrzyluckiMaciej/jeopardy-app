@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react'
-import { ArrowLeft, Check, ChevronDown, ChevronUp, Folder, Layers, LayoutGrid, Trophy } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, ChevronUp, EllipsisVertical, Folder, Layers, LayoutGrid, Trophy } from 'lucide-react'
 import type { Board, BoardFolder, Game, GameFolder } from '../types'
 import { buildPathString, isFolderInside, resolvePath } from '../lib/folderPath'
 import { collectFolderSubtree } from '../lib/folderSubtree'
@@ -150,6 +150,7 @@ export default function BoardPickerExplorer({
     x: number
     y: number
     items: ContextMenuItem[]
+    anchorId?: string
   } | null>(null)
   const [prevRenameNavKey, setPrevRenameNavKey] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>('createdAt')
@@ -384,226 +385,231 @@ export default function BoardPickerExplorer({
     setMenu(null)
   }
 
+  function showMenu(x: number, y: number, items: ContextMenuItem[], anchorId?: string) {
+    setMenu({ x, y, items, anchorId })
+  }
+
+  function openMenuFromEvent(e: MouseEvent, items: ContextMenuItem[]) {
+    e.preventDefault()
+    e.stopPropagation()
+    showMenu(e.clientX, e.clientY, items)
+  }
+
+  function openMenuFromButton(e: MouseEvent, items: ContextMenuItem[], anchorId: string) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (menu?.anchorId === anchorId) {
+      closeMenu()
+      return
+    }
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    // Prefer anchoring under the button; ContextMenu clamps to the viewport.
+    showMenu(rect.left, rect.bottom + 4, items, anchorId)
+  }
+
+  function emptyMenuItems(): ContextMenuItem[] {
+    return [
+      {
+        id: 'new-board',
+        label: 'New Board',
+        onSelect: () => onCreateBoard(currentFolderId),
+      },
+      ...(onCreateFinal
+        ? [
+            {
+              id: 'new-final',
+              label: 'New Final Jeopardy',
+              onSelect: () => onCreateFinal(currentFolderId),
+            },
+          ]
+        : []),
+      {
+        id: 'new-folder',
+        label: 'New Folder',
+        onSelect: () => {
+          const id = createFolder('New Folder', currentFolderId)
+          const createdName =
+            useBoardStore.getState().folders.find((f) => f.id === id)?.name ?? 'New Folder'
+          setEditingFolderId(id, createdName)
+        },
+      },
+    ]
+  }
+
+  function folderMenuItems(folder: BoardFolder): ContextMenuItem[] {
+    if (isTrash) {
+      return [
+        {
+          id: 'restore',
+          label: 'Restore',
+          onSelect: () => onRestoreFolder?.(folder),
+        },
+        {
+          id: 'delete-permanent',
+          label: 'Delete permanently',
+          danger: true,
+          onSelect: () => onPermanentDeleteFolder?.(folder),
+        },
+      ]
+    }
+    return [
+      {
+        id: 'new-board',
+        label: 'New Board',
+        onSelect: () => {
+          navigateTo(folder.id)
+          onCreateBoard(folder.id)
+        },
+      },
+      ...(onCreateFinal
+        ? [
+            {
+              id: 'new-final',
+              label: 'New Final Jeopardy',
+              onSelect: () => {
+                navigateTo(folder.id)
+                onCreateFinal(folder.id)
+              },
+            },
+          ]
+        : []),
+      {
+        id: 'rename',
+        label: 'Rename',
+        onSelect: () => setEditingFolderId(folder.id, folder.name),
+      },
+      {
+        id: 'duplicate',
+        label: 'Duplicate',
+        onSelect: () => onDuplicateFolder(folder),
+      },
+      {
+        id: 'add-to-game',
+        label: 'Add to game',
+        onSelect: () => {
+          const folderIds = collectFolderSubtree(folders, folder.id)
+          const boardIds = boards
+            .filter((b) => b.folderId != null && folderIds.has(b.folderId) && !isBoardTrashed(b))
+            .map((b) => b.id)
+          const count = boardIds.length
+          const label =
+            count === 1
+              ? `1 board from ${folder.name}`
+              : `${count} boards from ${folder.name}`
+          onRequestAddToGame(boardIds, label)
+        },
+      },
+      {
+        id: 'delete',
+        label: 'Delete',
+        danger: true,
+        onSelect: () => onRequestDeleteFolder(folder),
+      },
+    ]
+  }
+
+  function boardMenuItems(board: Board): ContextMenuItem[] {
+    if (isTrash) {
+      return [
+        {
+          id: 'restore',
+          label: 'Restore',
+          onSelect: () => onRestoreBoard?.(board),
+        },
+        {
+          id: 'delete-permanent',
+          label: 'Delete permanently',
+          danger: true,
+          onSelect: () => onPermanentDeleteBoard?.(board),
+        },
+      ]
+    }
+    return [
+      {
+        id: 'edit',
+        label: 'Edit',
+        onSelect: () => onEditBoard(board),
+      },
+      {
+        id: 'rename',
+        label: 'Rename',
+        onSelect: () => setEditingBoardId(board.id, board.name),
+      },
+      {
+        id: 'duplicate',
+        label: 'Duplicate',
+        onSelect: () => onDuplicateBoard(board),
+      },
+      {
+        id: 'add-to-game',
+        label: 'Add to game',
+        onSelect: () => onRequestAddToGame([board.id], board.name),
+      },
+      {
+        id: 'delete',
+        label: 'Delete',
+        danger: true,
+        onSelect: () => onDeleteBoard(board),
+      },
+    ]
+  }
+
+  function gameFolderMenuItems(folder: GameFolder): ContextMenuItem[] {
+    return [
+      {
+        id: 'restore',
+        label: 'Restore',
+        onSelect: () => onRestoreGameFolder?.(folder),
+      },
+      {
+        id: 'delete-permanent',
+        label: 'Delete permanently',
+        danger: true,
+        onSelect: () => onPermanentDeleteGameFolder?.(folder),
+      },
+    ]
+  }
+
+  function gameMenuItems(game: Game): ContextMenuItem[] {
+    return [
+      {
+        id: 'restore',
+        label: 'Restore',
+        onSelect: () => onRestoreGame?.(game),
+      },
+      {
+        id: 'delete-permanent',
+        label: 'Delete permanently',
+        danger: true,
+        onSelect: () => onPermanentDeleteGame?.(game),
+      },
+    ]
+  }
+
   function openEmptyMenu(e: MouseEvent) {
     if (isTrash) return
     const target = e.target as HTMLElement
     if (target.closest('.board-picker-board-row, .board-picker-folder-row')) return
-    e.preventDefault()
-    e.stopPropagation()
-    setMenu({
-      x: e.clientX,
-      y: e.clientY,
-      items: [
-        {
-          id: 'new-board',
-          label: 'New Board',
-          onSelect: () => onCreateBoard(currentFolderId),
-        },
-        ...(onCreateFinal
-          ? [
-              {
-                id: 'new-final',
-                label: 'New Final Jeopardy',
-                onSelect: () => onCreateFinal(currentFolderId),
-              },
-            ]
-          : []),
-        {
-          id: 'new-folder',
-          label: 'New Folder',
-          onSelect: () => {
-            const id = createFolder('New Folder', currentFolderId)
-            const createdName =
-              useBoardStore.getState().folders.find((f) => f.id === id)?.name ?? 'New Folder'
-            setEditingFolderId(id, createdName)
-          },
-        },
-      ],
-    })
+    openMenuFromEvent(e, emptyMenuItems())
   }
 
-  function openFolderMenu(e: MouseEvent, folder: BoardFolder) {
-    e.preventDefault()
-    e.stopPropagation()
-    if (isTrash) {
-      setMenu({
-        x: e.clientX,
-        y: e.clientY,
-        items: [
-          {
-            id: 'restore',
-            label: 'Restore',
-            onSelect: () => onRestoreFolder?.(folder),
-          },
-          {
-            id: 'delete-permanent',
-            label: 'Delete permanently',
-            danger: true,
-            onSelect: () => onPermanentDeleteFolder?.(folder),
-          },
-        ],
-      })
-      return
-    }
-    setMenu({
-      x: e.clientX,
-      y: e.clientY,
-      items: [
-        {
-          id: 'new-board',
-          label: 'New Board',
-          onSelect: () => {
-            navigateTo(folder.id)
-            onCreateBoard(folder.id)
-          },
-        },
-        ...(onCreateFinal
-          ? [
-              {
-                id: 'new-final',
-                label: 'New Final Jeopardy',
-                onSelect: () => {
-                  navigateTo(folder.id)
-                  onCreateFinal(folder.id)
-                },
-              },
-            ]
-          : []),
-        {
-          id: 'rename',
-          label: 'Rename',
-          onSelect: () => setEditingFolderId(folder.id, folder.name),
-        },
-        {
-          id: 'duplicate',
-          label: 'Duplicate',
-          onSelect: () => onDuplicateFolder(folder),
-        },
-        {
-          id: 'add-to-game',
-          label: 'Add to game',
-          onSelect: () => {
-            const folderIds = collectFolderSubtree(folders, folder.id)
-            const boardIds = boards
-              .filter((b) => b.folderId != null && folderIds.has(b.folderId) && !isBoardTrashed(b))
-              .map((b) => b.id)
-            const count = boardIds.length
-            const label =
-              count === 1
-                ? `1 board from ${folder.name}`
-                : `${count} boards from ${folder.name}`
-            onRequestAddToGame(boardIds, label)
-          },
-        },
-        {
-          id: 'delete',
-          label: 'Delete',
-          danger: true,
-          onSelect: () => onRequestDeleteFolder(folder),
-        },
-      ],
-    })
-  }
-
-  function openBoardMenu(e: MouseEvent, board: Board) {
-    e.preventDefault()
-    e.stopPropagation()
-    if (isTrash) {
-      setMenu({
-        x: e.clientX,
-        y: e.clientY,
-        items: [
-          {
-            id: 'restore',
-            label: 'Restore',
-            onSelect: () => onRestoreBoard?.(board),
-          },
-          {
-            id: 'delete-permanent',
-            label: 'Delete permanently',
-            danger: true,
-            onSelect: () => onPermanentDeleteBoard?.(board),
-          },
-        ],
-      })
-      return
-    }
-    setMenu({
-      x: e.clientX,
-      y: e.clientY,
-      items: [
-        {
-          id: 'edit',
-          label: 'Edit',
-          onSelect: () => onEditBoard(board),
-        },
-        {
-          id: 'rename',
-          label: 'Rename',
-          onSelect: () => setEditingBoardId(board.id, board.name),
-        },
-        {
-          id: 'duplicate',
-          label: 'Duplicate',
-          onSelect: () => onDuplicateBoard(board),
-        },
-        {
-          id: 'add-to-game',
-          label: 'Add to game',
-          onSelect: () => onRequestAddToGame([board.id], board.name),
-        },
-        {
-          id: 'delete',
-          label: 'Delete',
-          danger: true,
-          onSelect: () => onDeleteBoard(board),
-        },
-      ],
-    })
-  }
-
-  function openGameFolderMenu(e: MouseEvent, folder: GameFolder) {
-    e.preventDefault()
-    e.stopPropagation()
-    setMenu({
-      x: e.clientX,
-      y: e.clientY,
-      items: [
-        {
-          id: 'restore',
-          label: 'Restore',
-          onSelect: () => onRestoreGameFolder?.(folder),
-        },
-        {
-          id: 'delete-permanent',
-          label: 'Delete permanently',
-          danger: true,
-          onSelect: () => onPermanentDeleteGameFolder?.(folder),
-        },
-      ],
-    })
-  }
-
-  function openGameMenu(e: MouseEvent, game: Game) {
-    e.preventDefault()
-    e.stopPropagation()
-    setMenu({
-      x: e.clientX,
-      y: e.clientY,
-      items: [
-        {
-          id: 'restore',
-          label: 'Restore',
-          onSelect: () => onRestoreGame?.(game),
-        },
-        {
-          id: 'delete-permanent',
-          label: 'Delete permanently',
-          danger: true,
-          onSelect: () => onPermanentDeleteGame?.(game),
-        },
-      ],
-    })
+  function renderRowMenuButton(items: ContextMenuItem[], label: string, anchorId: string) {
+    return (
+      <div className="board-picker-explorer-row__menu">
+        <button
+          type="button"
+          className="board-picker-row-menu-btn"
+          aria-label={label}
+          title={label}
+          aria-expanded={menu?.anchorId === anchorId}
+          onClick={(e) => openMenuFromButton(e, items, anchorId)}
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <EllipsisVertical size={14} aria-hidden />
+        </button>
+      </div>
+    )
   }
 
   function commitRename(folderId: string) {
@@ -766,7 +772,7 @@ export default function BoardPickerExplorer({
         }}
         onContextMenu={(e) => {
           if (isEditing) return
-          openBoardMenu(e, board)
+          openMenuFromEvent(e, boardMenuItems(board))
         }}
       >
         <div className="board-picker-explorer-row__name">
@@ -821,6 +827,7 @@ export default function BoardPickerExplorer({
           )}
         </div>
         {renderDateColumns(board.createdAt, board.updatedAt)}
+        {!isEditing && renderRowMenuButton(boardMenuItems(board), 'Board actions', `board-${board.id}`)}
       </div>
     )
   }
@@ -860,7 +867,10 @@ export default function BoardPickerExplorer({
           setDragOverTarget((cur) => (cur === dropKey ? null : cur))
         }}
         onDrop={(e) => handleDropOnFolder(e, folder.id)}
-        onContextMenu={(e) => openFolderMenu(e, folder)}
+        onContextMenu={(e) => {
+          if (isEditing) return
+          openMenuFromEvent(e, folderMenuItems(folder))
+        }}
       >
         <div className="board-picker-explorer-row__name">
           {isEditing ? (
@@ -918,6 +928,7 @@ export default function BoardPickerExplorer({
           )}
         </div>
         {renderDateColumns(folder.createdAt, folder.updatedAt)}
+        {!isEditing && renderRowMenuButton(folderMenuItems(folder), 'Folder actions', `folder-${folder.id}`)}
       </div>
     )
   }
@@ -927,7 +938,7 @@ export default function BoardPickerExplorer({
       <div
         key={`game-${game.id}`}
         className="board-picker-board-row board-picker-explorer-row"
-        onContextMenu={(e) => openGameMenu(e, game)}
+        onContextMenu={(e) => openMenuFromEvent(e, gameMenuItems(game))}
       >
         <div className="board-picker-explorer-row__name">
           <button type="button" className="board-picker-board-btn">
@@ -936,6 +947,7 @@ export default function BoardPickerExplorer({
           </button>
         </div>
         {renderDateColumns(game.createdAt, game.updatedAt)}
+        {renderRowMenuButton(gameMenuItems(game), 'Game actions', `trash-game-${game.id}`)}
       </div>
     )
   }
@@ -945,7 +957,7 @@ export default function BoardPickerExplorer({
       <div
         key={`game-folder-${folder.id}`}
         className="board-picker-folder-row board-picker-explorer-row"
-        onContextMenu={(e) => openGameFolderMenu(e, folder)}
+        onContextMenu={(e) => openMenuFromEvent(e, gameFolderMenuItems(folder))}
       >
         <div className="board-picker-explorer-row__name">
           <button
@@ -958,6 +970,7 @@ export default function BoardPickerExplorer({
           </button>
         </div>
         {renderDateColumns(folder.createdAt, folder.updatedAt)}
+        {renderRowMenuButton(gameFolderMenuItems(folder), 'Folder actions', `trash-game-folder-${folder.id}`)}
       </div>
     )
   }
@@ -1058,6 +1071,7 @@ export default function BoardPickerExplorer({
             {renderSortHeader('name', 'Name', 'board-picker-explorer-header__name')}
             {renderSortHeader('createdAt', 'Created at', 'board-picker-explorer-header__date')}
             {renderSortHeader('updatedAt', 'Last modified at', 'board-picker-explorer-header__date')}
+            <span className="board-picker-explorer-header__menu" aria-hidden />
           </div>
         )}
         {visibleEntries.map((entry) => {
