@@ -1750,7 +1750,15 @@ body.board-picker-reordering * {
   flex-direction: column;
   gap: var(--space-sm);
   /* Inset padding so hover glow/borders are not clipped at scroll edges */
-  padding: 4px 4px 4px 2px;
+  padding: 4px 6px 4px 2px;
+}
+.board-picker-boards__scroll.board-picker-explorer {
+  gap: 0;
+  align-items: flex-start;
+}
+.board-picker-boards__scroll.board-picker-explorer > .board-picker-empty {
+  align-self: stretch;
+  width: 100%;
 }
 .board-picker-empty {
   font-size: 0.9375rem;
@@ -1874,13 +1882,16 @@ body.board-picker-reordering * {
   grid-template-columns: minmax(8rem, 1fr) 10.5rem 10.5rem 1.75rem;
   align-items: center;
   column-gap: 10px;
-  min-width: 32rem;
+  box-sizing: border-box;
+  /* Grow with the grid so the menu column stays inside the background */
+  width: max-content;
+  min-width: 100%;
 }
 .board-picker-explorer-header {
   position: sticky;
   top: 0;
   z-index: 1;
-  padding: 4px 8px 6px;
+  padding: 4px 6px 6px 8px;
   margin-bottom: 2px;
   border-bottom: 1px solid var(--border-default);
   background: var(--navy-mid);
@@ -1922,13 +1933,14 @@ body.board-picker-reordering * {
   margin-bottom: 0;
 }
 .board-picker-board-row.board-picker-explorer-row {
-  padding: 6px 8px;
+  padding: 6px 6px 6px 8px;
   gap: 0;
   column-gap: 10px;
   border-radius: var(--radius-lg);
   border: 1px solid transparent;
   cursor: grab;
   transition: background 0.15s ease, border-color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 .board-picker-board-row.board-picker-explorer-row:hover {
   background: rgba(255, 255, 255, 0.04);
@@ -1968,8 +1980,7 @@ body.board-picker-reordering * {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  width: 1.75rem;
-  flex-shrink: 0;
+  min-width: 0;
 }
 .board-picker-row-menu-btn {
   display: flex;
@@ -1984,13 +1995,22 @@ body.board-picker-reordering * {
   color: #8899cc;
   cursor: pointer;
   flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
   transition: color 0.15s ease, background 0.15s ease;
 }
 .board-picker-row-menu-btn:hover,
 .board-picker-row-menu-btn:focus-visible {
   color: var(--white);
-  background: rgba(255, 255, 255, 0.08);
   outline: none;
+}
+/* Separate button chrome only for fine pointers — avoids stacked hover fills on touch */
+@media (hover: hover) and (pointer: fine) {
+  .board-picker-row-menu-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+.board-picker-row-menu-btn:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
 }
 .board-picker-add-board-search {
   display: flex;
@@ -2085,12 +2105,15 @@ body.board-picker-reordering * {
   grid-template-columns: minmax(8rem, 1fr) 10.5rem 10.5rem 1.75rem;
   align-items: center;
   column-gap: 10px;
-  padding: 6px 8px;
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 100%;
+  padding: 6px 6px 6px 8px;
   border-radius: var(--radius-lg);
   border: 1px solid transparent;
   cursor: grab;
   transition: background 0.15s ease, border-color 0.15s ease;
-  min-width: 32rem;
+  -webkit-tap-highlight-color: transparent;
 }
 .board-picker-folder-row:hover {
   background: rgba(255, 255, 255, 0.04);
