@@ -4,11 +4,14 @@ import { useNavigate } from 'react-router-dom'
 import {
   useGameStore,
   useBoardStore,
+  canRestoreToFolder,
   isBoardTrashed,
   isFolderTrashed,
   isGameFolderTrashed,
   isGameTrashed,
   uniqueBoardName,
+  uniqueFolderName,
+  uniqueItemName,
 } from '../store/gameStore'
 import { buildItemPathString, buildPathString, resolveFolderOrItemPath } from '../lib/folderPath'
 import * as net from '../lib/network'
@@ -51,6 +54,13 @@ import Scoreboard from '../components/Scoreboard'
 import Podium from '../components/Podium'
 
 type Tab = 'board' | 'settings' | 'boards'
+
+type PendingRestore = {
+  kind: 'board' | 'folder' | 'game' | 'gameFolder'
+  id: string
+  currentName: string
+  uniqueName: string
+}
 
 function pickRandom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
@@ -144,6 +154,7 @@ export default function HostPage() {
   const [mobileNavExiting, setMobileNavExiting] = useState(false)
   const [showExitConfirm, setShowExitConfirm] = useState(false)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
+  const [pendingRestore, setPendingRestore] = useState<PendingRestore | null>(null)
 
   const peerToClient = useRef(new Map<string, string>())
   const nameSessions = useRef(new Map<string, NameSession>())
@@ -731,11 +742,51 @@ export default function HostPage() {
   }
 
   function handleRestoreBoard(board: Board) {
-    boardStore.restoreBoard(board.id)
+    const state = useBoardStore.getState()
+    const target = canRestoreToFolder(state.folders, board.restoreFolderId, isFolderTrashed)
+      ? (board.restoreFolderId ?? null)
+      : null
+    const uniqueName = uniqueBoardName(
+      state.boards,
+      target,
+      board.name,
+      isFinalBoard(board) ? 'final' : 'board',
+      board.id,
+    )
+    if (uniqueName === board.name) {
+      boardStore.restoreBoard(board.id)
+      return
+    }
+    setPendingRestore({
+      kind: 'board',
+      id: board.id,
+      currentName: board.name,
+      uniqueName,
+    })
   }
 
   function handleRestoreFolder(folder: BoardFolder) {
-    boardStore.restoreFolder(folder.id)
+    const state = useBoardStore.getState()
+    const targetParent = canRestoreToFolder(state.folders, folder.restoreParentId, isFolderTrashed)
+      ? (folder.restoreParentId ?? null)
+      : null
+    const uniqueName = uniqueFolderName(
+      state.folders,
+      targetParent,
+      folder.name,
+      isFolderTrashed,
+      folder.id,
+    )
+    if (uniqueName === folder.name) {
+      boardStore.restoreFolder(folder.id)
+      return
+    }
+    setPendingRestore({
+      kind: 'folder',
+      id: folder.id,
+      currentName: folder.name,
+      uniqueName,
+    })
   }
 
   function handlePermanentDeleteBoard(board: Board) {
@@ -798,11 +849,70 @@ export default function HostPage() {
   }
 
   function handleRestoreGame(game: Game) {
-    boardStore.restoreGame(game.id)
+    const state = useBoardStore.getState()
+    const target = canRestoreToFolder(
+      state.gameFolders,
+      game.restoreFolderId,
+      isGameFolderTrashed,
+    )
+      ? (game.restoreFolderId ?? null)
+      : null
+    const uniqueName = uniqueItemName(
+      state.games,
+      target,
+      game.name,
+      isGameTrashed,
+      game.id,
+      'New Game',
+    )
+    if (uniqueName === game.name) {
+      boardStore.restoreGame(game.id)
+      return
+    }
+    setPendingRestore({
+      kind: 'game',
+      id: game.id,
+      currentName: game.name,
+      uniqueName,
+    })
   }
 
   function handleRestoreGameFolder(folder: GameFolder) {
-    boardStore.restoreGameFolder(folder.id)
+    const state = useBoardStore.getState()
+    const targetParent = canRestoreToFolder(
+      state.gameFolders,
+      folder.restoreParentId,
+      isGameFolderTrashed,
+    )
+      ? (folder.restoreParentId ?? null)
+      : null
+    const uniqueName = uniqueFolderName(
+      state.gameFolders,
+      targetParent,
+      folder.name,
+      isGameFolderTrashed,
+      folder.id,
+    )
+    if (uniqueName === folder.name) {
+      boardStore.restoreGameFolder(folder.id)
+      return
+    }
+    setPendingRestore({
+      kind: 'gameFolder',
+      id: folder.id,
+      currentName: folder.name,
+      uniqueName,
+    })
+  }
+
+  function confirmPendingRestore() {
+    if (!pendingRestore) return
+    const { kind, id } = pendingRestore
+    setPendingRestore(null)
+    if (kind === 'board') boardStore.restoreBoard(id)
+    else if (kind === 'folder') boardStore.restoreFolder(id)
+    else if (kind === 'game') boardStore.restoreGame(id)
+    else boardStore.restoreGameFolder(id)
   }
 
   function isPickerNavDragTrashed(payload: PickerNavDragPayload): boolean {
@@ -2429,6 +2539,16 @@ export default function HostPage() {
           onConfirm={handleAddToGameConfirm}
           onCreateAndConfirm={handleAddToGameCreateAndConfirm}
           onCancel={() => setAddToGameTarget(null)}
+        />
+      )}
+
+      {pendingRestore && (
+        <ConfirmModal
+          title="Duplicate name"
+          message={`"${pendingRestore.currentName}" already exists here. It will be renamed to "${pendingRestore.uniqueName}".`}
+          confirmLabel="Restore"
+          onConfirm={confirmPendingRestore}
+          onCancel={() => setPendingRestore(null)}
         />
       )}
 

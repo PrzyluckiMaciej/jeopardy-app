@@ -271,6 +271,16 @@ describe('useBoardStore', () => {
       expect(board?.folderId).toBeNull()
     })
 
+    it('auto-suffixes duplicate board names when restoring', () => {
+      useBoardStore.getState().saveBoard(makeBoard({ id: 'b1', name: 'Same', folderId: null }))
+      useBoardStore.getState().trashBoard('b1')
+      useBoardStore.getState().saveBoard(makeBoard({ id: 'b2', name: 'Same', folderId: null }))
+      useBoardStore.getState().restoreBoard('b1')
+
+      expect(useBoardStore.getState().boards.find((b) => b.id === 'b1')?.name).toBe('Same (2)')
+      expect(useBoardStore.getState().boards.find((b) => b.id === 'b2')?.name).toBe('Same')
+    })
+
     it('trashes a folder subtree and unlinks boards from games', () => {
       const rootId = useBoardStore.getState().createFolder('Root')
       const midId = useBoardStore.getState().createFolder('Mid', rootId)
@@ -471,6 +481,16 @@ describe('useBoardStore', () => {
       const game = useBoardStore.getState().games.find((g) => g.id === gameId)
       expect(game?.trashedAt).toBeNull()
       expect(game?.folderId).toBeNull()
+    })
+
+    it('auto-suffixes duplicate game names when restoring', () => {
+      const firstId = useBoardStore.getState().createGame('Same')
+      useBoardStore.getState().trashGame(firstId)
+      const secondId = useBoardStore.getState().createGame('Same')
+      useBoardStore.getState().restoreGame(firstId)
+
+      expect(useBoardStore.getState().games.find((g) => g.id === firstId)?.name).toBe('Same (2)')
+      expect(useBoardStore.getState().games.find((g) => g.id === secondId)?.name).toBe('Same')
     })
 
     it('trashes a game folder subtree including games', () => {
