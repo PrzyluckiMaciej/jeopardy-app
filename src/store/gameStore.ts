@@ -139,7 +139,7 @@ function isFolderNameTaken(
 }
 
 /** Returns `desiredName` or `desiredName (2)`, `(3)`, … until unique among siblings. */
-function uniqueFolderName(
+export function uniqueFolderName(
   folders: FolderLike[],
   parentId: string | null,
   desiredName: string,
@@ -175,7 +175,7 @@ function isItemNameTaken(
 }
 
 /** Returns `desiredName` or `desiredName (2)`, `(3)`, … until unique among siblings. */
-function uniqueItemName(
+export function uniqueItemName(
   items: ItemLike[],
   folderId: string | null,
   desiredName: string,

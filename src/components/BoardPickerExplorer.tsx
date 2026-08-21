@@ -18,8 +18,11 @@ import {
   isFolderTrashed,
   isGameFolderTrashed,
   isGameTrashed,
+  uniqueBoardName,
+  uniqueFolderName,
   useBoardStore,
 } from '../store/gameStore'
+import ConfirmModal from './ConfirmModal'
 import ContextMenu, { type ContextMenuItem } from './ContextMenu'
 import NewItemModal from './NewItemModal'
 
@@ -54,6 +57,14 @@ function pickerEntrySortRow(entry: PickerEntry) {
 interface RenameDraft {
   id: string
   value: string
+}
+
+interface PendingMove {
+  kind: 'board' | 'folder'
+  id: string
+  targetFolderId: string | null
+  currentName: string
+  uniqueName: string
 }
 
 export type BoardPickerExplorerMode = 'library' | 'trash'
@@ -143,6 +154,7 @@ export default function BoardPickerExplorer({
   const [pathDraft, setPathDraft] = useState('/')
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null)
   const [activeDrag, setActiveDrag] = useState<DragPayload | null>(null)
+  const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
   const [internalRenameFolderId, setInternalRenameFolderId] = useState<string | null>(null)
   const [internalRenameBoardId, setInternalRenameBoardId] = useState<string | null>(null)
   const [folderRenameDraft, setFolderRenameDraft] = useState<RenameDraft | null>(null)
@@ -717,6 +729,72 @@ export default function BoardPickerExplorer({
     return canDropOnFolder(payload, parentFolderId)
   }
 
+  function requestMove(payload: DragPayload, targetFolderId: string | null) {
+    if (payload.type === 'board') {
+      const board = boards.find((b) => b.id === payload.id)
+      if (!board || isBoardTrashed(board)) return
+      if ((board.folderId ?? null) === targetFolderId) return
+      const uniqueName = uniqueBoardName(
+        boards,
+        targetFolderId,
+        board.name,
+        isFinalBoard(board) ? 'final' : 'board',
+        board.id,
+      )
+      if (uniqueName === board.name) {
+        moveBoardToFolder(board.id, targetFolderId)
+        return
+      }
+      setPendingMove({
+        kind: 'board',
+        id: board.id,
+        targetFolderId,
+        currentName: board.name,
+        uniqueName,
+      })
+      return
+    }
+
+    const folder = folders.find((f) => f.id === payload.id)
+    if (!folder || isFolderTrashed(folder)) return
+    if (folder.parentId === targetFolderId) return
+    if (
+      targetFolderId !== null &&
+      (targetFolderId === folder.id || isFolderInside(scopedFolders, targetFolderId, folder.id))
+    ) {
+      return
+    }
+    const uniqueName = uniqueFolderName(
+      folders,
+      targetFolderId,
+      folder.name,
+      isFolderTrashed,
+      folder.id,
+    )
+    if (uniqueName === folder.name) {
+      moveFolder(folder.id, targetFolderId)
+      return
+    }
+    setPendingMove({
+      kind: 'folder',
+      id: folder.id,
+      targetFolderId,
+      currentName: folder.name,
+      uniqueName,
+    })
+  }
+
+  function confirmPendingMove() {
+    if (!pendingMove) return
+    const { kind, id, targetFolderId } = pendingMove
+    setPendingMove(null)
+    if (kind === 'board') {
+      moveBoardToFolder(id, targetFolderId)
+    } else {
+      moveFolder(id, targetFolderId)
+    }
+  }
+
   function handleDropOnFolder(e: DragEvent, targetFolderId: string) {
     e.preventDefault()
     e.stopPropagation()
@@ -727,11 +805,7 @@ export default function BoardPickerExplorer({
     const payload = activeDrag ?? parseDragPayload(e)
     clearDrag()
     if (!payload || !canDropOnFolder(payload, targetFolderId)) return
-    if (payload.type === 'board') {
-      moveBoardToFolder(payload.id, targetFolderId)
-    } else {
-      moveFolder(payload.id, targetFolderId)
-    }
+    requestMove(payload, targetFolderId)
   }
 
   function handleDropOnParent(e: DragEvent) {
@@ -744,11 +818,7 @@ export default function BoardPickerExplorer({
     const payload = activeDrag ?? parseDragPayload(e)
     clearDrag()
     if (!payload || !canDropOnParent(payload)) return
-    if (payload.type === 'board') {
-      moveBoardToFolder(payload.id, parentFolderId)
-    } else {
-      moveFolder(payload.id, parentFolderId)
-    }
+    requestMove(payload, parentFolderId)
   }
 
   function handleDropOnCurrent(e: DragEvent) {
@@ -760,13 +830,11 @@ export default function BoardPickerExplorer({
     const payload = activeDrag ?? parseDragPayload(e)
     clearDrag()
     if (!payload) return
-    if (payload.type === 'board') {
-      moveBoardToFolder(payload.id, currentFolderId)
-    } else {
+    if (payload.type === 'folder') {
       if (currentFolderId && payload.id === currentFolderId) return
       if (currentFolderId && isFolderInside(scopedFolders, currentFolderId, payload.id)) return
-      moveFolder(payload.id, currentFolderId)
     }
+    requestMove(payload, currentFolderId)
   }
 
   function renderBoardRow(board: Board) {
@@ -1147,6 +1215,15 @@ export default function BoardPickerExplorer({
           allowedTypes={pickerCreatableTypes('boards')}
           onConfirm={handleNewItemConfirm}
           onCancel={() => setNewItemOpen(false)}
+        />
+      )}
+      {pendingMove && (
+        <ConfirmModal
+          title="Duplicate name"
+          message={`"${pendingMove.currentName}" already exists here. It will be renamed to "${pendingMove.uniqueName}".`}
+          confirmLabel="Move"
+          onConfirm={confirmPendingMove}
+          onCancel={() => setPendingMove(null)}
         />
       )}
     </>
