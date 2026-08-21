@@ -15,8 +15,11 @@ import {
 import {
   isGameFolderTrashed,
   isGameTrashed,
+  uniqueFolderName,
+  uniqueItemName,
   useBoardStore,
 } from '../store/gameStore'
+import ConfirmModal from './ConfirmModal'
 import ContextMenu, { type ContextMenuItem } from './ContextMenu'
 import NewItemModal from './NewItemModal'
 
@@ -45,6 +48,14 @@ function pickerEntrySortRow(entry: PickerEntry) {
 interface RenameDraft {
   id: string
   value: string
+}
+
+interface PendingMove {
+  kind: 'game' | 'folder'
+  id: string
+  targetFolderId: string | null
+  currentName: string
+  uniqueName: string
 }
 
 interface Props {
@@ -104,6 +115,7 @@ export default function GamesPickerExplorer({
   const [pathDraft, setPathDraft] = useState('/')
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null)
   const [activeDrag, setActiveDrag] = useState<DragPayload | null>(null)
+  const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
   const [internalRenameFolderId, setInternalRenameFolderId] = useState<string | null>(null)
   const [internalRenameGameId, setInternalRenameGameId] = useState<string | null>(null)
   const [folderRenameDraft, setFolderRenameDraft] = useState<RenameDraft | null>(null)
@@ -531,17 +543,80 @@ export default function GamesPickerExplorer({
     return canDropOnFolder(payload, parentFolderId)
   }
 
+  function requestMove(payload: DragPayload, targetFolderId: string | null) {
+    if (payload.type === 'game') {
+      const game = games.find((g) => g.id === payload.id)
+      if (!game || isGameTrashed(game)) return
+      if ((game.folderId ?? null) === targetFolderId) return
+      const uniqueName = uniqueItemName(
+        games,
+        targetFolderId,
+        game.name,
+        isGameTrashed,
+        game.id,
+        'New Game',
+      )
+      if (uniqueName === game.name) {
+        moveGameToFolder(game.id, targetFolderId)
+        return
+      }
+      setPendingMove({
+        kind: 'game',
+        id: game.id,
+        targetFolderId,
+        currentName: game.name,
+        uniqueName,
+      })
+      return
+    }
+
+    const folder = folders.find((f) => f.id === payload.id)
+    if (!folder || isGameFolderTrashed(folder)) return
+    if (folder.parentId === targetFolderId) return
+    if (
+      targetFolderId !== null &&
+      (targetFolderId === folder.id || isFolderInside(scopedFolders, targetFolderId, folder.id))
+    ) {
+      return
+    }
+    const uniqueName = uniqueFolderName(
+      folders,
+      targetFolderId,
+      folder.name,
+      isGameFolderTrashed,
+      folder.id,
+    )
+    if (uniqueName === folder.name) {
+      moveGameFolder(folder.id, targetFolderId)
+      return
+    }
+    setPendingMove({
+      kind: 'folder',
+      id: folder.id,
+      targetFolderId,
+      currentName: folder.name,
+      uniqueName,
+    })
+  }
+
+  function confirmPendingMove() {
+    if (!pendingMove) return
+    const { kind, id, targetFolderId } = pendingMove
+    setPendingMove(null)
+    if (kind === 'game') {
+      moveGameToFolder(id, targetFolderId)
+    } else {
+      moveGameFolder(id, targetFolderId)
+    }
+  }
+
   function handleDropOnFolder(e: DragEvent, targetFolderId: string) {
     e.preventDefault()
     e.stopPropagation()
     const payload = activeDrag ?? parseDragPayload(e)
     clearDrag()
     if (!payload || !canDropOnFolder(payload, targetFolderId)) return
-    if (payload.type === 'game') {
-      moveGameToFolder(payload.id, targetFolderId)
-    } else {
-      moveGameFolder(payload.id, targetFolderId)
-    }
+    requestMove(payload, targetFolderId)
   }
 
   function handleDropOnParent(e: DragEvent) {
@@ -550,11 +625,7 @@ export default function GamesPickerExplorer({
     const payload = activeDrag ?? parseDragPayload(e)
     clearDrag()
     if (!payload || !canDropOnParent(payload)) return
-    if (payload.type === 'game') {
-      moveGameToFolder(payload.id, parentFolderId)
-    } else {
-      moveGameFolder(payload.id, parentFolderId)
-    }
+    requestMove(payload, parentFolderId)
   }
 
   function handleDropOnCurrent(e: DragEvent) {
@@ -562,13 +633,11 @@ export default function GamesPickerExplorer({
     const payload = activeDrag ?? parseDragPayload(e)
     clearDrag()
     if (!payload) return
-    if (payload.type === 'game') {
-      moveGameToFolder(payload.id, currentFolderId)
-    } else {
+    if (payload.type === 'folder') {
       if (currentFolderId && payload.id === currentFolderId) return
       if (currentFolderId && isFolderInside(scopedFolders, currentFolderId, payload.id)) return
-      moveGameFolder(payload.id, currentFolderId)
     }
+    requestMove(payload, currentFolderId)
   }
 
   function renderGameRow(game: Game) {
@@ -886,6 +955,15 @@ export default function GamesPickerExplorer({
           allowedTypes={pickerCreatableTypes('games')}
           onConfirm={handleNewItemConfirm}
           onCancel={() => setNewItemOpen(false)}
+        />
+      )}
+      {pendingMove && (
+        <ConfirmModal
+          title="Duplicate name"
+          message={`"${pendingMove.currentName}" already exists here. It will be renamed to "${pendingMove.uniqueName}".`}
+          confirmLabel="Move"
+          onConfirm={confirmPendingMove}
+          onCancel={() => setPendingMove(null)}
         />
       )}
     </>
