@@ -4,7 +4,6 @@ import { mimeTypeToMediaType } from '../mediaType'
 import { generateId, getDailyDoubleQuestionIds } from '../utils'
 import { uniqueBoardName, useBoardStore } from '../../store/gameStore'
 import {
-  TransferAbortError,
   checkTransferAbort,
   type ExportEnvelope,
   type ExportedBoardFolderNode,

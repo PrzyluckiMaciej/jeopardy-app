@@ -160,7 +160,6 @@ function countGameFolderMedia(
   games: Game[],
   boards: Board[],
 ): { media: number; structure: number; boardIds: Set<string> } {
-  const subtree = collectFolderSubtree(gameFolders, folderId)
   const boardIds = new Set<string>()
   let structure = 0
 

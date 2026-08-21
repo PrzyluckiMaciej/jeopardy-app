@@ -32,6 +32,9 @@ describe('parseAndValidateExport', () => {
       'boards',
     )
     expect(envelope.kind).toBe('board')
+    if (envelope.kind !== 'board' && envelope.kind !== 'final') {
+      throw new Error('expected board envelope')
+    }
     expect(envelope.payload.board.name).toBe('Test Board')
   })
 

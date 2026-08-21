@@ -79,7 +79,7 @@ function validateCategory(raw: unknown, index: number): Category {
     category.syncSettingsWithGlobal = raw.syncSettingsWithGlobal
   }
   if (isPlainObject(raw.settings)) {
-    category.settings = raw.settings as Category['settings']
+    category.settings = raw.settings as unknown as Category['settings']
   }
   return category
 }
