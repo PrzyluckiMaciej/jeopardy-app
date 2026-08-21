@@ -2,10 +2,14 @@ import { useMemo, useState } from 'react'
 import { ChevronDown, ChevronUp, LayoutGrid, Search, Trophy } from 'lucide-react'
 import type { Board, BoardFolder } from '../types'
 import { buildPathString } from '../lib/folderPath'
+import {
+  comparePickerRows,
+  pickerItemTypeFromBoard,
+  pickerItemTypeLabel,
+  type PickerSortDir,
+  type PickerSortKey,
+} from '../lib/pickerItemType'
 import { formatBoardTimestamp, isFinalBoard } from '../lib/utils'
-
-type SortKey = 'name' | 'createdAt' | 'updatedAt'
-type SortDir = 'asc' | 'desc'
 
 interface Props {
   boards: Board[]
@@ -13,35 +17,10 @@ interface Props {
   onAdd: (boardId: string) => void
 }
 
-function compareOptionalTime(a: number | null | undefined, b: number | null | undefined, dir: SortDir): number {
-  const aMissing = a == null || !Number.isFinite(a)
-  const bMissing = b == null || !Number.isFinite(b)
-  if (aMissing && bMissing) return 0
-  if (aMissing) return 1
-  if (bMissing) return -1
-  const cmp = a - b
-  return dir === 'asc' ? cmp : -cmp
-}
-
-function compareBySortKey(
-  a: { name: string; createdAt?: number; updatedAt?: number },
-  b: { name: string; createdAt?: number; updatedAt?: number },
-  key: SortKey,
-  dir: SortDir,
-): number {
-  if (key === 'name') {
-    const cmp = a.name.localeCompare(b.name)
-    return dir === 'asc' ? cmp : -cmp
-  }
-  const cmp = compareOptionalTime(a[key], b[key], dir)
-  if (cmp !== 0) return cmp
-  return a.name.localeCompare(b.name)
-}
-
 export default function AddBoardToGameList({ boards, folders, onAdd }: Props) {
   const [searchQuery, setSearchQuery] = useState('')
-  const [sortKey, setSortKey] = useState<SortKey>('createdAt')
-  const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const [sortKey, setSortKey] = useState<PickerSortKey>('type')
+  const [sortDir, setSortDir] = useState<PickerSortDir>('asc')
 
   const boardPaths = useMemo(() => {
     const map = new Map<string, string>()
@@ -56,12 +35,30 @@ export default function AddBoardToGameList({ boards, folders, onAdd }: Props) {
     const filtered = query
       ? boards.filter((b) => b.name.toLowerCase().includes(query))
       : boards
-    return [...filtered].sort((a, b) => compareBySortKey(a, b, sortKey, sortDir))
+    return [...filtered].sort((a, b) =>
+      comparePickerRows(
+        {
+          name: a.name,
+          type: pickerItemTypeFromBoard(a),
+          createdAt: a.createdAt,
+          updatedAt: a.updatedAt,
+        },
+        {
+          name: b.name,
+          type: pickerItemTypeFromBoard(b),
+          createdAt: b.createdAt,
+          updatedAt: b.updatedAt,
+        },
+        sortKey,
+        sortDir,
+        'boards',
+      ),
+    )
   }, [boards, searchQuery, sortKey, sortDir])
 
   if (boards.length === 0) return null
 
-  function toggleSort(key: SortKey) {
+  function toggleSort(key: PickerSortKey) {
     if (sortKey === key) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     } else {
@@ -70,7 +67,7 @@ export default function AddBoardToGameList({ boards, folders, onAdd }: Props) {
     }
   }
 
-  function renderSortHeader(key: SortKey, label: string, className: string) {
+  function renderSortHeader(key: PickerSortKey, label: string, className: string) {
     const active = sortKey === key
     const Icon = sortDir === 'asc' ? ChevronUp : ChevronDown
     return (
@@ -104,6 +101,7 @@ export default function AddBoardToGameList({ boards, folders, onAdd }: Props) {
       <div className="board-picker-add-board-list">
         <div className="board-picker-add-board-header board-picker-explorer-header">
           {renderSortHeader('name', 'Name', 'board-picker-explorer-header__name')}
+          {renderSortHeader('type', 'Type', 'board-picker-explorer-header__type')}
           {renderSortHeader('createdAt', 'Created at', 'board-picker-explorer-header__date')}
           {renderSortHeader('updatedAt', 'Last modified at', 'board-picker-explorer-header__date')}
           <span className="board-picker-add-board-header__action" aria-hidden />
@@ -113,6 +111,7 @@ export default function AddBoardToGameList({ boards, folders, onAdd }: Props) {
         ) : (
           visibleBoards.map((board) => {
             const path = boardPaths.get(board.id) ?? '/'
+            const type = pickerItemTypeFromBoard(board)
             return (
               <div key={board.id} className="board-picker-add-board-row">
                 <div className="board-picker-add-board-row__name">
@@ -126,6 +125,7 @@ export default function AddBoardToGameList({ boards, folders, onAdd }: Props) {
                     {path}
                   </span>
                 </div>
+                <span className="board-picker-explorer-row__type">{pickerItemTypeLabel(type)}</span>
                 <span className="board-picker-explorer-row__date">{formatBoardTimestamp(board.createdAt)}</span>
                 <span className="board-picker-explorer-row__date">{formatBoardTimestamp(board.updatedAt)}</span>
                 <div className="board-picker-add-board-row__action">

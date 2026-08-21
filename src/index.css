@@ -2070,7 +2070,7 @@ body.board-picker-reordering * {
 }
 .board-picker-add-board-list {
   display: grid;
-  grid-template-columns: minmax(8rem, 1fr) 10.5rem 10.5rem 3.5rem;
+  grid-template-columns: minmax(8rem, 1fr) 8.5rem 10.5rem 10.5rem 3.5rem;
   column-gap: 10px;
   min-width: 0;
   overflow-x: auto;
@@ -2084,7 +2084,7 @@ body.board-picker-reordering * {
   grid-template-columns: subgrid;
   grid-column: 1 / -1;
   align-items: center;
-  min-width: 30rem;
+  min-width: 38.5rem;
 }
 .board-picker-add-board-header {
   position: sticky;
