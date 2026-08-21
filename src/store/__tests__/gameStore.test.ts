@@ -104,15 +104,24 @@ describe('useBoardStore', () => {
       expect(useBoardStore.getState().renameBoard('a', 'Alpha')).toBe(true)
     })
 
-    it('rejects renaming a board to a sibling final name', () => {
-      useBoardStore.getState().saveBoard(makeBoard({ id: 'board', name: 'Shared' }))
+    it('allows renaming a final to a sibling board name', () => {
+      useBoardStore.getState().saveBoard(makeBoard({ id: 'board', name: 'Shared', kind: 'board' }))
       useBoardStore.getState().saveBoard(
         makeBoard({ id: 'final', name: 'Final Jeopardy', kind: 'final' }),
       )
-      expect(useBoardStore.getState().renameBoard('final', 'shared')).toBe(false)
-      expect(useBoardStore.getState().boards.find((x) => x.id === 'final')?.name).toBe(
-        'Final Jeopardy',
+      expect(useBoardStore.getState().renameBoard('final', 'shared')).toBe(true)
+      expect(useBoardStore.getState().boards.find((x) => x.id === 'final')?.name).toBe('shared')
+    })
+
+    it('rejects renaming a final to a sibling final name', () => {
+      useBoardStore.getState().saveBoard(
+        makeBoard({ id: 'final-a', name: 'Alpha', kind: 'final' }),
       )
+      useBoardStore.getState().saveBoard(
+        makeBoard({ id: 'final-b', name: 'Beta', kind: 'final' }),
+      )
+      expect(useBoardStore.getState().renameBoard('final-b', 'alpha')).toBe(false)
+      expect(useBoardStore.getState().boards.find((x) => x.id === 'final-b')?.name).toBe('Beta')
     })
 
     it('allows the same board name under different folders', () => {
@@ -129,6 +138,17 @@ describe('useBoardStore', () => {
       useBoardStore.getState().saveBoard(makeBoard({ id: 'twin', name: 'Twin' }))
       useBoardStore.getState().moveBoardToFolder('twin', dest)
       expect(useBoardStore.getState().boards.find((b) => b.id === 'twin')?.name).toBe('Twin (2)')
+      expect(useBoardStore.getState().boards.find((b) => b.id === 'twin')?.folderId).toBe(dest)
+    })
+
+    it('does not suffix a moved board when only a final shares the destination name', () => {
+      const dest = useBoardStore.getState().createFolder('Dest')
+      useBoardStore.getState().saveBoard(
+        makeBoard({ id: 'final-in-dest', name: 'Twin', folderId: dest, kind: 'final' }),
+      )
+      useBoardStore.getState().saveBoard(makeBoard({ id: 'twin', name: 'Twin', kind: 'board' }))
+      useBoardStore.getState().moveBoardToFolder('twin', dest)
+      expect(useBoardStore.getState().boards.find((b) => b.id === 'twin')?.name).toBe('Twin')
       expect(useBoardStore.getState().boards.find((b) => b.id === 'twin')?.folderId).toBe(dest)
     })
   })

@@ -1093,7 +1093,13 @@ export default function HostPage() {
 
   function handleNewBoard(folderId: string | null = null) {
     const draft = { ...createDefaultBoard(), folderId }
-    const name = uniqueBoardName(useBoardStore.getState().boards, folderId, draft.name, draft.id)
+    const name = uniqueBoardName(
+      useBoardStore.getState().boards,
+      folderId,
+      draft.name,
+      'board',
+      draft.id,
+    )
     const b = { ...draft, name }
     boardStore.saveBoard(b)
     setRenameFolderId(null)
@@ -1103,7 +1109,13 @@ export default function HostPage() {
 
   function handleNewFinal(folderId: string | null = null) {
     const draft = { ...createDefaultFinalJeopardy(), folderId }
-    const name = uniqueBoardName(useBoardStore.getState().boards, folderId, draft.name, draft.id)
+    const name = uniqueBoardName(
+      useBoardStore.getState().boards,
+      folderId,
+      draft.name,
+      'final',
+      draft.id,
+    )
     const b = { ...draft, name }
     boardStore.saveBoard(b)
     setRenameFolderId(null)
