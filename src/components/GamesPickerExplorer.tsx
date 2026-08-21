@@ -21,9 +21,21 @@ import {
   uniqueItemName,
   useBoardStore,
 } from '../store/gameStore'
+import {
+  downloadJson,
+  exportGameFolderItem,
+  exportGameItem,
+  importEnvelope,
+  parseAndValidateExport,
+  pickJsonFile,
+  sanitizeExportFilename,
+  useTransferJob,
+} from '../lib/transfer'
+import AddItemButton from './AddItemButton'
 import ConfirmModal from './ConfirmModal'
 import ContextMenu, { type ContextMenuItem } from './ContextMenu'
 import NewItemModal from './NewItemModal'
+import TransferProgressModal from './TransferProgressModal'
 
 type DragPayload =
   | { type: 'game'; id: string }
@@ -111,9 +123,18 @@ export default function GamesPickerExplorer({
   const createGameFolder = useBoardStore((s) => s.createGameFolder)
   const createGame = useBoardStore((s) => s.createGame)
   const renameGame = useBoardStore((s) => s.renameGame)
+  const boards = useBoardStore((s) => s.boards)
 
   const [userFolderId, setUserFolderId] = useState<string | null>(initialFolderId)
   const [newItemOpen, setNewItemOpen] = useState(false)
+  const {
+    job: transferJob,
+    errorMessage: transferError,
+    cancel: cancelTransfer,
+    dismissError: dismissTransferError,
+    showError: showTransferError,
+    runTransfer,
+  } = useTransferJob()
   const [pathEditing, setPathEditing] = useState(false)
   const [pathDraft, setPathDraft] = useState('/')
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null)
@@ -367,6 +388,42 @@ export default function GamesPickerExplorer({
     else if (type === 'folder') createNewFolder()
   }
 
+  function handleExportGame(game: Game) {
+    void runTransfer('Exporting…', async (signal, onProgress) => {
+      const envelope = await exportGameItem(
+        game,
+        { boards, folders: [] },
+        { signal, onProgress },
+      )
+      downloadJson(sanitizeExportFilename(game.name), envelope)
+    })
+  }
+
+  function handleExportFolder(folder: GameFolder) {
+    void runTransfer('Exporting…', async (signal, onProgress) => {
+      const envelope = await exportGameFolderItem(
+        folder,
+        { boards, folders: [], games, gameFolders: folders },
+        { signal, onProgress },
+      )
+      downloadJson(sanitizeExportFilename(folder.name), envelope)
+    })
+  }
+
+  async function handleImport() {
+    try {
+      const raw = await pickJsonFile()
+      if (raw == null) return
+      const envelope = parseAndValidateExport(raw, 'games')
+      await runTransfer('Importing…', async (signal, onProgress) => {
+        await importEnvelope(envelope, currentFolderId, { signal, onProgress })
+      })
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      showTransferError(err instanceof Error ? err.message : 'Import failed.')
+    }
+  }
+
   function emptyMenuItems(): ContextMenuItem[] {
     return [
       {
@@ -406,6 +463,11 @@ export default function GamesPickerExplorer({
         onSelect: () => onDuplicateFolder(folder),
       },
       {
+        id: 'export',
+        label: 'Export',
+        onSelect: () => handleExportFolder(folder),
+      },
+      {
         id: 'delete',
         label: 'Delete',
         danger: true,
@@ -425,6 +487,11 @@ export default function GamesPickerExplorer({
         id: 'duplicate',
         label: 'Duplicate',
         onSelect: () => onDuplicateGame(game),
+      },
+      {
+        id: 'export',
+        label: 'Export',
+        onSelect: () => handleExportGame(game),
       },
       {
         id: 'delete',
@@ -916,13 +983,7 @@ export default function GamesPickerExplorer({
           aria-label="Folder path"
           spellCheck={false}
         />
-        <button
-          type="button"
-          className="board-picker-new-item-btn"
-          onClick={() => setNewItemOpen(true)}
-        >
-          New Item
-        </button>
+        <AddItemButton onCreate={() => setNewItemOpen(true)} onImport={() => void handleImport()} />
       </div>
       <div
         className={`board-picker-boards__scroll board-picker-explorer${currentDragOver ? ' board-picker-explorer--drag-over' : ''}`}
@@ -965,6 +1026,24 @@ export default function GamesPickerExplorer({
           allowedTypes={pickerCreatableTypes('games')}
           onConfirm={handleNewItemConfirm}
           onCancel={() => setNewItemOpen(false)}
+        />
+      )}
+      {transferJob && (
+        <TransferProgressModal
+          title={transferJob.title}
+          percent={transferJob.percent}
+          label={transferJob.label}
+          onCancel={cancelTransfer}
+        />
+      )}
+      {transferError && (
+        <ConfirmModal
+          title="Transfer failed"
+          message={transferError}
+          confirmLabel="OK"
+          cancelLabel="Close"
+          onConfirm={dismissTransferError}
+          onCancel={dismissTransferError}
         />
       )}
       {pendingMove && (

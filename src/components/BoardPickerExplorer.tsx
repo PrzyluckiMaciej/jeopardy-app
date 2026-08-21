@@ -27,9 +27,21 @@ import {
   uniqueFolderName,
   useBoardStore,
 } from '../store/gameStore'
+import {
+  downloadJson,
+  exportBoardFolderItem,
+  exportBoardItem,
+  importEnvelope,
+  parseAndValidateExport,
+  pickJsonFile,
+  sanitizeExportFilename,
+  useTransferJob,
+} from '../lib/transfer'
+import AddItemButton from './AddItemButton'
 import ConfirmModal from './ConfirmModal'
 import ContextMenu, { type ContextMenuItem } from './ContextMenu'
 import NewItemModal from './NewItemModal'
+import TransferProgressModal from './TransferProgressModal'
 
 type DragPayload =
   | { type: 'board'; id: string }
@@ -160,6 +172,8 @@ export default function BoardPickerExplorer({
 
   const [userFolderId, setUserFolderId] = useState<string | null>(null)
   const [newItemOpen, setNewItemOpen] = useState(false)
+  const { job: transferJob, errorMessage: transferError, cancel: cancelTransfer, dismissError: dismissTransferError, showError: showTransferError, runTransfer } =
+    useTransferJob()
   const [pathEditing, setPathEditing] = useState(false)
   const [pathDraft, setPathDraft] = useState('/')
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null)
@@ -453,6 +467,38 @@ export default function BoardPickerExplorer({
     else if (type === 'folder') createNewFolder()
   }
 
+  function handleExportBoard(board: Board) {
+    void runTransfer('Exporting…', async (signal, onProgress) => {
+      const envelope = await exportBoardItem(board, { signal, onProgress })
+      downloadJson(sanitizeExportFilename(board.name), envelope)
+    })
+  }
+
+  function handleExportFolder(folder: BoardFolder) {
+    void runTransfer('Exporting…', async (signal, onProgress) => {
+      const envelope = await exportBoardFolderItem(
+        folder,
+        { boards, folders },
+        { signal, onProgress },
+      )
+      downloadJson(sanitizeExportFilename(folder.name), envelope)
+    })
+  }
+
+  async function handleImport() {
+    try {
+      const raw = await pickJsonFile()
+      if (raw == null) return
+      const envelope = parseAndValidateExport(raw, 'boards')
+      await runTransfer('Importing…', async (signal, onProgress) => {
+        await importEnvelope(envelope, currentFolderId, { signal, onProgress })
+      })
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      showTransferError(err instanceof Error ? err.message : 'Import failed.')
+    }
+  }
+
   function emptyMenuItems(): ContextMenuItem[] {
     return [
       {
@@ -550,6 +596,11 @@ export default function BoardPickerExplorer({
         },
       },
       {
+        id: 'export',
+        label: 'Export',
+        onSelect: () => handleExportFolder(folder),
+      },
+      {
         id: 'delete',
         label: 'Delete',
         danger: true,
@@ -603,6 +654,11 @@ export default function BoardPickerExplorer({
         id: 'add-to-game',
         label: 'Add to game',
         onSelect: () => onRequestAddToGame([board.id], board.name),
+      },
+      {
+        id: 'export',
+        label: 'Export',
+        onSelect: () => handleExportBoard(board),
       },
       {
         id: 'delete',
@@ -1251,13 +1307,7 @@ export default function BoardPickerExplorer({
           spellCheck={false}
         />
         {!isTrash && (
-          <button
-            type="button"
-            className="board-picker-new-item-btn"
-            onClick={() => setNewItemOpen(true)}
-          >
-            New Item
-          </button>
+          <AddItemButton onCreate={() => setNewItemOpen(true)} onImport={() => void handleImport()} />
         )}
       </div>
       <div
@@ -1305,6 +1355,24 @@ export default function BoardPickerExplorer({
           allowedTypes={pickerCreatableTypes('boards')}
           onConfirm={handleNewItemConfirm}
           onCancel={() => setNewItemOpen(false)}
+        />
+      )}
+      {transferJob && (
+        <TransferProgressModal
+          title={transferJob.title}
+          percent={transferJob.percent}
+          label={transferJob.label}
+          onCancel={cancelTransfer}
+        />
+      )}
+      {transferError && (
+        <ConfirmModal
+          title="Transfer failed"
+          message={transferError}
+          confirmLabel="OK"
+          cancelLabel="Close"
+          onConfirm={dismissTransferError}
+          onCancel={dismissTransferError}
         />
       )}
       {pendingMove && (
