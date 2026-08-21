@@ -98,3 +98,52 @@ export function isFolderInside(
   }
   return false
 }
+
+type FolderPathNode = { id: string; name: string; parentId: string | null }
+
+/**
+ * Ensure a slash folder path exists by reusing non-trashed same-named siblings
+ * (case-insensitive) and creating only missing segments. Never renames with suffixes.
+ * `/` or empty → root (`null`).
+ */
+export function ensureFolderPathIds<T extends FolderPathNode>(
+  path: string | null | undefined,
+  options: {
+    getFolders: () => T[]
+    isTrashed: (folder: T) => boolean
+    createFolder: (name: string, parentId: string | null) => string
+  },
+): { folderId: string | null; createdIds: string[] } {
+  if (path == null || path === '' || path === '/') {
+    return { folderId: null, createdIds: [] }
+  }
+
+  const segments = path
+    .split('/')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+  if (segments.length === 0) return { folderId: null, createdIds: [] }
+
+  const createdIds: string[] = []
+  let parentId: string | null = null
+
+  for (const seg of segments) {
+    const folders = options.getFolders()
+    const key = seg.toLowerCase()
+    const existing = folders.find(
+      (f) =>
+        !options.isTrashed(f) &&
+        f.parentId === parentId &&
+        f.name.trim().toLowerCase() === key,
+    )
+    if (existing) {
+      parentId = existing.id
+      continue
+    }
+    const id = options.createFolder(seg, parentId)
+    createdIds.push(id)
+    parentId = id
+  }
+
+  return { folderId: parentId, createdIds }
+}

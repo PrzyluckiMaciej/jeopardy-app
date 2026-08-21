@@ -1,8 +1,9 @@
 import type { Board, BoardKind } from '../../types'
 import { dataUrlToBlob, deleteMedia, saveMedia } from '../db'
+import { ensureFolderPathIds } from '../folderPath'
 import { mimeTypeToMediaType } from '../mediaType'
 import { generateId, getDailyDoubleQuestionIds } from '../utils'
-import { uniqueBoardName, useBoardStore } from '../../store/gameStore'
+import { isFolderTrashed, uniqueBoardName, useBoardStore } from '../../store/gameStore'
 import { findReusableBoard } from './boardContentMatch'
 import {
   checkTransferAbort,
@@ -245,7 +246,19 @@ async function resolveBoardForGameImport(
       return existingId
     }
   }
-  return importBoardPackage(pkg, null, tracker, created)
+
+  const { folderId, createdIds } = ensureFolderPathIds(pkg.folderPath, {
+    getFolders: () => useBoardStore.getState().folders,
+    isTrashed: isFolderTrashed,
+    createFolder: (name, parentId) => useBoardStore.getState().createFolder(name, parentId),
+  })
+  for (const id of createdIds) {
+    created.folderIds.push(id)
+    tracker.done += 1
+    report(tracker, 'Creating folder')
+  }
+
+  return importBoardPackage(pkg, folderId, tracker, created)
 }
 
 async function importGamePackage(
