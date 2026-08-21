@@ -8,6 +8,7 @@ import {
   isFolderTrashed,
   isGameFolderTrashed,
   isGameTrashed,
+  uniqueBoardName,
 } from '../store/gameStore'
 import { buildItemPathString, buildPathString, resolveFolderOrItemPath } from '../lib/folderPath'
 import * as net from '../lib/network'
@@ -1091,7 +1092,9 @@ export default function HostPage() {
   }
 
   function handleNewBoard(folderId: string | null = null) {
-    const b = { ...createDefaultBoard(), folderId }
+    const draft = { ...createDefaultBoard(), folderId }
+    const name = uniqueBoardName(useBoardStore.getState().boards, folderId, draft.name, draft.id)
+    const b = { ...draft, name }
     boardStore.saveBoard(b)
     setRenameFolderId(null)
     setRenameBoardId(b.id)
@@ -1099,7 +1102,9 @@ export default function HostPage() {
   }
 
   function handleNewFinal(folderId: string | null = null) {
-    const b = { ...createDefaultFinalJeopardy(), folderId }
+    const draft = { ...createDefaultFinalJeopardy(), folderId }
+    const name = uniqueBoardName(useBoardStore.getState().boards, folderId, draft.name, draft.id)
+    const b = { ...draft, name }
     boardStore.saveBoard(b)
     setRenameFolderId(null)
     setRenameBoardId(b.id)

@@ -89,6 +89,50 @@ describe('useBoardStore', () => {
     })
   })
 
+  describe('board names', () => {
+    it('renames a board', () => {
+      useBoardStore.getState().saveBoard(makeBoard({ id: 'b1', name: 'Old' }))
+      expect(useBoardStore.getState().renameBoard('b1', 'New')).toBe(true)
+      expect(useBoardStore.getState().boards[0].name).toBe('New')
+    })
+
+    it('rejects renaming to a sibling board name (case-insensitive)', () => {
+      useBoardStore.getState().saveBoard(makeBoard({ id: 'a', name: 'Alpha' }))
+      useBoardStore.getState().saveBoard(makeBoard({ id: 'b', name: 'Beta' }))
+      expect(useBoardStore.getState().renameBoard('b', 'alpha')).toBe(false)
+      expect(useBoardStore.getState().boards.find((x) => x.id === 'b')?.name).toBe('Beta')
+      expect(useBoardStore.getState().renameBoard('a', 'Alpha')).toBe(true)
+    })
+
+    it('rejects renaming a board to a sibling final name', () => {
+      useBoardStore.getState().saveBoard(makeBoard({ id: 'board', name: 'Shared' }))
+      useBoardStore.getState().saveBoard(
+        makeBoard({ id: 'final', name: 'Final Jeopardy', kind: 'final' }),
+      )
+      expect(useBoardStore.getState().renameBoard('final', 'shared')).toBe(false)
+      expect(useBoardStore.getState().boards.find((x) => x.id === 'final')?.name).toBe(
+        'Final Jeopardy',
+      )
+    })
+
+    it('allows the same board name under different folders', () => {
+      const folderA = useBoardStore.getState().createFolder('A')
+      const folderB = useBoardStore.getState().createFolder('B')
+      useBoardStore.getState().saveBoard(makeBoard({ id: 'a', name: 'Shared', folderId: folderA }))
+      useBoardStore.getState().saveBoard(makeBoard({ id: 'b', name: 'Shared', folderId: folderB }))
+      expect(useBoardStore.getState().boards.find((x) => x.id === 'b')?.name).toBe('Shared')
+    })
+
+    it('suffixes a moved board when the destination has the same name', () => {
+      const dest = useBoardStore.getState().createFolder('Dest')
+      useBoardStore.getState().saveBoard(makeBoard({ id: 'in-dest', name: 'Twin', folderId: dest }))
+      useBoardStore.getState().saveBoard(makeBoard({ id: 'twin', name: 'Twin' }))
+      useBoardStore.getState().moveBoardToFolder('twin', dest)
+      expect(useBoardStore.getState().boards.find((b) => b.id === 'twin')?.name).toBe('Twin (2)')
+      expect(useBoardStore.getState().boards.find((b) => b.id === 'twin')?.folderId).toBe(dest)
+    })
+  })
+
   describe('folders', () => {
     it('creates a folder at root', () => {
       const id = useBoardStore.getState().createFolder('My Folder')
@@ -322,6 +366,38 @@ describe('useBoardStore', () => {
       const folderId = useBoardStore.getState().createGameFolder('Season 1')
       const gameId = useBoardStore.getState().createGame('Episode 1', folderId)
       expect(useBoardStore.getState().games.find((g) => g.id === gameId)?.folderId).toBe(folderId)
+    })
+
+    it('auto-suffixes duplicate game names in the same folder', () => {
+      const a = useBoardStore.getState().createGame('Show')
+      const b = useBoardStore.getState().createGame('Show')
+      expect(useBoardStore.getState().games.find((g) => g.id === a)?.name).toBe('Show')
+      expect(useBoardStore.getState().games.find((g) => g.id === b)?.name).toBe('Show (2)')
+    })
+
+    it('allows the same game name under different folders', () => {
+      const folderA = useBoardStore.getState().createGameFolder('A')
+      const folderB = useBoardStore.getState().createGameFolder('B')
+      useBoardStore.getState().createGame('Shared', folderA)
+      const id = useBoardStore.getState().createGame('Shared', folderB)
+      expect(useBoardStore.getState().games.find((g) => g.id === id)?.name).toBe('Shared')
+    })
+
+    it('rejects renaming to a sibling game name (case-insensitive)', () => {
+      const a = useBoardStore.getState().createGame('Alpha')
+      const b = useBoardStore.getState().createGame('Beta')
+      expect(useBoardStore.getState().renameGame(b, 'alpha')).toBe(false)
+      expect(useBoardStore.getState().games.find((g) => g.id === b)?.name).toBe('Beta')
+      expect(useBoardStore.getState().renameGame(a, 'Alpha')).toBe(true)
+    })
+
+    it('suffixes a moved game when the destination has the same name', () => {
+      const dest = useBoardStore.getState().createGameFolder('Dest')
+      useBoardStore.getState().createGame('Twin', dest)
+      const twin = useBoardStore.getState().createGame('Twin')
+      useBoardStore.getState().moveGameToFolder(twin, dest)
+      expect(useBoardStore.getState().games.find((g) => g.id === twin)?.name).toBe('Twin (2)')
+      expect(useBoardStore.getState().games.find((g) => g.id === twin)?.folderId).toBe(dest)
     })
 
     it('creates a game folder at root', () => {

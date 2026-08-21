@@ -100,10 +100,6 @@ function parseDragPayload(e: DragEvent): DragPayload | null {
   return null
 }
 
-function stampBoardUpdatedAt(board: Board): Board {
-  return { ...board, updatedAt: Date.now() }
-}
-
 export default function BoardPickerExplorer({
   boards,
   folders,
@@ -137,7 +133,7 @@ export default function BoardPickerExplorer({
   const moveFolder = useBoardStore((s) => s.moveFolder)
   const renameFolder = useBoardStore((s) => s.renameFolder)
   const createFolder = useBoardStore((s) => s.createFolder)
-  const saveBoard = useBoardStore((s) => s.saveBoard)
+  const renameBoard = useBoardStore((s) => s.renameBoard)
 
   const [userFolderId, setUserFolderId] = useState<string | null>(null)
   const [pathEditing, setPathEditing] = useState(false)
@@ -208,6 +204,21 @@ export default function BoardPickerExplorer({
         f.name.trim().toLowerCase() === name.toLowerCase(),
     )
   }, [editingFolderId, folderRenameValue, scopedFolders, isTrash])
+
+  const boardRenameConflict = useMemo(() => {
+    if (!editingBoardId || isTrash) return false
+    const name = boardRenameValue.trim()
+    if (!name) return false
+    const board = scopedBoards.find((b) => b.id === editingBoardId)
+    if (!board) return false
+    if (board.name.trim().toLowerCase() === name.toLowerCase()) return false
+    return scopedBoards.some(
+      (b) =>
+        b.id !== editingBoardId &&
+        (b.folderId ?? null) === (board.folderId ?? null) &&
+        b.name.trim().toLowerCase() === name.toLowerCase(),
+    )
+  }, [editingBoardId, boardRenameValue, scopedBoards, isTrash])
 
   // Adjust navigation while rendering when the current folder disappears or a rename starts.
   const folderExistsInBoardTree =
@@ -619,11 +630,13 @@ export default function BoardPickerExplorer({
 
   function commitBoardRename(boardId: string) {
     const name = boardRenameValue.trim()
-    const board = scopedBoards.find((b) => b.id === boardId)
-    if (board && name && name !== board.name) {
-      saveBoard(stampBoardUpdatedAt({ ...board, name }))
+    if (!name) {
+      setEditingBoardId(null)
+      return
     }
-    setEditingBoardId(null)
+    if (renameBoard(boardId, name)) {
+      setEditingBoardId(null)
+    }
   }
 
   function renderTypeColumn(type: PickerItemType) {
@@ -775,37 +788,51 @@ export default function BoardPickerExplorer({
       >
         <div className="board-picker-explorer-row__name">
           {isEditing ? (
-            <div className="flex items-center gap-1 flex-1 min-w-0">
-              {isFinalBoard(board) ? (
-                <Trophy size={14} className="board-picker-object-icon board-picker-object-icon--final" />
-              ) : (
-                <LayoutGrid size={14} className="board-picker-object-icon board-picker-object-icon--board" />
+            <div className="board-picker-rename flex-1 min-w-0">
+              <div className="flex items-center gap-1 min-w-0">
+                {isFinalBoard(board) ? (
+                  <Trophy size={14} className="board-picker-object-icon board-picker-object-icon--final" />
+                ) : (
+                  <LayoutGrid size={14} className="board-picker-object-icon board-picker-object-icon--board" />
+                )}
+                <input
+                  className={`board-picker-input${boardRenameConflict ? ' board-picker-input--error' : ''}`}
+                  value={boardRenameValue}
+                  onChange={(e) => {
+                    if (editingBoardId) {
+                      setBoardRenameDraft({ id: editingBoardId, value: e.target.value })
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commitBoardRename(board.id)
+                    if (e.key === 'Escape') setEditingBoardId(null)
+                  }}
+                  onBlur={() => commitBoardRename(board.id)}
+                  autoFocus
+                  onFocus={(e) => e.target.select()}
+                  onClick={(e) => e.stopPropagation()}
+                  aria-invalid={boardRenameConflict}
+                  aria-describedby={boardRenameConflict ? `board-rename-error-${board.id}` : undefined}
+                />
+                <button
+                  type="button"
+                  className="board-picker-save-btn"
+                  onClick={() => commitBoardRename(board.id)}
+                  title="Save"
+                  disabled={boardRenameConflict}
+                >
+                  <Check size={14} />
+                </button>
+              </div>
+              {boardRenameConflict && (
+                <div
+                  id={`board-rename-error-${board.id}`}
+                  className="board-picker-rename-error"
+                  role="alert"
+                >
+                  Name already taken in this folder
+                </div>
               )}
-              <input
-                className="board-picker-input"
-                value={boardRenameValue}
-                onChange={(e) => {
-                  if (editingBoardId) {
-                    setBoardRenameDraft({ id: editingBoardId, value: e.target.value })
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') commitBoardRename(board.id)
-                  if (e.key === 'Escape') setEditingBoardId(null)
-                }}
-                onBlur={() => commitBoardRename(board.id)}
-                autoFocus
-                onFocus={(e) => e.target.select()}
-                onClick={(e) => e.stopPropagation()}
-              />
-              <button
-                type="button"
-                className="board-picker-save-btn"
-                onClick={() => commitBoardRename(board.id)}
-                title="Save"
-              >
-                <Check size={14} />
-              </button>
             </div>
           ) : (
             <button
