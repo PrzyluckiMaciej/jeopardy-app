@@ -21,6 +21,7 @@ import { loadPersistedSettings } from '../lib/settings'
 import { sanitizeStateForPersist } from '../lib/hostSession'
 
 type FolderLike = { id: string; name: string; parentId: string | null; trashedAt?: number | null }
+type ItemLike = { id: string; name: string; folderId?: string | null; trashedAt?: number | null }
 
 // ---- Board editor store (persisted) ----
 interface BoardStore {
@@ -38,8 +39,11 @@ interface BoardStore {
   /** Permanently remove a board. */
   deleteBoard: (id: string) => void
   getBoard: (id: string) => Board | undefined
+  /** Returns false if the name conflicts with a sibling board/final. */
+  renameBoard: (id: string, name: string) => boolean
   createGame: (name: string, folderId?: string | null) => string
-  renameGame: (id: string, name: string) => void
+  /** Returns false if the name conflicts with a sibling game. */
+  renameGame: (id: string, name: string) => boolean
   /** Soft-delete: move game to trash. */
   trashGame: (id: string) => void
   restoreGame: (id: string) => void
@@ -143,6 +147,53 @@ function uniqueFolderName(
     n += 1
   }
   return `${base} (${n})`
+}
+
+/** Case-insensitive sibling name check for boards/games. Empty names count as taken. Ignores trashed. */
+function isItemNameTaken(
+  items: ItemLike[],
+  folderId: string | null,
+  name: string,
+  isTrashed: (item: ItemLike) => boolean,
+  excludeId?: string,
+): boolean {
+  const key = name.trim().toLowerCase()
+  if (!key) return true
+  return items.some(
+    (item) =>
+      item.id !== excludeId &&
+      !isTrashed(item) &&
+      (item.folderId ?? null) === folderId &&
+      item.name.trim().toLowerCase() === key,
+  )
+}
+
+/** Returns `desiredName` or `desiredName (2)`, `(3)`, … until unique among siblings. */
+function uniqueItemName(
+  items: ItemLike[],
+  folderId: string | null,
+  desiredName: string,
+  isTrashed: (item: ItemLike) => boolean,
+  excludeId?: string,
+  fallback = 'Untitled',
+): string {
+  const base = desiredName.trim() || fallback
+  if (!isItemNameTaken(items, folderId, base, isTrashed, excludeId)) return base
+  let n = 2
+  while (isItemNameTaken(items, folderId, `${base} (${n})`, isTrashed, excludeId)) {
+    n += 1
+  }
+  return `${base} (${n})`
+}
+
+/** Unique board/final name among non-trashed siblings in `folderId`. */
+export function uniqueBoardName(
+  boards: ItemLike[],
+  folderId: string | null,
+  desiredName: string,
+  excludeId?: string,
+): string {
+  return uniqueItemName(boards, folderId, desiredName, isBoardTrashed, excludeId, 'New Board')
 }
 
 function migrateBoardDailyDoubles(
@@ -358,30 +409,83 @@ export const useBoardStore = create<BoardStore>()(
           })),
         })),
       getBoard: (id) => get().boards.find((b) => b.id === id),
+      renameBoard: (id, name) => {
+        let renamed = false
+        set((s) => {
+          const board = s.boards.find((b) => b.id === id)
+          if (!board || isBoardTrashed(board)) return s
+          const trimmed = name.trim()
+          if (!trimmed) return s
+          if (
+            isItemNameTaken(
+              s.boards,
+              board.folderId ?? null,
+              trimmed,
+              isBoardTrashed,
+              id,
+            )
+          ) {
+            return s
+          }
+          renamed = true
+          return {
+            boards: s.boards.map((b) =>
+              b.id === id ? { ...b, name: trimmed, updatedAt: Date.now() } : b,
+            ),
+          }
+        })
+        return renamed
+      },
       createGame: (name, folderId = null) => {
         const id = crypto.randomUUID()
         const now = Date.now()
-        set((s) => ({
-          games: [
-            ...s.games,
-            {
-              id,
-              name,
-              boardIds: [],
-              folderId: folderId ?? null,
-              createdAt: now,
-              updatedAt: now,
-            },
-          ],
-        }))
+        const parent = folderId ?? null
+        set((s) => {
+          const uniqueName = uniqueItemName(
+            s.games,
+            parent,
+            name,
+            isGameTrashed,
+            undefined,
+            'New Game',
+          )
+          return {
+            games: [
+              ...s.games,
+              {
+                id,
+                name: uniqueName,
+                boardIds: [],
+                folderId: parent,
+                createdAt: now,
+                updatedAt: now,
+              },
+            ],
+          }
+        })
         return id
       },
-      renameGame: (id, name) =>
-        set((s) => ({
-          games: s.games.map((g) =>
-            g.id === id ? { ...g, name, updatedAt: Date.now() } : g,
-          ),
-        })),
+      renameGame: (id, name) => {
+        let renamed = false
+        set((s) => {
+          const game = s.games.find((g) => g.id === id)
+          if (!game || isGameTrashed(game)) return s
+          const trimmed = name.trim()
+          if (!trimmed) return s
+          if (
+            isItemNameTaken(s.games, game.folderId ?? null, trimmed, isGameTrashed, id)
+          ) {
+            return s
+          }
+          renamed = true
+          return {
+            games: s.games.map((g) =>
+              g.id === id ? { ...g, name: trimmed, updatedAt: Date.now() } : g,
+            ),
+          }
+        })
+        return renamed
+      },
       trashGame: (id) =>
         set((s) => {
           const game = s.games.find((g) => g.id === id)
@@ -460,11 +564,26 @@ export const useBoardStore = create<BoardStore>()(
           }),
         })),
       moveGameToFolder: (gameId, folderId) =>
-        set((s) => ({
-          games: s.games.map((g) =>
-            g.id === gameId ? { ...g, folderId, updatedAt: Date.now() } : g,
-          ),
-        })),
+        set((s) => {
+          const game = s.games.find((g) => g.id === gameId)
+          if (!game || isGameTrashed(game)) return s
+          if ((game.folderId ?? null) === folderId) return s
+          const uniqueName = uniqueItemName(
+            s.games,
+            folderId,
+            game.name,
+            isGameTrashed,
+            gameId,
+            'New Game',
+          )
+          return {
+            games: s.games.map((g) =>
+              g.id === gameId
+                ? { ...g, folderId, name: uniqueName, updatedAt: Date.now() }
+                : g,
+            ),
+          }
+        }),
       createFolder: (name, parentId = null) => {
         const id = crypto.randomUUID()
         const now = Date.now()
@@ -772,11 +891,19 @@ export const useBoardStore = create<BoardStore>()(
           }
         }),
       moveBoardToFolder: (boardId, folderId) =>
-        set((s) => ({
-          boards: s.boards.map((b) =>
-            b.id === boardId ? { ...b, folderId, updatedAt: Date.now() } : b,
-          ),
-        })),
+        set((s) => {
+          const board = s.boards.find((b) => b.id === boardId)
+          if (!board || isBoardTrashed(board)) return s
+          if ((board.folderId ?? null) === folderId) return s
+          const uniqueName = uniqueBoardName(s.boards, folderId, board.name, boardId)
+          return {
+            boards: s.boards.map((b) =>
+              b.id === boardId
+                ? { ...b, folderId, name: uniqueName, updatedAt: Date.now() }
+                : b,
+            ),
+          }
+        }),
       moveFolder: (folderId, newParentId) =>
         set((s) => {
           if (folderId === newParentId) return s

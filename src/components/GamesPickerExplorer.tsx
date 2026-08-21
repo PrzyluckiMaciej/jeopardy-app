@@ -163,6 +163,21 @@ export default function GamesPickerExplorer({
     )
   }, [editingFolderId, folderRenameValue, scopedFolders])
 
+  const gameRenameConflict = useMemo(() => {
+    if (!editingGameId) return false
+    const name = gameRenameValue.trim()
+    if (!name) return false
+    const game = scopedGames.find((g) => g.id === editingGameId)
+    if (!game) return false
+    if (game.name.trim().toLowerCase() === name.toLowerCase()) return false
+    return scopedGames.some(
+      (g) =>
+        g.id !== editingGameId &&
+        (g.folderId ?? null) === (game.folderId ?? null) &&
+        g.name.trim().toLowerCase() === name.toLowerCase(),
+    )
+  }, [editingGameId, gameRenameValue, scopedGames])
+
   if (userFolderId !== null && !scopedFolders.some((f) => f.id === userFolderId)) {
     setUserFolderId(null)
   }
@@ -430,11 +445,13 @@ export default function GamesPickerExplorer({
 
   function commitGameRename(gameId: string) {
     const name = gameRenameValue.trim()
-    const game = scopedGames.find((g) => g.id === gameId)
-    if (game && name && name !== game.name) {
-      renameGame(gameId, name)
+    if (!name) {
+      setEditingGameId(null)
+      return
     }
-    setEditingGameId(null)
+    if (renameGame(gameId, name)) {
+      setEditingGameId(null)
+    }
   }
 
   function renderTypeColumn(type: PickerItemType) {
@@ -573,33 +590,47 @@ export default function GamesPickerExplorer({
       >
         <div className="board-picker-explorer-row__name">
           {isEditing ? (
-            <div className="flex items-center gap-1 flex-1 min-w-0">
-              <Layers size={14} className="board-picker-object-icon board-picker-object-icon--game" />
-              <input
-                className="board-picker-input"
-                value={gameRenameValue}
-                onChange={(e) => {
-                  if (editingGameId) {
-                    setGameRenameDraft({ id: editingGameId, value: e.target.value })
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') commitGameRename(game.id)
-                  if (e.key === 'Escape') setEditingGameId(null)
-                }}
-                onBlur={() => commitGameRename(game.id)}
-                autoFocus
-                onFocus={(e) => e.target.select()}
-                onClick={(e) => e.stopPropagation()}
-              />
-              <button
-                type="button"
-                className="board-picker-save-btn"
-                onClick={() => commitGameRename(game.id)}
-                title="Save"
-              >
-                <Check size={14} />
-              </button>
+            <div className="board-picker-rename flex-1 min-w-0">
+              <div className="flex items-center gap-1 min-w-0">
+                <Layers size={14} className="board-picker-object-icon board-picker-object-icon--game" />
+                <input
+                  className={`board-picker-input${gameRenameConflict ? ' board-picker-input--error' : ''}`}
+                  value={gameRenameValue}
+                  onChange={(e) => {
+                    if (editingGameId) {
+                      setGameRenameDraft({ id: editingGameId, value: e.target.value })
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commitGameRename(game.id)
+                    if (e.key === 'Escape') setEditingGameId(null)
+                  }}
+                  onBlur={() => commitGameRename(game.id)}
+                  autoFocus
+                  onFocus={(e) => e.target.select()}
+                  onClick={(e) => e.stopPropagation()}
+                  aria-invalid={gameRenameConflict}
+                  aria-describedby={gameRenameConflict ? `game-rename-error-${game.id}` : undefined}
+                />
+                <button
+                  type="button"
+                  className="board-picker-save-btn"
+                  onClick={() => commitGameRename(game.id)}
+                  title="Save"
+                  disabled={gameRenameConflict}
+                >
+                  <Check size={14} />
+                </button>
+              </div>
+              {gameRenameConflict && (
+                <div
+                  id={`game-rename-error-${game.id}`}
+                  className="board-picker-rename-error"
+                  role="alert"
+                >
+                  Name already taken in this folder
+                </div>
+              )}
             </div>
           ) : (
             <button
