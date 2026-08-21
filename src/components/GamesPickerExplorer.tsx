@@ -12,6 +12,7 @@ import {
   type PickerSortDir,
   type PickerSortKey,
 } from '../lib/pickerItemType'
+import { GAMES_DND_MIME, type PickerNavDragPayload } from '../lib/pickerDnD'
 import {
   isGameFolderTrashed,
   isGameTrashed,
@@ -22,8 +23,6 @@ import {
 import ConfirmModal from './ConfirmModal'
 import ContextMenu, { type ContextMenuItem } from './ContextMenu'
 import NewItemModal from './NewItemModal'
-
-const DND_MIME = 'application/x-jeopardy-games-picker'
 
 type DragPayload =
   | { type: 'game'; id: string }
@@ -74,11 +73,13 @@ interface Props {
   onRenameGameIdChange?: (id: string | null) => void
   /** Folder to show when the explorer mounts / when this value changes. */
   initialFolderId?: string | null
+  /** Notifies HostPage of the active drag for nav-tab drop targets. */
+  onPickerDragChange?: (payload: PickerNavDragPayload | null) => void
 }
 
 function parseDragPayload(e: DragEvent): DragPayload | null {
   try {
-    const raw = e.dataTransfer.getData(DND_MIME) || e.dataTransfer.getData('text/plain')
+    const raw = e.dataTransfer.getData(GAMES_DND_MIME) || e.dataTransfer.getData('text/plain')
     if (!raw) return null
     const data = JSON.parse(raw) as DragPayload
     if (data?.type === 'game' || data?.type === 'folder') return data
@@ -101,6 +102,7 @@ export default function GamesPickerExplorer({
   renameGameId: controlledRenameGameId,
   onRenameGameIdChange,
   initialFolderId = null,
+  onPickerDragChange,
 }: Props) {
   const moveGameToFolder = useBoardStore((s) => s.moveGameToFolder)
   const moveGameFolder = useBoardStore((s) => s.moveGameFolder)
@@ -499,7 +501,7 @@ export default function GamesPickerExplorer({
 
   function setDragData(e: DragEvent, payload: DragPayload, dragImageEl?: HTMLElement | null) {
     const json = JSON.stringify(payload)
-    e.dataTransfer.setData(DND_MIME, json)
+    e.dataTransfer.setData(GAMES_DND_MIME, json)
     e.dataTransfer.setData('text/plain', json)
     e.dataTransfer.effectAllowed = 'move'
     clearDragGhost()
@@ -521,12 +523,14 @@ export default function GamesPickerExplorer({
       )
     }
     setActiveDrag(payload)
+    onPickerDragChange?.({ domain: 'games', type: payload.type, id: payload.id })
   }
 
   function clearDrag() {
     clearDragGhost()
     setActiveDrag(null)
     setDragOverTarget(null)
+    onPickerDragChange?.(null)
   }
 
   function canDropOnFolder(payload: DragPayload | null, targetFolderId: string): boolean {

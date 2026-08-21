@@ -1427,6 +1427,11 @@ select:focus-visible {
 .board-picker-nav-item--active:hover {
   background: rgba(212, 160, 23, 0.22);
 }
+.board-picker-nav-item--drag-over {
+  background: rgba(212, 160, 23, 0.16);
+  border-color: rgba(212, 160, 23, 0.5);
+  color: var(--gold);
+}
 .board-picker-game-row {
   display: flex;
   align-items: center;
