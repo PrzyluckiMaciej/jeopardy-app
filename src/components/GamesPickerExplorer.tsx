@@ -124,6 +124,7 @@ export default function GamesPickerExplorer({
   const createGame = useBoardStore((s) => s.createGame)
   const renameGame = useBoardStore((s) => s.renameGame)
   const boards = useBoardStore((s) => s.boards)
+  const boardFolders = useBoardStore((s) => s.folders)
 
   const [userFolderId, setUserFolderId] = useState<string | null>(initialFolderId)
   const [newItemOpen, setNewItemOpen] = useState(false)
@@ -392,7 +393,7 @@ export default function GamesPickerExplorer({
     void runTransfer('Exporting…', async (signal, onProgress) => {
       const envelope = await exportGameItem(
         game,
-        { boards, folders: [] },
+        { boards, folders: boardFolders },
         { signal, onProgress },
       )
       downloadJson(sanitizeExportFilename(game.name), envelope)
@@ -403,7 +404,7 @@ export default function GamesPickerExplorer({
     void runTransfer('Exporting…', async (signal, onProgress) => {
       const envelope = await exportGameFolderItem(
         folder,
-        { boards, folders: [], games, gameFolders: folders },
+        { boards, folders: boardFolders, games, gameFolders: folders },
         { signal, onProgress },
       )
       downloadJson(sanitizeExportFilename(folder.name), envelope)

@@ -159,7 +159,11 @@ function validateBoardPackage(raw: unknown): ExportedBoardPackage {
     }
   }
 
-  return { board, media }
+  const pkg: ExportedBoardPackage = { board, media }
+  if (raw.folderPath != null) {
+    pkg.folderPath = requireString(raw.folderPath, 'folderPath')
+  }
+  return pkg
 }
 
 function validateBoardFolderNode(raw: unknown): ExportedBoardFolderNode {

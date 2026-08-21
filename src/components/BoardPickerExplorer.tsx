@@ -469,7 +469,7 @@ export default function BoardPickerExplorer({
 
   function handleExportBoard(board: Board) {
     void runTransfer('Exporting…', async (signal, onProgress) => {
-      const envelope = await exportBoardItem(board, { signal, onProgress })
+      const envelope = await exportBoardItem(board, { folders }, { signal, onProgress })
       downloadJson(sanitizeExportFilename(board.name), envelope)
     })
   }
