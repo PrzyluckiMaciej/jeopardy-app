@@ -514,6 +514,15 @@ export default function BoardPickerExplorer({
         label: 'Duplicate',
         onSelect: () => onDuplicateFolder(folder),
       },
+      ...(currentFolderId !== null
+        ? [
+            {
+              id: 'move-to-parent',
+              label: 'Move to parent directory',
+              onSelect: () => requestMove({ type: 'folder', id: folder.id }, parentFolderId),
+            },
+          ]
+        : []),
       {
         id: 'add-to-game',
         label: 'Add to game',
@@ -571,6 +580,15 @@ export default function BoardPickerExplorer({
         label: 'Duplicate',
         onSelect: () => onDuplicateBoard(board),
       },
+      ...(currentFolderId !== null
+        ? [
+            {
+              id: 'move-to-parent',
+              label: 'Move to parent directory',
+              onSelect: () => requestMove({ type: 'board', id: board.id }, parentFolderId),
+            },
+          ]
+        : []),
       {
         id: 'add-to-game',
         label: 'Add to game',
