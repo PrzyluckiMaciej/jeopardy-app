@@ -4,6 +4,14 @@ import type { Game, GameFolder } from '../types'
 import { buildPathString, isFolderInside, resolveFolderOrItemPath } from '../lib/folderPath'
 import { formatBoardTimestamp } from '../lib/utils'
 import {
+  comparePickerRows,
+  pickerItemTypeFromKind,
+  pickerItemTypeLabel,
+  type PickerItemType,
+  type PickerSortDir,
+  type PickerSortKey,
+} from '../lib/pickerItemType'
+import {
   isGameFolderTrashed,
   isGameTrashed,
   useBoardStore,
@@ -16,8 +24,21 @@ type DragPayload =
   | { type: 'game'; id: string }
   | { type: 'folder'; id: string }
 
-type SortKey = 'name' | 'createdAt' | 'updatedAt'
-type SortDir = 'asc' | 'desc'
+type SortKey = PickerSortKey
+type SortDir = PickerSortDir
+
+type PickerEntry =
+  | { kind: 'folder'; item: GameFolder }
+  | { kind: 'game'; item: Game }
+
+function pickerEntrySortRow(entry: PickerEntry) {
+  return {
+    name: entry.item.name,
+    type: pickerItemTypeFromKind(entry.kind),
+    createdAt: entry.item.createdAt,
+    updatedAt: entry.item.updatedAt,
+  }
+}
 
 interface RenameDraft {
   id: string
@@ -52,31 +73,6 @@ function parseDragPayload(e: DragEvent): DragPayload | null {
     /* ignore */
   }
   return null
-}
-
-function compareOptionalTime(a: number | null | undefined, b: number | null | undefined, dir: SortDir): number {
-  const aMissing = a == null || !Number.isFinite(a)
-  const bMissing = b == null || !Number.isFinite(b)
-  if (aMissing && bMissing) return 0
-  if (aMissing) return 1
-  if (bMissing) return -1
-  const cmp = a - b
-  return dir === 'asc' ? cmp : -cmp
-}
-
-function compareBySortKey(
-  a: { name: string; createdAt?: number; updatedAt?: number },
-  b: { name: string; createdAt?: number; updatedAt?: number },
-  key: SortKey,
-  dir: SortDir,
-): number {
-  if (key === 'name') {
-    const cmp = a.name.localeCompare(b.name)
-    return dir === 'asc' ? cmp : -cmp
-  }
-  const cmp = compareOptionalTime(a[key], b[key], dir)
-  if (cmp !== 0) return cmp
-  return a.name.localeCompare(b.name)
 }
 
 export default function GamesPickerExplorer({
@@ -116,7 +112,7 @@ export default function GamesPickerExplorer({
     anchorId?: string
   } | null>(null)
   const [prevRenameNavKey, setPrevRenameNavKey] = useState<string | null>(null)
-  const [sortKey, setSortKey] = useState<SortKey>('createdAt')
+  const [sortKey, setSortKey] = useState<SortKey>('type')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const dragGhostRef = useRef<HTMLElement | null>(null)
   const prevInitialFolderId = useRef(initialFolderId)
@@ -227,17 +223,14 @@ export default function GamesPickerExplorer({
   )
 
   const visibleEntries = useMemo(() => {
-    type Entry =
-      | { kind: 'folder'; item: GameFolder }
-      | { kind: 'game'; item: Game }
-    const folderEntries: Entry[] = scopedFolders
+    const folderEntries: PickerEntry[] = scopedFolders
       .filter((f) => f.parentId === currentFolderId)
       .map((item) => ({ kind: 'folder', item }))
-    const gameEntries: Entry[] = scopedGames
+    const gameEntries: PickerEntry[] = scopedGames
       .filter((g) => (g.folderId ?? null) === currentFolderId)
       .map((item) => ({ kind: 'game', item }))
     return [...folderEntries, ...gameEntries].sort((a, b) =>
-      compareBySortKey(a.item, b.item, sortKey, sortDir),
+      comparePickerRows(pickerEntrySortRow(a), pickerEntrySortRow(b), sortKey, sortDir, 'games'),
     )
   }, [scopedFolders, scopedGames, currentFolderId, sortKey, sortDir])
 
@@ -444,6 +437,10 @@ export default function GamesPickerExplorer({
     setEditingGameId(null)
   }
 
+  function renderTypeColumn(type: PickerItemType) {
+    return <span className="board-picker-explorer-row__type">{pickerItemTypeLabel(type)}</span>
+  }
+
   function renderDateColumns(createdAt?: number, updatedAt?: number) {
     return (
       <>
@@ -615,6 +612,7 @@ export default function GamesPickerExplorer({
             </button>
           )}
         </div>
+        {renderTypeColumn('game')}
         {renderDateColumns(game.createdAt, game.updatedAt)}
         {!isEditing && renderRowMenuButton(gameMenuItems(game), 'Game actions', `game-${game.id}`)}
       </div>
@@ -714,6 +712,7 @@ export default function GamesPickerExplorer({
             </button>
           )}
         </div>
+        {renderTypeColumn('folder')}
         {renderDateColumns(folder.createdAt, folder.updatedAt)}
         {!isEditing && renderRowMenuButton(folderMenuItems(folder), 'Folder actions', `folder-${folder.id}`)}
       </div>
@@ -813,6 +812,7 @@ export default function GamesPickerExplorer({
         {!isEmpty && (
           <div className="board-picker-explorer-header">
             {renderSortHeader('name', 'Name', 'board-picker-explorer-header__name')}
+            {renderSortHeader('type', 'Type', 'board-picker-explorer-header__type')}
             {renderSortHeader('createdAt', 'Created at', 'board-picker-explorer-header__date')}
             {renderSortHeader('updatedAt', 'Last modified at', 'board-picker-explorer-header__date')}
             <span className="board-picker-explorer-header__menu" aria-hidden />
