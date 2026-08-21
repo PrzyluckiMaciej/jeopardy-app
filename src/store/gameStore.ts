@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import type {
   Board,
   BoardFolder,
+  BoardKind,
   Game,
   GameFolder,
   GameState,
@@ -22,6 +23,11 @@ import { sanitizeStateForPersist } from '../lib/hostSession'
 
 type FolderLike = { id: string; name: string; parentId: string | null; trashedAt?: number | null }
 type ItemLike = { id: string; name: string; folderId?: string | null; trashedAt?: number | null }
+type BoardItemLike = ItemLike & { kind?: BoardKind }
+
+function boardKindOf(item: Pick<BoardItemLike, 'kind'>): BoardKind {
+  return item.kind === 'final' ? 'final' : 'board'
+}
 
 // ---- Board editor store (persisted) ----
 interface BoardStore {
@@ -39,7 +45,7 @@ interface BoardStore {
   /** Permanently remove a board. */
   deleteBoard: (id: string) => void
   getBoard: (id: string) => Board | undefined
-  /** Returns false if the name conflicts with a sibling board/final. */
+  /** Returns false if the name conflicts with a sibling of the same kind. */
   renameBoard: (id: string, name: string) => boolean
   createGame: (name: string, folderId?: string | null) => string
   /** Returns false if the name conflicts with a sibling game. */
@@ -186,14 +192,41 @@ function uniqueItemName(
   return `${base} (${n})`
 }
 
-/** Unique board/final name among non-trashed siblings in `folderId`. */
+/** Case-insensitive sibling name check for boards, scoped by kind. Empty names count as taken. */
+function isBoardNameTaken(
+  boards: BoardItemLike[],
+  folderId: string | null,
+  name: string,
+  kind: BoardKind,
+  excludeId?: string,
+): boolean {
+  const key = name.trim().toLowerCase()
+  if (!key) return true
+  return boards.some(
+    (item) =>
+      item.id !== excludeId &&
+      !isBoardTrashed(item) &&
+      (item.folderId ?? null) === folderId &&
+      boardKindOf(item) === kind &&
+      item.name.trim().toLowerCase() === key,
+  )
+}
+
+/** Unique name among non-trashed siblings of the same kind in `folderId`. */
 export function uniqueBoardName(
-  boards: ItemLike[],
+  boards: BoardItemLike[],
   folderId: string | null,
   desiredName: string,
+  kind: BoardKind = 'board',
   excludeId?: string,
 ): string {
-  return uniqueItemName(boards, folderId, desiredName, isBoardTrashed, excludeId, 'New Board')
+  const base = desiredName.trim() || (kind === 'final' ? 'Final Jeopardy' : 'New Board')
+  if (!isBoardNameTaken(boards, folderId, base, kind, excludeId)) return base
+  let n = 2
+  while (isBoardNameTaken(boards, folderId, `${base} (${n})`, kind, excludeId)) {
+    n += 1
+  }
+  return `${base} (${n})`
 }
 
 function migrateBoardDailyDoubles(
@@ -417,11 +450,11 @@ export const useBoardStore = create<BoardStore>()(
           const trimmed = name.trim()
           if (!trimmed) return s
           if (
-            isItemNameTaken(
+            isBoardNameTaken(
               s.boards,
               board.folderId ?? null,
               trimmed,
-              isBoardTrashed,
+              boardKindOf(board),
               id,
             )
           ) {
@@ -895,7 +928,13 @@ export const useBoardStore = create<BoardStore>()(
           const board = s.boards.find((b) => b.id === boardId)
           if (!board || isBoardTrashed(board)) return s
           if ((board.folderId ?? null) === folderId) return s
-          const uniqueName = uniqueBoardName(s.boards, folderId, board.name, boardId)
+          const uniqueName = uniqueBoardName(
+            s.boards,
+            folderId,
+            board.name,
+            boardKindOf(board),
+            boardId,
+          )
           return {
             boards: s.boards.map((b) =>
               b.id === boardId

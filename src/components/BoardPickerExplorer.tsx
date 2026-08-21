@@ -215,10 +215,12 @@ export default function BoardPickerExplorer({
     const board = scopedBoards.find((b) => b.id === editingBoardId)
     if (!board) return false
     if (board.name.trim().toLowerCase() === name.toLowerCase()) return false
+    const kind = isFinalBoard(board) ? 'final' : 'board'
     return scopedBoards.some(
       (b) =>
         b.id !== editingBoardId &&
         (b.folderId ?? null) === (board.folderId ?? null) &&
+        (isFinalBoard(b) ? 'final' : 'board') === kind &&
         b.name.trim().toLowerCase() === name.toLowerCase(),
     )
   }, [editingBoardId, boardRenameValue, scopedBoards, isTrash])
