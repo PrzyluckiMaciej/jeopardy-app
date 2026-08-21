@@ -5,6 +5,7 @@ import { buildPathString, isFolderInside, resolveFolderOrItemPath } from '../lib
 import { formatBoardTimestamp } from '../lib/utils'
 import {
   comparePickerRows,
+  pickerCreatableTypes,
   pickerItemTypeFromKind,
   pickerItemTypeLabel,
   type PickerItemType,
@@ -17,6 +18,7 @@ import {
   useBoardStore,
 } from '../store/gameStore'
 import ContextMenu, { type ContextMenuItem } from './ContextMenu'
+import NewItemModal from './NewItemModal'
 
 const DND_MIME = 'application/x-jeopardy-games-picker'
 
@@ -97,6 +99,7 @@ export default function GamesPickerExplorer({
   const renameGame = useBoardStore((s) => s.renameGame)
 
   const [userFolderId, setUserFolderId] = useState<string | null>(initialFolderId)
+  const [newItemOpen, setNewItemOpen] = useState(false)
   const [pathEditing, setPathEditing] = useState(false)
   const [pathDraft, setPathDraft] = useState('/')
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null)
@@ -329,27 +332,37 @@ export default function GamesPickerExplorer({
     showMenu(rect.left, rect.bottom + 4, items, anchorId)
   }
 
+  function createNewGame() {
+    const id = createGame('New Game', currentFolderId)
+    const createdName =
+      useBoardStore.getState().games.find((g) => g.id === id)?.name ?? 'New Game'
+    setEditingGameId(id, createdName)
+  }
+
+  function createNewFolder() {
+    const id = createGameFolder('New Folder', currentFolderId)
+    const createdName =
+      useBoardStore.getState().gameFolders.find((f) => f.id === id)?.name ?? 'New Folder'
+    setEditingFolderId(id, createdName)
+  }
+
+  function handleNewItemConfirm(type: PickerItemType) {
+    setNewItemOpen(false)
+    if (type === 'game') createNewGame()
+    else if (type === 'folder') createNewFolder()
+  }
+
   function emptyMenuItems(): ContextMenuItem[] {
     return [
       {
         id: 'new-game',
         label: 'New Game',
-        onSelect: () => {
-          const id = createGame('New Game', currentFolderId)
-          const createdName =
-            useBoardStore.getState().games.find((g) => g.id === id)?.name ?? 'New Game'
-          setEditingGameId(id, createdName)
-        },
+        onSelect: () => createNewGame(),
       },
       {
         id: 'new-folder',
         label: 'New Folder',
-        onSelect: () => {
-          const id = createGameFolder('New Folder', currentFolderId)
-          const createdName =
-            useBoardStore.getState().gameFolders.find((f) => f.id === id)?.name ?? 'New Folder'
-          setEditingFolderId(id, createdName)
-        },
+        onSelect: () => createNewFolder(),
       },
     ]
   }
@@ -824,6 +837,13 @@ export default function GamesPickerExplorer({
           aria-label="Folder path"
           spellCheck={false}
         />
+        <button
+          type="button"
+          className="board-picker-new-item-btn"
+          onClick={() => setNewItemOpen(true)}
+        >
+          New Item
+        </button>
       </div>
       <div
         className={`board-picker-boards__scroll board-picker-explorer${currentDragOver ? ' board-picker-explorer--drag-over' : ''}`}
@@ -860,6 +880,13 @@ export default function GamesPickerExplorer({
       </div>
       {menu && (
         <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={closeMenu} />
+      )}
+      {newItemOpen && (
+        <NewItemModal
+          allowedTypes={pickerCreatableTypes('games')}
+          onConfirm={handleNewItemConfirm}
+          onCancel={() => setNewItemOpen(false)}
+        />
       )}
     </>
   )

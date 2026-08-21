@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   comparePickerRows,
+  pickerCreatableTypes,
   pickerItemTypeFromBoard,
   pickerItemTypeFromKind,
   pickerItemTypeLabel,
@@ -51,6 +52,16 @@ describe('pickerItemTypeRank', () => {
     expect(pickerItemTypeRank('folder', 'trash')).toBeLessThan(pickerItemTypeRank('game', 'trash'))
     expect(pickerItemTypeRank('game', 'trash')).toBeLessThan(pickerItemTypeRank('board', 'trash'))
     expect(pickerItemTypeRank('board', 'trash')).toBeLessThan(pickerItemTypeRank('final', 'trash'))
+  })
+})
+
+describe('pickerCreatableTypes', () => {
+  it('returns boards tab create options', () => {
+    expect(pickerCreatableTypes('boards')).toEqual(['folder', 'board', 'final'])
+  })
+
+  it('returns games tab create options', () => {
+    expect(pickerCreatableTypes('games')).toEqual(['folder', 'game'])
   })
 })
 

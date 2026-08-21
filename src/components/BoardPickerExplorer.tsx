@@ -5,6 +5,7 @@ import { buildPathString, isFolderInside, resolvePath } from '../lib/folderPath'
 import { collectFolderSubtree } from '../lib/folderSubtree'
 import {
   comparePickerRows,
+  pickerCreatableTypes,
   pickerItemTypeFromKind,
   pickerItemTypeLabel,
   type PickerItemType,
@@ -20,6 +21,7 @@ import {
   useBoardStore,
 } from '../store/gameStore'
 import ContextMenu, { type ContextMenuItem } from './ContextMenu'
+import NewItemModal from './NewItemModal'
 
 const DND_MIME = 'application/x-jeopardy-picker'
 
@@ -136,6 +138,7 @@ export default function BoardPickerExplorer({
   const renameBoard = useBoardStore((s) => s.renameBoard)
 
   const [userFolderId, setUserFolderId] = useState<string | null>(null)
+  const [newItemOpen, setNewItemOpen] = useState(false)
   const [pathEditing, setPathEditing] = useState(false)
   const [pathDraft, setPathDraft] = useState('/')
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null)
@@ -412,6 +415,20 @@ export default function BoardPickerExplorer({
     showMenu(rect.left, rect.bottom + 4, items, anchorId)
   }
 
+  function createNewFolder() {
+    const id = createFolder('New Folder', currentFolderId)
+    const createdName =
+      useBoardStore.getState().folders.find((f) => f.id === id)?.name ?? 'New Folder'
+    setEditingFolderId(id, createdName)
+  }
+
+  function handleNewItemConfirm(type: PickerItemType) {
+    setNewItemOpen(false)
+    if (type === 'board') onCreateBoard(currentFolderId)
+    else if (type === 'final') onCreateFinal?.(currentFolderId)
+    else if (type === 'folder') createNewFolder()
+  }
+
   function emptyMenuItems(): ContextMenuItem[] {
     return [
       {
@@ -431,12 +448,7 @@ export default function BoardPickerExplorer({
       {
         id: 'new-folder',
         label: 'New Folder',
-        onSelect: () => {
-          const id = createFolder('New Folder', currentFolderId)
-          const createdName =
-            useBoardStore.getState().folders.find((f) => f.id === id)?.name ?? 'New Folder'
-          setEditingFolderId(id, createdName)
-        },
+        onSelect: () => createNewFolder(),
       },
     ]
   }
@@ -1078,6 +1090,15 @@ export default function BoardPickerExplorer({
           aria-label="Folder path"
           spellCheck={false}
         />
+        {!isTrash && (
+          <button
+            type="button"
+            className="board-picker-new-item-btn"
+            onClick={() => setNewItemOpen(true)}
+          >
+            New Item
+          </button>
+        )}
       </div>
       <div
         className={`board-picker-boards__scroll board-picker-explorer${currentDragOver ? ' board-picker-explorer--drag-over' : ''}`}
@@ -1118,6 +1139,13 @@ export default function BoardPickerExplorer({
       </div>
       {menu && (
         <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={closeMenu} />
+      )}
+      {newItemOpen && !isTrash && (
+        <NewItemModal
+          allowedTypes={pickerCreatableTypes('boards')}
+          onConfirm={handleNewItemConfirm}
+          onCancel={() => setNewItemOpen(false)}
+        />
       )}
     </>
   )
