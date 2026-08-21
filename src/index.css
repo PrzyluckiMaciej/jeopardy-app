@@ -2166,6 +2166,14 @@ body.board-picker-reordering * {
   width: 100%;
   padding: 2px 0;
 }
+.board-picker-folder-row__count {
+  flex-shrink: 0;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #6b7db3;
+}
 .board-picker-object-icon {
   flex-shrink: 0;
 }

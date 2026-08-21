@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type
 import { ArrowLeft, Check, ChevronDown, ChevronUp, EllipsisVertical, Folder, Layers } from 'lucide-react'
 import type { Game, GameFolder } from '../types'
 import { buildPathString, isFolderInside, resolveFolderOrItemPath } from '../lib/folderPath'
+import { collectFolderSubtree } from '../lib/folderSubtree'
 import { formatBoardTimestamp } from '../lib/utils'
 import {
   comparePickerRows,
@@ -740,6 +741,10 @@ export default function GamesPickerExplorer({
     const isEditing = editingFolderId === folder.id
     const dropKey = `folder:${folder.id}`
     const isDragOver = dragOverTarget === dropKey
+    const folderIds = collectFolderSubtree(scopedFolders, folder.id)
+    const itemCount = scopedGames.filter(
+      (g) => g.folderId != null && folderIds.has(g.folderId),
+    ).length
 
     return (
       <div
@@ -826,6 +831,7 @@ export default function GamesPickerExplorer({
             >
               <Folder size={14} className="board-picker-object-icon board-picker-object-icon--folder" />
               <span className="truncate">{folder.name}</span>
+              <span className="board-picker-folder-row__count">({itemCount})</span>
             </button>
           )}
         </div>

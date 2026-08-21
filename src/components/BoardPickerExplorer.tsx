@@ -987,6 +987,10 @@ export default function BoardPickerExplorer({
     const isEditing = !isTrash && editingFolderId === folder.id
     const dropKey = `folder:${folder.id}`
     const isDragOver = !isTrash && dragOverTarget === dropKey
+    const folderIds = collectFolderSubtree(scopedFolders, folder.id)
+    const itemCount = scopedBoards.filter(
+      (b) => b.folderId != null && folderIds.has(b.folderId),
+    ).length
 
     return (
       <div
@@ -1075,6 +1079,7 @@ export default function BoardPickerExplorer({
             >
               <Folder size={14} className="board-picker-object-icon board-picker-object-icon--folder" />
               <span className="truncate">{folder.name}</span>
+              <span className="board-picker-folder-row__count">({itemCount})</span>
             </button>
           )}
         </div>
@@ -1124,6 +1129,11 @@ export default function BoardPickerExplorer({
   }
 
   function renderGameFolderRow(folder: GameFolder) {
+    const folderIds = collectFolderSubtree(scopedGameFolders, folder.id)
+    const itemCount = scopedGames.filter(
+      (g) => g.folderId != null && folderIds.has(g.folderId),
+    ).length
+
     return (
       <div
         key={`game-folder-${folder.id}`}
@@ -1156,6 +1166,7 @@ export default function BoardPickerExplorer({
           >
             <Folder size={14} className="board-picker-object-icon board-picker-object-icon--folder" />
             <span className="truncate">{folder.name}</span>
+            <span className="board-picker-folder-row__count">({itemCount})</span>
           </button>
         </div>
         {renderTypeColumn('folder')}
