@@ -12,6 +12,11 @@ import {
   type PickerSortDir,
   type PickerSortKey,
 } from '../lib/pickerItemType'
+import {
+  BOARDS_DND_MIME,
+  GAMES_DND_MIME,
+  type PickerNavDragPayload,
+} from '../lib/pickerDnD'
 import { formatBoardTimestamp, isFinalBoard } from '../lib/utils'
 import {
   isBoardTrashed,
@@ -26,10 +31,12 @@ import ConfirmModal from './ConfirmModal'
 import ContextMenu, { type ContextMenuItem } from './ContextMenu'
 import NewItemModal from './NewItemModal'
 
-const DND_MIME = 'application/x-jeopardy-picker'
-
 type DragPayload =
   | { type: 'board'; id: string }
+  | { type: 'folder'; id: string }
+
+type GamesDragPayload =
+  | { type: 'game'; id: string }
   | { type: 'folder'; id: string }
 
 type SortKey = PickerSortKey
@@ -99,11 +106,13 @@ interface Props {
   /** When set, start inline rename for this board id (e.g. after create). */
   renameBoardId?: string | null
   onRenameBoardIdChange?: (id: string | null) => void
+  /** Notifies HostPage of the active drag for nav-tab drop targets. */
+  onPickerDragChange?: (payload: PickerNavDragPayload | null) => void
 }
 
 function parseDragPayload(e: DragEvent): DragPayload | null {
   try {
-    const raw = e.dataTransfer.getData(DND_MIME) || e.dataTransfer.getData('text/plain')
+    const raw = e.dataTransfer.getData(BOARDS_DND_MIME) || e.dataTransfer.getData('text/plain')
     if (!raw) return null
     const data = JSON.parse(raw) as DragPayload
     if (data?.type === 'board' || data?.type === 'folder') return data
@@ -140,6 +149,7 @@ export default function BoardPickerExplorer({
   onRenameFolderIdChange,
   renameBoardId: controlledRenameBoardId,
   onRenameBoardIdChange,
+  onPickerDragChange,
 }: Props) {
   const isTrash = mode === 'trash'
   const moveBoardToFolder = useBoardStore((s) => s.moveBoardToFolder)
@@ -701,36 +711,51 @@ export default function BoardPickerExplorer({
     dragGhostRef.current = null
   }
 
+  function applyDragImage(e: DragEvent, dragImageEl?: HTMLElement | null) {
+    clearDragGhost()
+    if (!dragImageEl) return
+    const contentEl =
+      dragImageEl.querySelector('.board-picker-board-btn, .board-picker-folder-row__btn') ??
+      dragImageEl
+    const source = contentEl instanceof HTMLElement ? contentEl : dragImageEl
+    const ghost = document.createElement('div')
+    ghost.className = 'board-picker-drag-ghost'
+    ghost.appendChild(source.cloneNode(true))
+    document.body.appendChild(ghost)
+    dragGhostRef.current = ghost
+    const rect = source.getBoundingClientRect()
+    e.dataTransfer.setDragImage(
+      ghost,
+      Math.min(Math.max(e.clientX - rect.left, 0), rect.width),
+      Math.min(Math.max(e.clientY - rect.top, 0), rect.height),
+    )
+  }
+
   function setDragData(e: DragEvent, payload: DragPayload, dragImageEl?: HTMLElement | null) {
     const json = JSON.stringify(payload)
-    e.dataTransfer.setData(DND_MIME, json)
+    e.dataTransfer.setData(BOARDS_DND_MIME, json)
     e.dataTransfer.setData('text/plain', json)
     e.dataTransfer.effectAllowed = 'move'
-    clearDragGhost()
-    if (dragImageEl) {
-      const contentEl =
-        dragImageEl.querySelector('.board-picker-board-btn, .board-picker-folder-row__btn') ??
-        dragImageEl
-      const source = contentEl instanceof HTMLElement ? contentEl : dragImageEl
-      const ghost = document.createElement('div')
-      ghost.className = 'board-picker-drag-ghost'
-      ghost.appendChild(source.cloneNode(true))
-      document.body.appendChild(ghost)
-      dragGhostRef.current = ghost
-      const rect = source.getBoundingClientRect()
-      e.dataTransfer.setDragImage(
-        ghost,
-        Math.min(Math.max(e.clientX - rect.left, 0), rect.width),
-        Math.min(Math.max(e.clientY - rect.top, 0), rect.height),
-      )
-    }
+    applyDragImage(e, dragImageEl)
     setActiveDrag(payload)
+    onPickerDragChange?.({ domain: 'boards', type: payload.type, id: payload.id })
+  }
+
+  function setGamesDragData(e: DragEvent, payload: GamesDragPayload, dragImageEl?: HTMLElement | null) {
+    const json = JSON.stringify(payload)
+    e.dataTransfer.setData(GAMES_DND_MIME, json)
+    e.dataTransfer.setData('text/plain', json)
+    e.dataTransfer.effectAllowed = 'move'
+    applyDragImage(e, dragImageEl)
+    setActiveDrag(null)
+    onPickerDragChange?.({ domain: 'games', type: payload.type, id: payload.id })
   }
 
   function clearDrag() {
     clearDragGhost()
     setActiveDrag(null)
     setDragOverTarget(null)
+    onPickerDragChange?.(null)
   }
 
   function canDropOnFolder(payload: DragPayload | null, targetFolderId: string): boolean {
@@ -862,9 +887,9 @@ export default function BoardPickerExplorer({
       <div
         key={board.id}
         className="board-picker-board-row board-picker-explorer-row"
-        draggable={!isTrash && !isEditing}
+        draggable={!isEditing}
         onDragStart={(e) => {
-          if (isTrash) return
+          if (isEditing) return
           const nameEl = e.currentTarget.querySelector('.board-picker-explorer-row__name')
           setDragData(
             e,
@@ -967,9 +992,9 @@ export default function BoardPickerExplorer({
       <div
         key={folder.id}
         className={`board-picker-folder-row board-picker-explorer-row${isDragOver ? ' board-picker-folder-row--drag-over' : ''}`}
-        draggable={!isTrash && !isEditing}
+        draggable={!isEditing}
         onDragStart={(e) => {
-          if (isTrash) return
+          if (isEditing) return
           const nameEl = e.currentTarget.querySelector('.board-picker-explorer-row__name')
           setDragData(
             e,
@@ -1065,6 +1090,24 @@ export default function BoardPickerExplorer({
       <div
         key={`game-${game.id}`}
         className="board-picker-board-row board-picker-explorer-row"
+        draggable
+        onDragStart={(e) => {
+          const nameEl = e.currentTarget.querySelector('.board-picker-explorer-row__name')
+          setGamesDragData(
+            e,
+            { type: 'game', id: game.id },
+            nameEl instanceof HTMLElement ? nameEl : null,
+          )
+        }}
+        onDragEnd={clearDrag}
+        onDragOver={(e) => {
+          e.stopPropagation()
+        }}
+        onDrop={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          clearDrag()
+        }}
         onContextMenu={(e) => openMenuFromEvent(e, gameMenuItems(game))}
       >
         <div className="board-picker-explorer-row__name">
@@ -1085,6 +1128,24 @@ export default function BoardPickerExplorer({
       <div
         key={`game-folder-${folder.id}`}
         className="board-picker-folder-row board-picker-explorer-row"
+        draggable
+        onDragStart={(e) => {
+          const nameEl = e.currentTarget.querySelector('.board-picker-explorer-row__name')
+          setGamesDragData(
+            e,
+            { type: 'folder', id: folder.id },
+            nameEl instanceof HTMLElement ? nameEl : null,
+          )
+        }}
+        onDragEnd={clearDrag}
+        onDragOver={(e) => {
+          e.stopPropagation()
+        }}
+        onDrop={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          clearDrag()
+        }}
         onContextMenu={(e) => openMenuFromEvent(e, gameFolderMenuItems(folder))}
       >
         <div className="board-picker-explorer-row__name">

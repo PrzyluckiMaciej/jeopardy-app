@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type AnimationEvent as ReactAnimationEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useRef, useState, type AnimationEvent as ReactAnimationEvent, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { Settings, Trash2, Copy, Layers, LogOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Play, LayoutGrid, RotateCcw, Shuffle, X, Users, CircleHelp, Menu, ArrowLeft, Pencil, GripVertical, Trophy, Check } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -20,6 +20,11 @@ import { duplicateFolder } from '../lib/duplicateFolder'
 import { duplicateGame } from '../lib/duplicateGame'
 import { duplicateGameFolder } from '../lib/duplicateGameFolder'
 import { collectFolderSubtree } from '../lib/folderSubtree'
+import {
+  canDropPickerOnNav,
+  type PickerNavDragPayload,
+  type PickerNavDropTarget,
+} from '../lib/pickerDnD'
 import { getMedia, blobToDataUrl } from '../lib/db'
 import { mimeTypeToMediaType } from '../lib/mediaType'
 import { logEvent } from '../lib/logger'
@@ -104,6 +109,9 @@ export default function HostPage() {
 
   /** `'all'` | `'games'` | `'trash'` | game id */
   const [pickerNav, setPickerNav] = useState<string>('all')
+  /** Active library/trash drag for Boards/Games/Trash nav drop targets. */
+  const [pickerNavDrag, setPickerNavDrag] = useState<PickerNavDragPayload | null>(null)
+  const [pickerNavDragOver, setPickerNavDragOver] = useState<PickerNavDropTarget | null>(null)
   /** Folder to reopen in Games explorer after leaving game detail via Back. */
   const [returnGamesFolderId, setReturnGamesFolderId] = useState<string | null>(null)
   /** Folder shown when Games explorer mounts (null = Games root). */
@@ -795,6 +803,91 @@ export default function HostPage() {
 
   function handleRestoreGameFolder(folder: GameFolder) {
     boardStore.restoreGameFolder(folder.id)
+  }
+
+  function isPickerNavDragTrashed(payload: PickerNavDragPayload): boolean {
+    const state = useBoardStore.getState()
+    if (payload.domain === 'boards') {
+      if (payload.type === 'board') {
+        const board = state.boards.find((b) => b.id === payload.id)
+        return !!board && isBoardTrashed(board)
+      }
+      const folder = state.folders.find((f) => f.id === payload.id)
+      return !!folder && isFolderTrashed(folder)
+    }
+    if (payload.type === 'game') {
+      const game = state.games.find((g) => g.id === payload.id)
+      return !!game && isGameTrashed(game)
+    }
+    const folder = state.gameFolders.find((f) => f.id === payload.id)
+    return !!folder && isGameFolderTrashed(folder)
+  }
+
+  function canDropOnPickerNav(target: PickerNavDropTarget): boolean {
+    return canDropPickerOnNav(target, pickerNavDrag, { isTrashed: isPickerNavDragTrashed })
+  }
+
+  function handlePickerNavDragOver(e: ReactDragEvent, target: PickerNavDropTarget) {
+    if (!canDropOnPickerNav(target)) {
+      setPickerNavDragOver((cur) => (cur === target ? null : cur))
+      return
+    }
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setPickerNavDragOver(target)
+  }
+
+  function handlePickerNavDragLeave(e: ReactDragEvent, target: PickerNavDropTarget) {
+    const next = e.relatedTarget
+    if (next instanceof Node && e.currentTarget.contains(next)) return
+    setPickerNavDragOver((cur) => (cur === target ? null : cur))
+  }
+
+  function handlePickerNavDrop(e: ReactDragEvent, target: PickerNavDropTarget) {
+    e.preventDefault()
+    e.stopPropagation()
+    setPickerNavDragOver(null)
+    const payload = pickerNavDrag
+    if (!payload || !canDropPickerOnNav(target, payload, { isTrashed: isPickerNavDragTrashed })) {
+      setPickerNavDrag(null)
+      return
+    }
+
+    const state = useBoardStore.getState()
+    if (target === 'trash') {
+      if (payload.domain === 'boards') {
+        if (payload.type === 'board') {
+          handleTrashBoard(payload.id)
+        } else {
+          const folder = state.folders.find((f) => f.id === payload.id)
+          if (folder) handleTrashFolder(folder)
+        }
+      } else if (payload.type === 'game') {
+        const game = state.games.find((g) => g.id === payload.id)
+        if (game) handleTrashGame(game)
+      } else {
+        const folder = state.gameFolders.find((f) => f.id === payload.id)
+        if (folder) handleTrashGameFolder(folder)
+      }
+    } else if (target === 'boards' && payload.domain === 'boards') {
+      if (payload.type === 'board') {
+        const board = state.boards.find((b) => b.id === payload.id)
+        if (board) handleRestoreBoard(board)
+      } else {
+        const folder = state.folders.find((f) => f.id === payload.id)
+        if (folder) handleRestoreFolder(folder)
+      }
+    } else if (target === 'games' && payload.domain === 'games') {
+      if (payload.type === 'game') {
+        const game = state.games.find((g) => g.id === payload.id)
+        if (game) handleRestoreGame(game)
+      } else {
+        const folder = state.gameFolders.find((f) => f.id === payload.id)
+        if (folder) handleRestoreGameFolder(folder)
+      }
+    }
+
+    setPickerNavDrag(null)
   }
 
   function handlePermanentDeleteGame(game: Game) {
@@ -1893,8 +1986,11 @@ export default function HostPage() {
                 <div className="board-picker-system-folders">
                   <button
                     type="button"
-                    className={`board-picker-nav-item flex-shrink-0${pickerIsAll ? ' board-picker-nav-item--active' : ''}`}
+                    className={`board-picker-nav-item flex-shrink-0${pickerIsAll ? ' board-picker-nav-item--active' : ''}${pickerNavDragOver === 'boards' ? ' board-picker-nav-item--drag-over' : ''}`}
                     onClick={() => setPickerNav('all')}
+                    onDragOver={(e) => handlePickerNavDragOver(e, 'boards')}
+                    onDragLeave={(e) => handlePickerNavDragLeave(e, 'boards')}
+                    onDrop={(e) => handlePickerNavDrop(e, 'boards')}
                   >
                     <LayoutGrid size={14} className="board-picker-object-icon board-picker-object-icon--board" aria-hidden />
                     <span className="board-picker-nav-item__text">
@@ -1905,8 +2001,11 @@ export default function HostPage() {
 
                   <button
                     type="button"
-                    className={`board-picker-nav-item flex-shrink-0${gamesNavActive ? ' board-picker-nav-item--active' : ''}`}
+                    className={`board-picker-nav-item flex-shrink-0${gamesNavActive ? ' board-picker-nav-item--active' : ''}${pickerNavDragOver === 'games' ? ' board-picker-nav-item--drag-over' : ''}`}
                     onClick={() => openGamesExplorer(null)}
+                    onDragOver={(e) => handlePickerNavDragOver(e, 'games')}
+                    onDragLeave={(e) => handlePickerNavDragLeave(e, 'games')}
+                    onDrop={(e) => handlePickerNavDrop(e, 'games')}
                   >
                     <Layers size={14} className="board-picker-object-icon board-picker-object-icon--game" aria-hidden />
                     <span className="board-picker-nav-item__text">
@@ -1917,9 +2016,12 @@ export default function HostPage() {
 
                   <button
                     type="button"
-                    className={`board-picker-nav-item flex-shrink-0${pickerIsTrash ? ' board-picker-nav-item--active' : ''}`}
+                    className={`board-picker-nav-item flex-shrink-0${pickerIsTrash ? ' board-picker-nav-item--active' : ''}${pickerNavDragOver === 'trash' ? ' board-picker-nav-item--drag-over' : ''}`}
                     onClick={() => setPickerNav('trash')}
                     onContextMenu={openTrashNavMenu}
+                    onDragOver={(e) => handlePickerNavDragOver(e, 'trash')}
+                    onDragLeave={(e) => handlePickerNavDragLeave(e, 'trash')}
+                    onDrop={(e) => handlePickerNavDrop(e, 'trash')}
                   >
                     <Trash2 size={14} className="flex-shrink-0 opacity-70" aria-hidden />
                     <span className="board-picker-nav-item__text">
@@ -1948,17 +2050,17 @@ export default function HostPage() {
                       className="board-picker-help"
                       data-tooltip={
                         pickerIsTrash
-                          ? 'Right-click an item to restore it or delete it permanently. Right-click Trash to empty it.'
+                          ? 'Drag items onto Boards or Games to restore them. Right-click an item to restore it or delete it permanently. Right-click Trash to empty it.'
                           : pickerIsGames
-                            ? 'Click a folder to open it. Right-click empty space or a folder to create items, or a game/folder to rename, duplicate, or delete.'
-                            : 'Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, rename, duplicate, or delete.'
+                            ? 'Drag items onto Trash to move them there. Click a folder to open it. Right-click empty space or a folder to create items, or a game/folder to rename, duplicate, or delete.'
+                            : 'Drag items onto Trash to move them there. Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, rename, duplicate, or delete.'
                       }
                       aria-label={
                         pickerIsTrash
-                          ? 'Right-click an item to restore it or delete it permanently. Right-click Trash to empty it.'
+                          ? 'Drag items onto Boards or Games to restore them. Right-click an item to restore it or delete it permanently. Right-click Trash to empty it.'
                           : pickerIsGames
-                            ? 'Click a folder to open it. Right-click empty space or a folder to create items, or a game/folder to rename, duplicate, or delete.'
-                            : 'Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, rename, duplicate, or delete.'
+                            ? 'Drag items onto Trash to move them there. Click a folder to open it. Right-click empty space or a folder to create items, or a game/folder to rename, duplicate, or delete.'
+                            : 'Drag items onto Trash to move them there. Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, rename, duplicate, or delete.'
                       }
                       tabIndex={0}
                     >
@@ -1995,6 +2097,10 @@ export default function HostPage() {
                     onRenameFolderIdChange={setRenameFolderId}
                     renameBoardId={renameBoardId}
                     onRenameBoardIdChange={setRenameBoardId}
+                    onPickerDragChange={(payload) => {
+                      setPickerNavDrag(payload)
+                      if (!payload) setPickerNavDragOver(null)
+                    }}
                   />
                 ) : pickerIsGames ? (
                   <GamesPickerExplorer
@@ -2011,6 +2117,10 @@ export default function HostPage() {
                     renameGameId={renameGameId}
                     onRenameGameIdChange={setRenameGameId}
                     initialFolderId={gamesExplorerFolderId}
+                    onPickerDragChange={(payload) => {
+                      setPickerNavDrag(payload)
+                      if (!payload) setPickerNavDragOver(null)
+                    }}
                   />
                 ) : (
                 <>
