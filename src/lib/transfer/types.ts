@@ -32,6 +32,8 @@ export type ExportedBoardData = Omit<
 export interface ExportedBoardPackage {
   board: ExportedBoardData
   media: ExportedMedia[]
+  /** Board folder path at export time (`/` = All Boards root). */
+  folderPath?: string
 }
 
 export interface ExportedBoardFolderNode {

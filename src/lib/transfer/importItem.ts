@@ -3,6 +3,7 @@ import { dataUrlToBlob, deleteMedia, saveMedia } from '../db'
 import { mimeTypeToMediaType } from '../mediaType'
 import { generateId, getDailyDoubleQuestionIds } from '../utils'
 import { uniqueBoardName, useBoardStore } from '../../store/gameStore'
+import { findReusableBoard } from './boardContentMatch'
 import {
   checkTransferAbort,
   type ExportEnvelope,
@@ -229,6 +230,24 @@ async function importBoardFolderNode(
   return folderId
 }
 
+async function resolveBoardForGameImport(
+  pkg: ExportedBoardPackage,
+  tracker: ProgressTracker,
+  created: CreatedIds,
+): Promise<string> {
+  checkTransferAbort(tracker.signal)
+  const store = useBoardStore.getState()
+  if (pkg.folderPath) {
+    const existingId = await findReusableBoard(pkg, store.boards, store.folders)
+    if (existingId) {
+      tracker.done += countBoardPackageWork(pkg)
+      report(tracker, `Reusing ${pkg.board.name}`)
+      return existingId
+    }
+  }
+  return importBoardPackage(pkg, null, tracker, created)
+}
+
 async function importGamePackage(
   pkg: ExportedGamePackage,
   gameFolderId: string | null,
@@ -238,8 +257,7 @@ async function importGamePackage(
   checkTransferAbort(tracker.signal)
   const boardIds: string[] = []
   for (const boardPkg of pkg.boards) {
-    // Boards from game imports land in All Boards root
-    const id = await importBoardPackage(boardPkg, null, tracker, created)
+    const id = await resolveBoardForGameImport(boardPkg, tracker, created)
     boardIds.push(id)
   }
 
@@ -267,7 +285,7 @@ async function importGameFolderNode(
 
   if (isRoot) {
     for (const boardPkg of rootBoards) {
-      const newId = await importBoardPackage(boardPkg, null, tracker, created)
+      const newId = await resolveBoardForGameImport(boardPkg, tracker, created)
       sharedBoardMap.set(boardPkg.exportId, newId)
     }
   }

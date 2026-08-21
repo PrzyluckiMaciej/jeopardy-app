@@ -1,5 +1,6 @@
 import type { Board, BoardFolder, Game, GameFolder } from '../../types'
 import { blobToDataUrl, getMedia } from '../db'
+import { buildPathString } from '../folderPath'
 import { collectFolderSubtree } from '../folderSubtree'
 import { isBoardTrashed, isFolderTrashed, isGameFolderTrashed, isGameTrashed } from '../../store/gameStore'
 import {
@@ -96,6 +97,7 @@ function countBoardMedia(board: Board): number {
 
 async function packageBoard(
   board: Board,
+  folders: BoardFolder[],
   tracker: ProgressTracker,
 ): Promise<ExportedBoardPackage> {
   checkTransferAbort(tracker.signal)
@@ -103,6 +105,7 @@ async function packageBoard(
   return {
     board: stripBoardPlacement(board),
     media,
+    folderPath: buildPathString(folders, board.folderId ?? null),
   }
 }
 
@@ -144,7 +147,7 @@ async function buildBoardFolderNode(
 
   const boardsOut: ExportedBoardPackage[] = []
   for (const board of childBoards) {
-    boardsOut.push(await packageBoard(board, tracker))
+    boardsOut.push(await packageBoard(board, folders, tracker))
   }
 
   tracker.done += 1
@@ -221,7 +224,7 @@ async function buildGameFolderNode(
       }
       const board = ctx.boards.find((b) => b.id === boardId && !isBoardTrashed(b))
       if (!board) continue
-      const pkg = await packageBoard(board, tracker)
+      const pkg = await packageBoard(board, ctx.folders, tracker)
       sharedBoards.set(boardId, { exportId: boardId, ...pkg })
       boardExportIds.push(boardId)
     }
@@ -243,6 +246,7 @@ async function buildGameFolderNode(
 
 export async function exportBoardItem(
   board: Board,
+  ctx: Pick<ExportBoardContext, 'folders'>,
   options?: { signal?: AbortSignal; onProgress?: OnTransferProgress },
 ): Promise<ExportEnvelope> {
   const mediaCount = countBoardMedia(board)
@@ -253,7 +257,7 @@ export async function exportBoardItem(
     signal: options?.signal,
   }
   report(tracker, 'Preparing board')
-  const payload = await packageBoard(board, tracker)
+  const payload = await packageBoard(board, ctx.folders, tracker)
   tracker.done = tracker.total
   report(tracker, 'Done')
   const kind = exportKindForBoard(board)
@@ -322,7 +326,7 @@ export async function exportGameItem(
 
   const boards: ExportedBoardPackage[] = []
   for (const board of linked) {
-    boards.push(await packageBoard(board, tracker))
+    boards.push(await packageBoard(board, ctx.folders, tracker))
     tracker.done += 1
     report(tracker, `Board ${board.name}`)
   }

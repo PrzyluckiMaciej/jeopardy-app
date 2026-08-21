@@ -83,4 +83,21 @@ describe('parseAndValidateExport', () => {
       ),
     ).toThrow(/invalid data URL/)
   })
+
+  it('accepts optional folderPath on board packages', () => {
+    const envelope = parseAndValidateExport(
+      {
+        format: EXPORT_FORMAT,
+        version: EXPORT_VERSION,
+        exportedAt: 1,
+        kind: 'board',
+        payload: { ...boardPayload, folderPath: '/Trivia' },
+      },
+      'boards',
+    )
+    if (envelope.kind !== 'board' && envelope.kind !== 'final') {
+      throw new Error('expected board envelope')
+    }
+    expect(envelope.payload.folderPath).toBe('/Trivia')
+  })
 })
