@@ -16,10 +16,15 @@ export function downloadJson(filename: string, data: unknown): void {
 /** Sanitize a user-facing name into a safe download filename stem. */
 export function sanitizeExportFilename(name: string): string {
   const trimmed = name.trim() || 'export'
-  const safe = trimmed
-    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_')
-    .replace(/\s+/g, ' ')
-    .slice(0, 80)
-    .trim()
+  let safe = ''
+  for (const ch of trimmed) {
+    const code = ch.charCodeAt(0)
+    if (code < 32 || '<>:"/\\|?*'.includes(ch)) {
+      safe += '_'
+    } else {
+      safe += ch
+    }
+  }
+  safe = safe.replace(/\s+/g, ' ').slice(0, 80).trim()
   return safe || 'export'
 }

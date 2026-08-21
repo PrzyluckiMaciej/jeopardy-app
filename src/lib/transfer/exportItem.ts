@@ -43,13 +43,16 @@ function report(tracker: ProgressTracker, label?: string) {
 }
 
 function stripBoardPlacement(board: Board): ExportedBoardPackage['board'] {
-  const {
-    folderId: _f,
-    trashedAt: _t,
-    restoreFolderId: _r,
-    ...rest
-  } = board
-  return { ...rest }
+  return {
+    id: board.id,
+    name: board.name,
+    kind: board.kind,
+    categories: board.categories,
+    pointValues: board.pointValues,
+    dailyDoubleQuestionIds: board.dailyDoubleQuestionIds,
+    createdAt: board.createdAt,
+    updatedAt: board.updatedAt,
+  }
 }
 
 async function collectBoardMedia(
