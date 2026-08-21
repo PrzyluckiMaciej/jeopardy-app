@@ -20,6 +20,12 @@ const RANK: Record<PickerTypeSortContext, readonly PickerItemType[]> = {
   trash: ['folder', 'game', 'board', 'final'],
 }
 
+export type PickerCreateContext = 'boards' | 'games'
+
+export function pickerCreatableTypes(context: PickerCreateContext): readonly PickerItemType[] {
+  return RANK[context]
+}
+
 export interface PickerSortRow {
   name: string
   type: PickerItemType

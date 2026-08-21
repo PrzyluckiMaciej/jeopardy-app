@@ -1864,6 +1864,25 @@ body.board-picker-reordering * {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.board-picker-new-item-btn {
+  flex-shrink: 0;
+  height: 1.875rem;
+  padding: 0 12px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--navy);
+  background: var(--gold);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.board-picker-new-item-btn:hover {
+  background: var(--gold-light);
+}
 .board-picker-explorer {
   min-height: 4rem;
   border-radius: var(--radius-lg);
