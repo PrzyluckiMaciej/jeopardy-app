@@ -93,7 +93,7 @@ export function isGameFolderTrashed(folder: FolderLike): boolean {
 }
 
 /** True when the restore target exists and is not trashed. */
-function canRestoreToFolder(
+export function canRestoreToFolder(
   folders: FolderLike[],
   folderId: string | null | undefined,
   isTrashed: (f: FolderLike) => boolean,
@@ -360,12 +360,20 @@ export const useBoardStore = create<BoardStore>()(
           const target = canRestoreToFolder(s.folders, board.restoreFolderId, isFolderTrashed)
             ? (board.restoreFolderId ?? null)
             : null
+          const uniqueName = uniqueBoardName(
+            s.boards,
+            target,
+            board.name,
+            boardKindOf(board),
+            id,
+          )
           return {
             boards: s.boards.map((b) =>
               b.id === id
                 ? {
                     ...b,
                     folderId: target,
+                    name: uniqueName,
                     trashedAt: null,
                     restoreFolderId: null,
                     updatedAt: now,
@@ -550,12 +558,21 @@ export const useBoardStore = create<BoardStore>()(
           )
             ? (game.restoreFolderId ?? null)
             : null
+          const uniqueName = uniqueItemName(
+            s.games,
+            target,
+            game.name,
+            isGameTrashed,
+            id,
+            'New Game',
+          )
           return {
             games: s.games.map((g) =>
               g.id === id
                 ? {
                     ...g,
                     folderId: target,
+                    name: uniqueName,
                     trashedAt: null,
                     restoreFolderId: null,
                     updatedAt: now,
