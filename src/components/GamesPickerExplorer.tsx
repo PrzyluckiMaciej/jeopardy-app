@@ -1131,7 +1131,15 @@ export default function GamesPickerExplorer({
 
   useEffect(() => {
     return () => {
-      resetLongPressState()
+      if (longPressTimerRef.current != null) {
+        clearTimeout(longPressTimerRef.current)
+        longPressTimerRef.current = null
+      }
+      longPressGhostRef.current?.remove()
+      longPressGhostRef.current = null
+      document.body.classList.remove('board-picker-pointer-dragging')
+      longPressActiveRef.current = false
+      longPressPointerIdRef.current = null
     }
   }, [])
 

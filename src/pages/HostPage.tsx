@@ -126,7 +126,6 @@ export default function HostPage() {
   const [pickerNavDrag, setPickerNavDrag] = useState<PickerNavDragPayload | null>(null)
   const [pickerNavDragOver, setPickerNavDragOver] = useState<PickerNavDropTarget | null>(null)
   const pickerNavDragRef = useRef<PickerNavDragPayload | null>(null)
-  pickerNavDragRef.current = pickerNavDrag
   /** Folder to reopen in Games explorer after leaving game detail via Back. */
   const [returnGamesFolderId, setReturnGamesFolderId] = useState<string | null>(null)
   /** Folder shown when Games explorer mounts (null = Games root). */
@@ -157,8 +156,9 @@ export default function HostPage() {
   const [mobilePlayersOpen, setMobilePlayersOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [mobileNavExiting, setMobileNavExiting] = useState(false)
-  const [pickerHelpOpen, setPickerHelpOpen] = useState(false)
+  const [pickerHelpOpenForNav, setPickerHelpOpenForNav] = useState<string | null>(null)
   const pickerHelpRef = useRef<HTMLButtonElement | null>(null)
+  const pickerHelpOpen = pickerHelpOpenForNav === pickerNav
   const [showExitConfirm, setShowExitConfirm] = useState(false)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [pendingRestore, setPendingRestore] = useState<PendingRestore | null>(null)
@@ -1072,6 +1072,11 @@ export default function HostPage() {
     return !!folder && isGameFolderTrashed(folder)
   }
 
+  function updatePickerNavDrag(payload: PickerNavDragPayload | null) {
+    pickerNavDragRef.current = payload
+    setPickerNavDrag(payload)
+  }
+
   function canDropOnPickerNav(target: PickerNavDropTarget): boolean {
     return canDropPickerOnNav(target, pickerNavDrag, { isTrashed: isPickerNavDragTrashed })
   }
@@ -1102,7 +1107,7 @@ export default function HostPage() {
     setPickerNavDragOver(null)
     const payload = pickerNavDragRef.current
     if (!payload || !canDropPickerOnNav(target, payload, { isTrashed: isPickerNavDragTrashed })) {
-      setPickerNavDrag(null)
+      updatePickerNavDrag(null)
       return
     }
 
@@ -1179,7 +1184,7 @@ export default function HostPage() {
       }
     }
 
-    setPickerNavDrag(null)
+    updatePickerNavDrag(null)
   }
 
   function handlePermanentDeleteGame(game: Game) {
@@ -1717,6 +1722,10 @@ export default function HostPage() {
   }
 
   useEffect(() => {
+    pickerNavDragRef.current = pickerNavDrag
+  }, [pickerNavDrag])
+
+  useEffect(() => {
     if (!mobileNavOpen) return
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') closeMobileNav()
@@ -1726,17 +1735,13 @@ export default function HostPage() {
   }, [mobileNavOpen, mobileNavExiting]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    setPickerHelpOpen(false)
-  }, [pickerNav])
-
-  useEffect(() => {
     if (!pickerHelpOpen) return
     function onPointerDown(e: PointerEvent) {
       if (pickerHelpRef.current?.contains(e.target as Node)) return
-      setPickerHelpOpen(false)
+      setPickerHelpOpenForNav(null)
     }
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') setPickerHelpOpen(false)
+      if (e.key === 'Escape') setPickerHelpOpenForNav(null)
     }
     document.addEventListener('pointerdown', onPointerDown)
     window.addEventListener('keydown', onKeyDown)
@@ -2409,7 +2414,9 @@ export default function HostPage() {
                             : 'Select items for mass move, add to game, export, or delete. Drag items onto Trash to move them there. Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, rename, duplicate, or delete.'
                       }
                       aria-expanded={pickerHelpOpen}
-                      onClick={() => setPickerHelpOpen((open) => !open)}
+                      onClick={() =>
+                        setPickerHelpOpenForNav((current) => (current === pickerNav ? null : pickerNav))
+                      }
                     >
                       <CircleHelp size={18} aria-hidden />
                     </button>
@@ -2446,7 +2453,7 @@ export default function HostPage() {
                     renameBoardId={renameBoardId}
                     onRenameBoardIdChange={setRenameBoardId}
                     onPickerDragChange={(payload) => {
-                      setPickerNavDrag(payload)
+                      updatePickerNavDrag(payload)
                       if (!payload) setPickerNavDragOver(null)
                     }}
                     onPickerNavHover={(target) => {
@@ -2474,7 +2481,7 @@ export default function HostPage() {
                     onRenameGameIdChange={setRenameGameId}
                     initialFolderId={gamesExplorerFolderId}
                     onPickerDragChange={(payload) => {
-                      setPickerNavDrag(payload)
+                      updatePickerNavDrag(payload)
                       if (!payload) setPickerNavDragOver(null)
                     }}
                     onPickerNavHover={(target) => {
