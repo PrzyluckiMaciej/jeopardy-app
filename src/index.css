@@ -1959,7 +1959,7 @@ body.board-picker-reordering * {
 .board-picker-explorer-header,
 .board-picker-explorer-row {
   display: grid;
-  grid-template-columns: minmax(8rem, 1fr) 8.5rem 10.5rem 10.5rem 1.75rem;
+  grid-template-columns: 1.5rem minmax(8rem, 1fr) 8.5rem 10.5rem 10.5rem 1.75rem;
   align-items: center;
   column-gap: 10px;
   box-sizing: border-box;
@@ -2026,6 +2026,52 @@ body.board-picker-reordering * {
 }
 .board-picker-board-row.board-picker-explorer-row:hover {
   background: rgba(255, 255, 255, 0.04);
+}
+.board-picker-explorer-header__check,
+.board-picker-explorer-row__check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.board-picker-checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  cursor: pointer;
+}
+.board-picker-checkbox input {
+  width: 0.875rem;
+  height: 0.875rem;
+  aspect-ratio: 1;
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: var(--gold);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: rgba(45, 61, 143, 0.55);
+  border: 1px solid var(--border-emphasis);
+  border-radius: 2px;
+}
+.board-picker-checkbox input:checked,
+.board-picker-checkbox input:indeterminate {
+  appearance: auto;
+  -webkit-appearance: checkbox;
+  background-color: transparent;
+  border: none;
+}
+.board-picker-explorer-row--selected,
+.board-picker-board-row.board-picker-explorer-row--selected,
+.board-picker-folder-row.board-picker-explorer-row--selected {
+  background: rgba(212, 160, 23, 0.12);
+}
+.board-picker-board-row.board-picker-explorer-row--selected:hover,
+.board-picker-folder-row.board-picker-explorer-row--selected:hover {
+  background: rgba(212, 160, 23, 0.16);
 }
 .board-picker-explorer-row__name {
   min-width: 0;
@@ -2185,7 +2231,7 @@ body.board-picker-reordering * {
 }
 .board-picker-folder-row {
   display: grid;
-  grid-template-columns: minmax(8rem, 1fr) 8.5rem 10.5rem 10.5rem 1.75rem;
+  grid-template-columns: 1.5rem minmax(8rem, 1fr) 8.5rem 10.5rem 10.5rem 1.75rem;
   align-items: center;
   column-gap: 10px;
   box-sizing: border-box;
@@ -2201,7 +2247,46 @@ body.board-picker-reordering * {
 .board-picker-folder-row:hover {
   background: rgba(255, 255, 255, 0.04);
 }
-.board-picker-folder-row--drag-over {
+.board-picker-mass-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  padding: 8px 6px 4px 2px;
+  border-top: 1px solid var(--border-default);
+  margin-top: 4px;
+}
+.board-picker-mass-bar__count {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #8899cc;
+  margin-right: auto;
+}
+.board-picker-mass-bar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.board-picker-mass-bar .btn-ghost,
+.board-picker-mass-bar .btn-danger {
+  padding: 6px 12px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.board-picker-mass-bar .btn-ghost:disabled,
+.board-picker-mass-bar .btn-danger:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.board-picker-folder-row--drag-over,
+.board-picker-folder-row.board-picker-explorer-row--selected.board-picker-folder-row--drag-over {
   background: rgba(212, 160, 23, 0.16);
   border-color: rgba(212, 160, 23, 0.5);
 }

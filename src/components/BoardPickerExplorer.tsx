@@ -28,6 +28,7 @@ import {
   useBoardStore,
 } from '../store/gameStore'
 import {
+  checkTransferAbort,
   downloadJson,
   exportBoardFolderItem,
   exportBoardItem,
@@ -37,10 +38,17 @@ import {
   sanitizeExportFilename,
   useTransferJob,
 } from '../lib/transfer'
+import {
+  pickerRenameConflictMessage,
+  pickerSelectionKey,
+  type PickerRestoreItem,
+} from '../lib/pickerSelection'
 import AddItemButton from './AddItemButton'
 import ConfirmModal from './ConfirmModal'
 import ContextMenu, { type ContextMenuItem } from './ContextMenu'
 import NewItemModal from './NewItemModal'
+import PickerCheckbox from './PickerCheckbox'
+import PickerMassActionBar, { type PickerMassAction } from './PickerMassActionBar'
 import TransferProgressModal from './TransferProgressModal'
 
 type DragPayload =
@@ -50,6 +58,11 @@ type DragPayload =
 type GamesDragPayload =
   | { type: 'game'; id: string }
   | { type: 'folder'; id: string }
+
+type ActiveBoardDrag = {
+  primary: DragPayload
+  items: DragPayload[]
+}
 
 type SortKey = PickerSortKey
 type SortDir = PickerSortDir
@@ -71,6 +84,10 @@ function pickerEntrySortRow(entry: PickerEntry) {
     createdAt: entry.item.createdAt,
     updatedAt: entry.item.updatedAt,
   }
+}
+
+function pickerEntryKey(entry: PickerEntry): string {
+  return pickerSelectionKey(entry.kind, entry.item.id)
 }
 
 interface RenameDraft {
@@ -112,6 +129,7 @@ interface Props {
   onRestoreGameFolder?: (folder: GameFolder) => void
   onPermanentDeleteGame?: (game: Game) => void
   onPermanentDeleteGameFolder?: (folder: GameFolder) => void
+  onRestoreMany?: (items: PickerRestoreItem[]) => void
   /** When set, start inline rename for this folder id (e.g. after create). */
   renameFolderId?: string | null
   onRenameFolderIdChange?: (id: string | null) => void
@@ -122,12 +140,26 @@ interface Props {
   onPickerDragChange?: (payload: PickerNavDragPayload | null) => void
 }
 
-function parseDragPayload(e: DragEvent): DragPayload | null {
+function parseDragPayload(e: DragEvent): ActiveBoardDrag | null {
   try {
     const raw = e.dataTransfer.getData(BOARDS_DND_MIME) || e.dataTransfer.getData('text/plain')
     if (!raw) return null
-    const data = JSON.parse(raw) as DragPayload
-    if (data?.type === 'board' || data?.type === 'folder') return data
+    const data = JSON.parse(raw) as DragPayload | { items: DragPayload[] }
+    if (data && 'items' in data && Array.isArray(data.items) && data.items.length > 0) {
+      const items = data.items.filter(
+        (item): item is DragPayload => item?.type === 'board' || item?.type === 'folder',
+      )
+      if (items.length === 0) return null
+      return { primary: items[0], items }
+    }
+    if (
+      data &&
+      'type' in data &&
+      (data.type === 'board' || data.type === 'folder') &&
+      typeof data.id === 'string'
+    ) {
+      return { primary: data, items: [data] }
+    }
   } catch {
     /* ignore */
   }
@@ -157,6 +189,7 @@ export default function BoardPickerExplorer({
   onRestoreGameFolder,
   onPermanentDeleteGame,
   onPermanentDeleteGameFolder,
+  onRestoreMany,
   renameFolderId: controlledRenameFolderId,
   onRenameFolderIdChange,
   renameBoardId: controlledRenameBoardId,
@@ -177,8 +210,14 @@ export default function BoardPickerExplorer({
   const [pathEditing, setPathEditing] = useState(false)
   const [pathDraft, setPathDraft] = useState('/')
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null)
-  const [activeDrag, setActiveDrag] = useState<DragPayload | null>(null)
+  const [activeDrag, setActiveDrag] = useState<ActiveBoardDrag | null>(null)
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
+  const [pendingBulkMove, setPendingBulkMove] = useState<{
+    items: Array<{ kind: 'board' | 'folder'; id: string }>
+    targetFolderId: string | null
+    conflicts: Array<{ currentName: string; uniqueName: string }>
+  } | null>(null)
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
   const [internalRenameFolderId, setInternalRenameFolderId] = useState<string | null>(null)
   const [internalRenameBoardId, setInternalRenameBoardId] = useState<string | null>(null)
   const [folderRenameDraft, setFolderRenameDraft] = useState<RenameDraft | null>(null)
@@ -378,6 +417,48 @@ export default function BoardPickerExplorer({
     inGameFolderTree,
   ])
 
+  const selectedEntries = useMemo(
+    () => visibleEntries.filter((entry) => selectedKeys.has(pickerEntryKey(entry))),
+    [visibleEntries, selectedKeys],
+  )
+  const allVisibleSelected =
+    visibleEntries.length > 0 && selectedEntries.length === visibleEntries.length
+  const someVisibleSelected = selectedEntries.length > 0 && !allVisibleSelected
+
+  function toggleSelected(key: string, checked: boolean) {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev)
+      if (checked) next.add(key)
+      else next.delete(key)
+      return next
+    })
+  }
+
+  function toggleSelectAll(checked: boolean) {
+    if (checked) {
+      setSelectedKeys(new Set(visibleEntries.map(pickerEntryKey)))
+      return
+    }
+    setSelectedKeys(new Set())
+  }
+
+  function clearSelection() {
+    setSelectedKeys(new Set())
+  }
+
+  function renderRowCheckbox(kind: PickerEntry['kind'], item: PickerEntry['item'], label: string) {
+    const key = pickerSelectionKey(kind, item.id)
+    return (
+      <div className="board-picker-explorer-row__check">
+        <PickerCheckbox
+          checked={selectedKeys.has(key)}
+          onChange={(checked) => toggleSelected(key, checked)}
+          ariaLabel={label}
+        />
+      </div>
+    )
+  }
+
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -408,6 +489,7 @@ export default function BoardPickerExplorer({
   }, [pathFolders, currentFolderId])
 
   function navigateTo(folderId: string | null) {
+    clearSelection()
     setUserFolderId(folderId)
     setPathEditing(false)
   }
@@ -425,6 +507,7 @@ export default function BoardPickerExplorer({
     }
     setPathEditing(false)
     setUserFolderId(resolved)
+    if (resolved !== currentFolderId) clearSelection()
   }
 
   function closeMenu() {
@@ -483,6 +566,254 @@ export default function BoardPickerExplorer({
       )
       downloadJson(sanitizeExportFilename(folder.name), envelope)
     })
+  }
+
+  function handleMassExport() {
+    const items = selectedEntries.filter(
+      (entry): entry is { kind: 'board'; item: Board } | { kind: 'folder'; item: BoardFolder } =>
+        entry.kind === 'board' || entry.kind === 'folder',
+    )
+    if (items.length === 0) return
+    void runTransfer('Exporting…', async (signal, onProgress) => {
+      const total = items.length
+      for (let i = 0; i < items.length; i += 1) {
+        checkTransferAbort(signal)
+        const entry = items[i]
+        onProgress({ done: i, total, label: `Exporting ${entry.item.name}` })
+        if (entry.kind === 'board') {
+          const envelope = await exportBoardItem(entry.item, { folders }, { signal })
+          downloadJson(sanitizeExportFilename(entry.item.name), envelope)
+        } else {
+          const envelope = await exportBoardFolderItem(
+            entry.item,
+            { boards, folders },
+            { signal },
+          )
+          downloadJson(sanitizeExportFilename(entry.item.name), envelope)
+        }
+      }
+      onProgress({ done: total, total, label: 'Done' })
+    })
+  }
+
+  function collectSelectedBoardIds(): string[] {
+    const ids = new Set<string>()
+    for (const entry of selectedEntries) {
+      if (entry.kind === 'board') {
+        ids.add(entry.item.id)
+        continue
+      }
+      if (entry.kind !== 'folder') continue
+      const folderIds = collectFolderSubtree(folders, entry.item.id)
+      for (const board of boards) {
+        if (board.folderId != null && folderIds.has(board.folderId) && !isBoardTrashed(board)) {
+          ids.add(board.id)
+        }
+      }
+    }
+    return [...ids]
+  }
+
+  function handleMassAddToGame() {
+    const boardIds = collectSelectedBoardIds()
+    if (boardIds.length === 0) return
+    const label = boardIds.length === 1 ? '1 board' : `${boardIds.length} boards`
+    onRequestAddToGame(boardIds, label)
+  }
+
+  function handleMassDelete() {
+    for (const entry of selectedEntries) {
+      if (entry.kind === 'board') onDeleteBoard(entry.item)
+      else if (entry.kind === 'folder') onRequestDeleteFolder(entry.item)
+    }
+    clearSelection()
+  }
+
+  function handleMassRestore() {
+    if (selectedEntries.length === 0) return
+    onRestoreMany?.(
+      selectedEntries.map((entry) => ({ kind: entry.kind, id: entry.item.id })),
+    )
+    clearSelection()
+  }
+
+  function handleMassPermanentDelete() {
+    for (const entry of selectedEntries) {
+      if (entry.kind === 'board') onPermanentDeleteBoard?.(entry.item)
+      else if (entry.kind === 'folder') onPermanentDeleteFolder?.(entry.item)
+      else if (entry.kind === 'game') onPermanentDeleteGame?.(entry.item)
+      else onPermanentDeleteGameFolder?.(entry.item)
+    }
+    clearSelection()
+  }
+
+  function applyBoardMoves(items: Array<{ kind: 'board' | 'folder'; id: string }>, targetFolderId: string | null) {
+    for (const item of items) {
+      if (item.kind === 'board') moveBoardToFolder(item.id, targetFolderId)
+      else moveFolder(item.id, targetFolderId)
+    }
+  }
+
+  function planBoardMoves(
+    payloads: DragPayload[],
+    targetFolderId: string | null,
+  ): {
+    items: Array<{ kind: 'board' | 'folder'; id: string }>
+    conflicts: Array<{ currentName: string; uniqueName: string }>
+  } {
+    const items: Array<{ kind: 'board' | 'folder'; id: string }> = []
+    const conflicts: Array<{ currentName: string; uniqueName: string }> = []
+    for (const payload of payloads) {
+      if (payload.type === 'board') {
+        const board = boards.find((b) => b.id === payload.id)
+        if (!board || isBoardTrashed(board)) continue
+        if ((board.folderId ?? null) === targetFolderId) continue
+        items.push({ kind: 'board', id: board.id })
+        const uniqueName = uniqueBoardName(
+          boards,
+          targetFolderId,
+          board.name,
+          isFinalBoard(board) ? 'final' : 'board',
+          board.id,
+        )
+        if (uniqueName !== board.name) {
+          conflicts.push({ currentName: board.name, uniqueName })
+        }
+        continue
+      }
+      const folder = folders.find((f) => f.id === payload.id)
+      if (!folder || isFolderTrashed(folder)) continue
+      if (folder.parentId === targetFolderId) continue
+      if (
+        targetFolderId !== null &&
+        (targetFolderId === folder.id || isFolderInside(scopedFolders, targetFolderId, folder.id))
+      ) {
+        continue
+      }
+      items.push({ kind: 'folder', id: folder.id })
+      const uniqueName = uniqueFolderName(
+        folders,
+        targetFolderId,
+        folder.name,
+        isFolderTrashed,
+        folder.id,
+      )
+      if (uniqueName !== folder.name) {
+        conflicts.push({ currentName: folder.name, uniqueName })
+      }
+    }
+    return { items, conflicts }
+  }
+
+  function requestMoveMany(payloads: DragPayload[], targetFolderId: string | null) {
+    const { items, conflicts } = planBoardMoves(payloads, targetFolderId)
+    if (items.length === 0) return
+    if (conflicts.length === 0) {
+      applyBoardMoves(items, targetFolderId)
+      clearSelection()
+      return
+    }
+    setPendingBulkMove({ items, targetFolderId, conflicts })
+  }
+
+  function handleMassMoveToParent() {
+    if (currentFolderId === null) return
+    const payloads: DragPayload[] = []
+    for (const entry of selectedEntries) {
+      if (entry.kind === 'board') payloads.push({ type: 'board', id: entry.item.id })
+      else if (entry.kind === 'folder') payloads.push({ type: 'folder', id: entry.item.id })
+    }
+    requestMoveMany(payloads, parentFolderId)
+  }
+
+  function confirmPendingBulkMove() {
+    if (!pendingBulkMove) return
+    const { items, targetFolderId } = pendingBulkMove
+    setPendingBulkMove(null)
+    applyBoardMoves(items, targetFolderId)
+    clearSelection()
+  }
+
+  function resolveBoardDragItems(primary: DragPayload): DragPayload[] {
+    const kind = primary.type === 'board' ? 'board' : 'folder'
+    const key = pickerSelectionKey(kind, primary.id)
+    if (!selectedKeys.has(key) || selectedEntries.length <= 1) return [primary]
+    const items: DragPayload[] = []
+    for (const entry of selectedEntries) {
+      if (entry.kind === 'board') items.push({ type: 'board', id: entry.item.id })
+      else if (entry.kind === 'folder') items.push({ type: 'folder', id: entry.item.id })
+    }
+    return items.length > 0 ? items : [primary]
+  }
+
+  function resolveGamesDragItems(primary: GamesDragPayload): GamesDragPayload[] {
+    const kind = primary.type === 'game' ? 'game' : 'gameFolder'
+    const key = pickerSelectionKey(kind, primary.id)
+    if (!selectedKeys.has(key) || selectedEntries.length <= 1) return [primary]
+    const items: GamesDragPayload[] = []
+    for (const entry of selectedEntries) {
+      if (entry.kind === 'game') items.push({ type: 'game', id: entry.item.id })
+      else if (entry.kind === 'gameFolder') items.push({ type: 'folder', id: entry.item.id })
+    }
+    return items.length > 0 ? items : [primary]
+  }
+
+  function bulkMenuItems(): ContextMenuItem[] {
+    return getMassActions().map((action) => ({
+      id: action.id,
+      label: action.label,
+      danger: action.danger,
+      onSelect: () => {
+        if (action.disabled) return
+        action.onSelect()
+      },
+    }))
+  }
+
+  function openItemContextMenu(
+    e: MouseEvent,
+    key: string,
+    singleItems: ContextMenuItem[],
+  ) {
+    if (selectedKeys.has(key) && selectedEntries.length > 1) {
+      openMenuFromEvent(e, bulkMenuItems())
+      return
+    }
+    openMenuFromEvent(e, singleItems)
+  }
+
+  function getMassActions(): PickerMassAction[] {
+    if (isTrash) {
+      return [
+        { id: 'restore', label: 'Restore', onSelect: handleMassRestore },
+        {
+          id: 'delete-permanent',
+          label: 'Delete permanently',
+          danger: true,
+          onSelect: handleMassPermanentDelete,
+        },
+      ]
+    }
+    const addToGameBoardCount = collectSelectedBoardIds().length
+    return [
+      ...(currentFolderId !== null
+        ? [
+            {
+              id: 'move-to-parent',
+              label: 'Move to parent directory',
+              onSelect: handleMassMoveToParent,
+            },
+          ]
+        : []),
+      {
+        id: 'add-to-game',
+        label: 'Add to game',
+        onSelect: handleMassAddToGame,
+        disabled: addToGameBoardCount === 0,
+      },
+      { id: 'export', label: 'Export', onSelect: handleMassExport },
+      { id: 'delete', label: 'Delete', danger: true, onSelect: handleMassDelete },
+    ]
   }
 
   async function handleImport() {
@@ -792,24 +1123,36 @@ export default function BoardPickerExplorer({
     )
   }
 
-  function setDragData(e: DragEvent, payload: DragPayload, dragImageEl?: HTMLElement | null) {
-    const json = JSON.stringify(payload)
+  function setDragData(e: DragEvent, primary: DragPayload, dragImageEl?: HTMLElement | null) {
+    const items = resolveBoardDragItems(primary)
+    const json = JSON.stringify({ items })
     e.dataTransfer.setData(BOARDS_DND_MIME, json)
     e.dataTransfer.setData('text/plain', json)
     e.dataTransfer.effectAllowed = 'move'
     applyDragImage(e, dragImageEl)
-    setActiveDrag(payload)
-    onPickerDragChange?.({ domain: 'boards', type: payload.type, id: payload.id })
+    setActiveDrag({ primary, items })
+    onPickerDragChange?.({
+      domain: 'boards',
+      type: primary.type,
+      id: primary.id,
+      items,
+    })
   }
 
-  function setGamesDragData(e: DragEvent, payload: GamesDragPayload, dragImageEl?: HTMLElement | null) {
-    const json = JSON.stringify(payload)
+  function setGamesDragData(e: DragEvent, primary: GamesDragPayload, dragImageEl?: HTMLElement | null) {
+    const items = resolveGamesDragItems(primary)
+    const json = JSON.stringify({ items })
     e.dataTransfer.setData(GAMES_DND_MIME, json)
     e.dataTransfer.setData('text/plain', json)
     e.dataTransfer.effectAllowed = 'move'
     applyDragImage(e, dragImageEl)
     setActiveDrag(null)
-    onPickerDragChange?.({ domain: 'games', type: payload.type, id: payload.id })
+    onPickerDragChange?.({
+      domain: 'games',
+      type: primary.type,
+      id: primary.id,
+      items,
+    })
   }
 
   function clearDrag() {
@@ -819,73 +1162,29 @@ export default function BoardPickerExplorer({
     onPickerDragChange?.(null)
   }
 
-  function canDropOnFolder(payload: DragPayload | null, targetFolderId: string): boolean {
-    if (isTrash || !payload) return false
-    if (payload.type === 'board') return true
-    if (payload.id === targetFolderId) return false
-    if (isFolderInside(scopedFolders, targetFolderId, payload.id)) return false
+  function canDropItemsOnFolder(items: DragPayload[], targetFolderId: string): boolean {
+    if (isTrash || items.length === 0) return false
+    for (const payload of items) {
+      if (payload.type === 'board') continue
+      if (payload.id === targetFolderId) return false
+      if (isFolderInside(scopedFolders, targetFolderId, payload.id)) return false
+    }
     return true
   }
 
-  function canDropOnParent(payload: DragPayload | null): boolean {
-    if (isTrash || !payload || currentFolderId === null) return false
+  function canDropOnFolder(drag: ActiveBoardDrag | null, targetFolderId: string): boolean {
+    if (!drag) return false
+    return canDropItemsOnFolder(drag.items, targetFolderId)
+  }
+
+  function canDropOnParent(drag: ActiveBoardDrag | null): boolean {
+    if (isTrash || !drag || currentFolderId === null) return false
     if (parentFolderId === null) return true
-    return canDropOnFolder(payload, parentFolderId)
+    return canDropItemsOnFolder(drag.items, parentFolderId)
   }
 
   function requestMove(payload: DragPayload, targetFolderId: string | null) {
-    if (payload.type === 'board') {
-      const board = boards.find((b) => b.id === payload.id)
-      if (!board || isBoardTrashed(board)) return
-      if ((board.folderId ?? null) === targetFolderId) return
-      const uniqueName = uniqueBoardName(
-        boards,
-        targetFolderId,
-        board.name,
-        isFinalBoard(board) ? 'final' : 'board',
-        board.id,
-      )
-      if (uniqueName === board.name) {
-        moveBoardToFolder(board.id, targetFolderId)
-        return
-      }
-      setPendingMove({
-        kind: 'board',
-        id: board.id,
-        targetFolderId,
-        currentName: board.name,
-        uniqueName,
-      })
-      return
-    }
-
-    const folder = folders.find((f) => f.id === payload.id)
-    if (!folder || isFolderTrashed(folder)) return
-    if (folder.parentId === targetFolderId) return
-    if (
-      targetFolderId !== null &&
-      (targetFolderId === folder.id || isFolderInside(scopedFolders, targetFolderId, folder.id))
-    ) {
-      return
-    }
-    const uniqueName = uniqueFolderName(
-      folders,
-      targetFolderId,
-      folder.name,
-      isFolderTrashed,
-      folder.id,
-    )
-    if (uniqueName === folder.name) {
-      moveFolder(folder.id, targetFolderId)
-      return
-    }
-    setPendingMove({
-      kind: 'folder',
-      id: folder.id,
-      targetFolderId,
-      currentName: folder.name,
-      uniqueName,
-    })
+    requestMoveMany([payload], targetFolderId)
   }
 
   function confirmPendingMove() {
@@ -906,10 +1205,10 @@ export default function BoardPickerExplorer({
       clearDrag()
       return
     }
-    const payload = activeDrag ?? parseDragPayload(e)
+    const drag = activeDrag ?? parseDragPayload(e)
     clearDrag()
-    if (!payload || !canDropOnFolder(payload, targetFolderId)) return
-    requestMove(payload, targetFolderId)
+    if (!drag || !canDropItemsOnFolder(drag.items, targetFolderId)) return
+    requestMoveMany(drag.items, targetFolderId)
   }
 
   function handleDropOnParent(e: DragEvent) {
@@ -919,10 +1218,10 @@ export default function BoardPickerExplorer({
       clearDrag()
       return
     }
-    const payload = activeDrag ?? parseDragPayload(e)
+    const drag = activeDrag ?? parseDragPayload(e)
     clearDrag()
-    if (!payload || !canDropOnParent(payload)) return
-    requestMove(payload, parentFolderId)
+    if (!drag || !canDropOnParent(drag)) return
+    requestMoveMany(drag.items, parentFolderId)
   }
 
   function handleDropOnCurrent(e: DragEvent) {
@@ -931,23 +1230,23 @@ export default function BoardPickerExplorer({
       clearDrag()
       return
     }
-    const payload = activeDrag ?? parseDragPayload(e)
+    const drag = activeDrag ?? parseDragPayload(e)
     clearDrag()
-    if (!payload) return
-    if (payload.type === 'folder') {
-      if (currentFolderId && payload.id === currentFolderId) return
-      if (currentFolderId && isFolderInside(scopedFolders, currentFolderId, payload.id)) return
+    if (!drag) return
+    if (currentFolderId) {
+      if (!canDropItemsOnFolder(drag.items, currentFolderId)) return
     }
-    requestMove(payload, currentFolderId)
+    requestMoveMany(drag.items, currentFolderId)
   }
 
   function renderBoardRow(board: Board) {
     const isEditing = !isTrash && editingBoardId === board.id
+    const selected = selectedKeys.has(pickerSelectionKey('board', board.id))
 
     return (
       <div
         key={board.id}
-        className="board-picker-board-row board-picker-explorer-row"
+        className={`board-picker-board-row board-picker-explorer-row${selected ? ' board-picker-explorer-row--selected' : ''}`}
         draggable={!isEditing}
         onDragStart={(e) => {
           if (isEditing) return
@@ -969,9 +1268,14 @@ export default function BoardPickerExplorer({
         }}
         onContextMenu={(e) => {
           if (isEditing) return
-          openMenuFromEvent(e, boardMenuItems(board))
+          openItemContextMenu(
+            e,
+            pickerSelectionKey('board', board.id),
+            boardMenuItems(board),
+          )
         }}
       >
+        {renderRowCheckbox('board', board, `Select ${board.name}`)}
         <div className="board-picker-explorer-row__name">
           {isEditing ? (
             <div className="board-picker-rename flex-1 min-w-0">
@@ -1039,7 +1343,12 @@ export default function BoardPickerExplorer({
         </div>
         {renderTypeColumn(pickerItemTypeFromKind('board', board))}
         {renderDateColumns(board.createdAt, board.updatedAt)}
-        {!isEditing && renderRowMenuButton(boardMenuItems(board), 'Board actions', `board-${board.id}`)}
+        {!isEditing &&
+          renderRowMenuButton(
+            selected && selectedEntries.length > 1 ? bulkMenuItems() : boardMenuItems(board),
+            'Board actions',
+            `board-${board.id}`,
+          )}
       </div>
     )
   }
@@ -1053,10 +1362,12 @@ export default function BoardPickerExplorer({
       (b) => b.folderId != null && folderIds.has(b.folderId),
     ).length
 
+    const selected = selectedKeys.has(pickerSelectionKey('folder', folder.id))
+
     return (
       <div
         key={folder.id}
-        className={`board-picker-folder-row board-picker-explorer-row${isDragOver ? ' board-picker-folder-row--drag-over' : ''}`}
+        className={`board-picker-folder-row board-picker-explorer-row${isDragOver ? ' board-picker-folder-row--drag-over' : ''}${selected ? ' board-picker-explorer-row--selected' : ''}`}
         draggable={!isEditing}
         onDragStart={(e) => {
           if (isEditing) return
@@ -1085,9 +1396,14 @@ export default function BoardPickerExplorer({
         onDrop={(e) => handleDropOnFolder(e, folder.id)}
         onContextMenu={(e) => {
           if (isEditing) return
-          openMenuFromEvent(e, folderMenuItems(folder))
+          openItemContextMenu(
+            e,
+            pickerSelectionKey('folder', folder.id),
+            folderMenuItems(folder),
+          )
         }}
       >
+        {renderRowCheckbox('folder', folder, `Select ${folder.name}`)}
         <div className="board-picker-explorer-row__name">
           {isEditing ? (
             <div className="board-picker-rename flex-1 min-w-0">
@@ -1146,16 +1462,22 @@ export default function BoardPickerExplorer({
         </div>
         {renderTypeColumn('folder')}
         {renderDateColumns(folder.createdAt, folder.updatedAt)}
-        {!isEditing && renderRowMenuButton(folderMenuItems(folder), 'Folder actions', `folder-${folder.id}`)}
+        {!isEditing &&
+          renderRowMenuButton(
+            selected && selectedEntries.length > 1 ? bulkMenuItems() : folderMenuItems(folder),
+            'Folder actions',
+            `folder-${folder.id}`,
+          )}
       </div>
     )
   }
 
   function renderGameRow(game: Game) {
+    const selected = selectedKeys.has(pickerSelectionKey('game', game.id))
     return (
       <div
         key={`game-${game.id}`}
-        className="board-picker-board-row board-picker-explorer-row"
+        className={`board-picker-board-row board-picker-explorer-row${selected ? ' board-picker-explorer-row--selected' : ''}`}
         draggable
         onDragStart={(e) => {
           const nameEl = e.currentTarget.querySelector('.board-picker-explorer-row__name')
@@ -1174,8 +1496,15 @@ export default function BoardPickerExplorer({
           e.stopPropagation()
           clearDrag()
         }}
-        onContextMenu={(e) => openMenuFromEvent(e, gameMenuItems(game))}
+        onContextMenu={(e) =>
+          openItemContextMenu(
+            e,
+            pickerSelectionKey('game', game.id),
+            gameMenuItems(game),
+          )
+        }
       >
+        {renderRowCheckbox('game', game, `Select ${game.name}`)}
         <div className="board-picker-explorer-row__name">
           <button type="button" className="board-picker-board-btn">
             <Layers size={14} className="board-picker-object-icon board-picker-object-icon--game" />
@@ -1184,7 +1513,11 @@ export default function BoardPickerExplorer({
         </div>
         {renderTypeColumn('game')}
         {renderDateColumns(game.createdAt, game.updatedAt)}
-        {renderRowMenuButton(gameMenuItems(game), 'Game actions', `trash-game-${game.id}`)}
+        {renderRowMenuButton(
+          selected && selectedEntries.length > 1 ? bulkMenuItems() : gameMenuItems(game),
+          'Game actions',
+          `trash-game-${game.id}`,
+        )}
       </div>
     )
   }
@@ -1195,10 +1528,12 @@ export default function BoardPickerExplorer({
       (g) => g.folderId != null && folderIds.has(g.folderId),
     ).length
 
+    const selected = selectedKeys.has(pickerSelectionKey('gameFolder', folder.id))
+
     return (
       <div
         key={`game-folder-${folder.id}`}
-        className="board-picker-folder-row board-picker-explorer-row"
+        className={`board-picker-folder-row board-picker-explorer-row${selected ? ' board-picker-explorer-row--selected' : ''}`}
         draggable
         onDragStart={(e) => {
           const nameEl = e.currentTarget.querySelector('.board-picker-explorer-row__name')
@@ -1217,8 +1552,15 @@ export default function BoardPickerExplorer({
           e.stopPropagation()
           clearDrag()
         }}
-        onContextMenu={(e) => openMenuFromEvent(e, gameFolderMenuItems(folder))}
+        onContextMenu={(e) =>
+          openItemContextMenu(
+            e,
+            pickerSelectionKey('gameFolder', folder.id),
+            gameFolderMenuItems(folder),
+          )
+        }
       >
+        {renderRowCheckbox('gameFolder', folder, `Select ${folder.name}`)}
         <div className="board-picker-explorer-row__name">
           <button
             type="button"
@@ -1232,7 +1574,11 @@ export default function BoardPickerExplorer({
         </div>
         {renderTypeColumn('folder')}
         {renderDateColumns(folder.createdAt, folder.updatedAt)}
-        {renderRowMenuButton(gameFolderMenuItems(folder), 'Folder actions', `trash-game-folder-${folder.id}`)}
+        {renderRowMenuButton(
+          selected && selectedEntries.length > 1 ? bulkMenuItems() : gameFolderMenuItems(folder),
+          'Folder actions',
+          `trash-game-folder-${folder.id}`,
+        )}
       </div>
     )
   }
@@ -1241,6 +1587,7 @@ export default function BoardPickerExplorer({
   const currentDragOver = !isTrash && dragOverTarget === 'current'
   const parentDragOver = !isTrash && dragOverTarget === 'parent'
   const atRoot = currentFolderId === null
+  const massActions = getMassActions()
 
   return (
     <>
@@ -1333,6 +1680,14 @@ export default function BoardPickerExplorer({
       >
         {!isEmpty && (
           <div className="board-picker-explorer-header">
+            <div className="board-picker-explorer-header__check">
+              <PickerCheckbox
+                checked={allVisibleSelected}
+                indeterminate={someVisibleSelected}
+                onChange={toggleSelectAll}
+                ariaLabel="Select all items in this folder"
+              />
+            </div>
             {renderSortHeader('name', 'Name', 'board-picker-explorer-header__name')}
             {renderSortHeader('type', 'Type', 'board-picker-explorer-header__type')}
             {renderSortHeader('createdAt', 'Created at', 'board-picker-explorer-header__date')}
@@ -1352,6 +1707,9 @@ export default function BoardPickerExplorer({
           </div>
         )}
       </div>
+      {selectedEntries.length > 0 && (
+        <PickerMassActionBar count={selectedEntries.length} actions={massActions} />
+      )}
       {menu && (
         <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={closeMenu} />
       )}
@@ -1387,6 +1745,15 @@ export default function BoardPickerExplorer({
           confirmLabel="Move"
           onConfirm={confirmPendingMove}
           onCancel={() => setPendingMove(null)}
+        />
+      )}
+      {pendingBulkMove && (
+        <ConfirmModal
+          title="Duplicate name"
+          message={pickerRenameConflictMessage(pendingBulkMove.conflicts)}
+          confirmLabel="Move"
+          onConfirm={confirmPendingBulkMove}
+          onCancel={() => setPendingBulkMove(null)}
         />
       )}
     </>

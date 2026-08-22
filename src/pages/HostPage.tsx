@@ -23,8 +23,10 @@ import { duplicateFolder } from '../lib/duplicateFolder'
 import { duplicateGame } from '../lib/duplicateGame'
 import { duplicateGameFolder } from '../lib/duplicateGameFolder'
 import { collectFolderSubtree } from '../lib/folderSubtree'
+import { pickerRenameConflictMessage, type PickerRestoreItem } from '../lib/pickerSelection'
 import {
   canDropPickerOnNav,
+  pickerNavDragItems,
   type PickerNavDragPayload,
   type PickerNavDropTarget,
 } from '../lib/pickerDnD'
@@ -155,6 +157,10 @@ export default function HostPage() {
   const [showExitConfirm, setShowExitConfirm] = useState(false)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [pendingRestore, setPendingRestore] = useState<PendingRestore | null>(null)
+  const [pendingRestoreMany, setPendingRestoreMany] = useState<{
+    items: PickerRestoreItem[]
+    conflicts: Array<{ currentName: string; uniqueName: string }>
+  } | null>(null)
 
   const peerToClient = useRef(new Map<string, string>())
   const nameSessions = useRef(new Map<string, NameSession>())
@@ -915,6 +921,120 @@ export default function HostPage() {
     else boardStore.restoreGameFolder(id)
   }
 
+  function applyRestoreItems(items: PickerRestoreItem[]) {
+    for (const item of items) {
+      if (item.kind === 'folder') boardStore.restoreFolder(item.id)
+      else if (item.kind === 'gameFolder') boardStore.restoreGameFolder(item.id)
+      else if (item.kind === 'board') boardStore.restoreBoard(item.id)
+      else boardStore.restoreGame(item.id)
+    }
+  }
+
+  function restoreConflictForItem(
+    item: PickerRestoreItem,
+  ): { currentName: string; uniqueName: string } | null {
+    const state = useBoardStore.getState()
+    if (item.kind === 'board') {
+      const board = state.boards.find((b) => b.id === item.id)
+      if (!board || !isBoardTrashed(board)) return null
+      const target = canRestoreToFolder(state.folders, board.restoreFolderId, isFolderTrashed)
+        ? (board.restoreFolderId ?? null)
+        : null
+      return {
+        currentName: board.name,
+        uniqueName: uniqueBoardName(
+          state.boards,
+          target,
+          board.name,
+          isFinalBoard(board) ? 'final' : 'board',
+          board.id,
+        ),
+      }
+    }
+    if (item.kind === 'folder') {
+      const folder = state.folders.find((f) => f.id === item.id)
+      if (!folder || !isFolderTrashed(folder)) return null
+      const targetParent = canRestoreToFolder(state.folders, folder.restoreParentId, isFolderTrashed)
+        ? (folder.restoreParentId ?? null)
+        : null
+      return {
+        currentName: folder.name,
+        uniqueName: uniqueFolderName(
+          state.folders,
+          targetParent,
+          folder.name,
+          isFolderTrashed,
+          folder.id,
+        ),
+      }
+    }
+    if (item.kind === 'game') {
+      const game = state.games.find((g) => g.id === item.id)
+      if (!game || !isGameTrashed(game)) return null
+      const target = canRestoreToFolder(
+        state.gameFolders,
+        game.restoreFolderId,
+        isGameFolderTrashed,
+      )
+        ? (game.restoreFolderId ?? null)
+        : null
+      return {
+        currentName: game.name,
+        uniqueName: uniqueItemName(
+          state.games,
+          target,
+          game.name,
+          isGameTrashed,
+          game.id,
+          'New Game',
+        ),
+      }
+    }
+    const folder = state.gameFolders.find((f) => f.id === item.id)
+    if (!folder || !isGameFolderTrashed(folder)) return null
+    const targetParent = canRestoreToFolder(
+      state.gameFolders,
+      folder.restoreParentId,
+      isGameFolderTrashed,
+    )
+      ? (folder.restoreParentId ?? null)
+      : null
+    return {
+      currentName: folder.name,
+      uniqueName: uniqueFolderName(
+        state.gameFolders,
+        targetParent,
+        folder.name,
+        isGameFolderTrashed,
+        folder.id,
+      ),
+    }
+  }
+
+  function handleRestoreMany(items: PickerRestoreItem[]) {
+    const rank = { folder: 0, gameFolder: 0, board: 1, game: 1 }
+    const sorted = [...items].sort((a, b) => rank[a.kind] - rank[b.kind])
+    const conflicts: Array<{ currentName: string; uniqueName: string }> = []
+    for (const item of sorted) {
+      const conflict = restoreConflictForItem(item)
+      if (conflict && conflict.uniqueName !== conflict.currentName) {
+        conflicts.push(conflict)
+      }
+    }
+    if (conflicts.length === 0) {
+      applyRestoreItems(sorted)
+      return
+    }
+    setPendingRestoreMany({ items: sorted, conflicts })
+  }
+
+  function confirmPendingRestoreMany() {
+    if (!pendingRestoreMany) return
+    const { items } = pendingRestoreMany
+    setPendingRestoreMany(null)
+    applyRestoreItems(items)
+  }
+
   function isPickerNavDragTrashed(payload: PickerNavDragPayload): boolean {
     const state = useBoardStore.getState()
     if (payload.domain === 'boards') {
@@ -964,36 +1084,60 @@ export default function HostPage() {
     }
 
     const state = useBoardStore.getState()
+    const items = pickerNavDragItems(payload)
+
     if (target === 'trash') {
-      if (payload.domain === 'boards') {
-        if (payload.type === 'board') {
-          handleTrashBoard(payload.id)
-        } else {
-          const folder = state.folders.find((f) => f.id === payload.id)
-          if (folder) handleTrashFolder(folder)
+      for (const item of items) {
+        if (payload.domain === 'boards') {
+          if (item.type === 'board') {
+            handleTrashBoard(item.id)
+          } else if (item.type === 'folder') {
+            const folder = state.folders.find((f) => f.id === item.id)
+            if (folder) handleTrashFolder(folder)
+          }
+        } else if (item.type === 'game') {
+          const game = state.games.find((g) => g.id === item.id)
+          if (game) handleTrashGame(game)
+        } else if (item.type === 'folder') {
+          const folder = state.gameFolders.find((f) => f.id === item.id)
+          if (folder) handleTrashGameFolder(folder)
         }
-      } else if (payload.type === 'game') {
-        const game = state.games.find((g) => g.id === payload.id)
-        if (game) handleTrashGame(game)
-      } else {
-        const folder = state.gameFolders.find((f) => f.id === payload.id)
-        if (folder) handleTrashGameFolder(folder)
       }
     } else if (target === 'boards' && payload.domain === 'boards') {
-      if (payload.type === 'board') {
-        const board = state.boards.find((b) => b.id === payload.id)
-        if (board) handleRestoreBoard(board)
-      } else {
-        const folder = state.folders.find((f) => f.id === payload.id)
-        if (folder) handleRestoreFolder(folder)
+      const restoreItems: PickerRestoreItem[] = []
+      for (const item of items) {
+        if (item.type === 'board') restoreItems.push({ kind: 'board', id: item.id })
+        else if (item.type === 'folder') restoreItems.push({ kind: 'folder', id: item.id })
+      }
+      if (restoreItems.length === 1) {
+        const only = restoreItems[0]
+        if (only.kind === 'board') {
+          const board = state.boards.find((b) => b.id === only.id)
+          if (board) handleRestoreBoard(board)
+        } else {
+          const folder = state.folders.find((f) => f.id === only.id)
+          if (folder) handleRestoreFolder(folder)
+        }
+      } else if (restoreItems.length > 1) {
+        handleRestoreMany(restoreItems)
       }
     } else if (target === 'games' && payload.domain === 'games') {
-      if (payload.type === 'game') {
-        const game = state.games.find((g) => g.id === payload.id)
-        if (game) handleRestoreGame(game)
-      } else {
-        const folder = state.gameFolders.find((f) => f.id === payload.id)
-        if (folder) handleRestoreGameFolder(folder)
+      const restoreItems: PickerRestoreItem[] = []
+      for (const item of items) {
+        if (item.type === 'game') restoreItems.push({ kind: 'game', id: item.id })
+        else if (item.type === 'folder') restoreItems.push({ kind: 'gameFolder', id: item.id })
+      }
+      if (restoreItems.length === 1) {
+        const only = restoreItems[0]
+        if (only.kind === 'game') {
+          const game = state.games.find((g) => g.id === only.id)
+          if (game) handleRestoreGame(game)
+        } else {
+          const folder = state.gameFolders.find((f) => f.id === only.id)
+          if (folder) handleRestoreGameFolder(folder)
+        }
+      } else if (restoreItems.length > 1) {
+        handleRestoreMany(restoreItems)
       }
     }
 
@@ -2160,17 +2304,17 @@ export default function HostPage() {
                       className="board-picker-help"
                       data-tooltip={
                         pickerIsTrash
-                          ? 'Drag items onto Boards or Games to restore them. Right-click an item to restore it or delete it permanently. Right-click Trash to empty it.'
+                          ? 'Select items for mass restore or permanent delete. Drag items onto Boards or Games to restore them. Right-click an item to restore it or delete it permanently. Right-click Trash to empty it.'
                           : pickerIsGames
-                            ? 'Drag items onto Trash to move them there. Click a folder to open it. Right-click empty space or a folder to create items, or a game/folder to rename, duplicate, or delete.'
-                            : 'Drag items onto Trash to move them there. Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, rename, duplicate, or delete.'
+                            ? 'Select items for mass move, export, or delete. Drag items onto Trash to move them there. Click a folder to open it. Right-click empty space or a folder to create items, or a game/folder to rename, duplicate, or delete.'
+                            : 'Select items for mass move, add to game, export, or delete. Drag items onto Trash to move them there. Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, rename, duplicate, or delete.'
                       }
                       aria-label={
                         pickerIsTrash
-                          ? 'Drag items onto Boards or Games to restore them. Right-click an item to restore it or delete it permanently. Right-click Trash to empty it.'
+                          ? 'Select items for mass restore or permanent delete. Drag items onto Boards or Games to restore them. Right-click an item to restore it or delete it permanently. Right-click Trash to empty it.'
                           : pickerIsGames
-                            ? 'Drag items onto Trash to move them there. Click a folder to open it. Right-click empty space or a folder to create items, or a game/folder to rename, duplicate, or delete.'
-                            : 'Drag items onto Trash to move them there. Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, rename, duplicate, or delete.'
+                            ? 'Select items for mass move, export, or delete. Drag items onto Trash to move them there. Click a folder to open it. Right-click empty space or a folder to create items, or a game/folder to rename, duplicate, or delete.'
+                            : 'Select items for mass move, add to game, export, or delete. Drag items onto Trash to move them there. Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, rename, duplicate, or delete.'
                       }
                       tabIndex={0}
                     >
@@ -2203,6 +2347,7 @@ export default function HostPage() {
                     onRestoreGameFolder={handleRestoreGameFolder}
                     onPermanentDeleteGame={handlePermanentDeleteGame}
                     onPermanentDeleteGameFolder={handlePermanentDeleteGameFolder}
+                    onRestoreMany={handleRestoreMany}
                     renameFolderId={renameFolderId}
                     onRenameFolderIdChange={setRenameFolderId}
                     renameBoardId={renameBoardId}
@@ -2549,6 +2694,16 @@ export default function HostPage() {
           confirmLabel="Restore"
           onConfirm={confirmPendingRestore}
           onCancel={() => setPendingRestore(null)}
+        />
+      )}
+
+      {pendingRestoreMany && (
+        <ConfirmModal
+          title="Duplicate name"
+          message={pickerRenameConflictMessage(pendingRestoreMany.conflicts)}
+          confirmLabel="Restore"
+          onConfirm={confirmPendingRestoreMany}
+          onCancel={() => setPendingRestoreMany(null)}
         />
       )}
 
