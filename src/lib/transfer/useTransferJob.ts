@@ -36,7 +36,7 @@ export function useTransferJob() {
     async (
       title: string,
       work: (signal: AbortSignal, onProgress: OnTransferProgress) => Promise<void>,
-    ) => {
+    ): Promise<'ok' | 'abort' | 'error'> => {
       const controller = new AbortController()
       abortRef.current = controller
       setJob({ title, percent: 0, label: 'Starting…' })
@@ -50,6 +50,7 @@ export function useTransferJob() {
       try {
         await work(controller.signal, onProgress)
         clearJob()
+        return 'ok'
       } catch (err) {
         clearJob()
         if (
@@ -57,13 +58,14 @@ export function useTransferJob() {
           (err instanceof DOMException && err.name === 'AbortError') ||
           controller.signal.aborted
         ) {
-          return
+          return 'abort'
         }
         const message =
           err instanceof TransferValidationError || err instanceof Error
             ? err.message
             : 'Transfer failed.'
         setErrorMessage(message)
+        return 'error'
       }
     },
     [clearJob],

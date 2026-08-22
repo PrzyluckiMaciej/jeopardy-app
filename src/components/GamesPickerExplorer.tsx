@@ -14,6 +14,7 @@ import {
   type PickerSortKey,
 } from '../lib/pickerItemType'
 import { GAMES_DND_MIME, type PickerNavDragPayload } from '../lib/pickerDnD'
+import { createPickerDragGhost, setPickerDragImage } from '../lib/pickerDragGhost'
 import {
   isGameFolderTrashed,
   isGameTrashed,
@@ -22,6 +23,7 @@ import {
   useBoardStore,
 } from '../store/gameStore'
 import {
+  checkTransferAbort,
   downloadJson,
   exportGameFolderItem,
   exportGameItem,
@@ -31,15 +33,24 @@ import {
   sanitizeExportFilename,
   useTransferJob,
 } from '../lib/transfer'
+import { pickerRenameConflictMessage, pickerSelectionKey } from '../lib/pickerSelection'
+import { showToast, toastItemLabel } from '../store/toastStore'
 import AddItemButton from './AddItemButton'
 import ConfirmModal from './ConfirmModal'
 import ContextMenu, { type ContextMenuItem } from './ContextMenu'
 import NewItemModal from './NewItemModal'
+import PickerCheckbox from './PickerCheckbox'
+import PickerMassActionBar, { type PickerMassAction } from './PickerMassActionBar'
 import TransferProgressModal from './TransferProgressModal'
 
 type DragPayload =
   | { type: 'game'; id: string }
   | { type: 'folder'; id: string }
+
+type ActiveGameDrag = {
+  primary: DragPayload
+  items: DragPayload[]
+}
 
 type SortKey = PickerSortKey
 type SortDir = PickerSortDir
@@ -55,6 +66,10 @@ function pickerEntrySortRow(entry: PickerEntry) {
     createdAt: entry.item.createdAt,
     updatedAt: entry.item.updatedAt,
   }
+}
+
+function pickerEntryKey(entry: PickerEntry): string {
+  return pickerSelectionKey(entry.kind, entry.item.id)
 }
 
 interface RenameDraft {
@@ -90,12 +105,26 @@ interface Props {
   onPickerDragChange?: (payload: PickerNavDragPayload | null) => void
 }
 
-function parseDragPayload(e: DragEvent): DragPayload | null {
+function parseDragPayload(e: DragEvent): ActiveGameDrag | null {
   try {
     const raw = e.dataTransfer.getData(GAMES_DND_MIME) || e.dataTransfer.getData('text/plain')
     if (!raw) return null
-    const data = JSON.parse(raw) as DragPayload
-    if (data?.type === 'game' || data?.type === 'folder') return data
+    const data = JSON.parse(raw) as DragPayload | { items: DragPayload[] }
+    if (data && 'items' in data && Array.isArray(data.items) && data.items.length > 0) {
+      const items = data.items.filter(
+        (item): item is DragPayload => item?.type === 'game' || item?.type === 'folder',
+      )
+      if (items.length === 0) return null
+      return { primary: items[0], items }
+    }
+    if (
+      data &&
+      'type' in data &&
+      (data.type === 'game' || data.type === 'folder') &&
+      typeof data.id === 'string'
+    ) {
+      return { primary: data, items: [data] }
+    }
   } catch {
     /* ignore */
   }
@@ -139,8 +168,15 @@ export default function GamesPickerExplorer({
   const [pathEditing, setPathEditing] = useState(false)
   const [pathDraft, setPathDraft] = useState('/')
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null)
-  const [activeDrag, setActiveDrag] = useState<DragPayload | null>(null)
+  const [activeDrag, setActiveDrag] = useState<ActiveGameDrag | null>(null)
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
+  const [pendingBulkMove, setPendingBulkMove] = useState<{
+    items: Array<{ kind: 'game' | 'folder'; id: string }>
+    targetFolderId: string | null
+    conflicts: Array<{ currentName: string; uniqueName: string }>
+    notify: boolean
+  } | null>(null)
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
   const [internalRenameFolderId, setInternalRenameFolderId] = useState<string | null>(null)
   const [internalRenameGameId, setInternalRenameGameId] = useState<string | null>(null)
   const [folderRenameDraft, setFolderRenameDraft] = useState<RenameDraft | null>(null)
@@ -161,6 +197,7 @@ export default function GamesPickerExplorer({
     if (prevInitialFolderId.current !== initialFolderId) {
       prevInitialFolderId.current = initialFolderId
       setUserFolderId(initialFolderId)
+      setSelectedKeys(new Set())
     }
   }, [initialFolderId])
 
@@ -289,6 +326,48 @@ export default function GamesPickerExplorer({
     )
   }, [scopedFolders, scopedGames, currentFolderId, sortKey, sortDir])
 
+  const selectedEntries = useMemo(
+    () => visibleEntries.filter((entry) => selectedKeys.has(pickerEntryKey(entry))),
+    [visibleEntries, selectedKeys],
+  )
+  const allVisibleSelected =
+    visibleEntries.length > 0 && selectedEntries.length === visibleEntries.length
+  const someVisibleSelected = selectedEntries.length > 0 && !allVisibleSelected
+
+  function toggleSelected(key: string, checked: boolean) {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev)
+      if (checked) next.add(key)
+      else next.delete(key)
+      return next
+    })
+  }
+
+  function toggleSelectAll(checked: boolean) {
+    if (checked) {
+      setSelectedKeys(new Set(visibleEntries.map(pickerEntryKey)))
+      return
+    }
+    setSelectedKeys(new Set())
+  }
+
+  function clearSelection() {
+    setSelectedKeys(new Set())
+  }
+
+  function renderRowCheckbox(kind: PickerEntry['kind'], item: PickerEntry['item'], label: string) {
+    const key = pickerSelectionKey(kind, item.id)
+    return (
+      <div className="board-picker-explorer-row__check">
+        <PickerCheckbox
+          checked={selectedKeys.has(key)}
+          onChange={(checked) => toggleSelected(key, checked)}
+          ariaLabel={label}
+        />
+      </div>
+    )
+  }
+
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -320,6 +399,7 @@ export default function GamesPickerExplorer({
   }, [scopedFolders, currentFolderId])
 
   function navigateTo(folderId: string | null) {
+    clearSelection()
     setUserFolderId(folderId)
     setPathEditing(false)
   }
@@ -337,6 +417,7 @@ export default function GamesPickerExplorer({
     }
     setPathEditing(false)
     if (resolved.kind === 'folder') {
+      if (resolved.id !== currentFolderId) clearSelection()
       setUserFolderId(resolved.id)
       return
     }
@@ -411,6 +492,210 @@ export default function GamesPickerExplorer({
     })
   }
 
+  function handleMassExport() {
+    if (selectedEntries.length === 0) {
+      showToast('error', 'Nothing to export.')
+      return
+    }
+    const items = [...selectedEntries]
+    void runTransfer('Exporting…', async (signal, onProgress) => {
+      const total = items.length
+      for (let i = 0; i < items.length; i += 1) {
+        checkTransferAbort(signal)
+        const entry = items[i]
+        onProgress({ done: i, total, label: `Exporting ${entry.item.name}` })
+        if (entry.kind === 'game') {
+          const envelope = await exportGameItem(
+            entry.item,
+            { boards, folders: boardFolders },
+            { signal },
+          )
+          downloadJson(sanitizeExportFilename(entry.item.name), envelope)
+        } else {
+          const envelope = await exportGameFolderItem(
+            entry.item,
+            { boards, folders: boardFolders, games, gameFolders: folders },
+            { signal },
+          )
+          downloadJson(sanitizeExportFilename(entry.item.name), envelope)
+        }
+      }
+      onProgress({ done: total, total, label: 'Done' })
+    }).then((result) => {
+      if (result === 'ok') {
+        showToast('success', `Exported ${toastItemLabel(items.length)}.`)
+      } else if (result === 'error') {
+        showToast('error', 'Export failed.')
+      }
+    })
+  }
+
+  function handleMassDelete() {
+    const count = selectedEntries.length
+    if (count === 0) {
+      showToast('error', 'Nothing to delete.')
+      return
+    }
+    for (const entry of selectedEntries) {
+      if (entry.kind === 'game') onDeleteGame(entry.item)
+      else onRequestDeleteFolder(entry.item)
+    }
+    clearSelection()
+    showToast('success', `Moved ${toastItemLabel(count)} to trash.`)
+  }
+
+  function applyGameMoves(
+    items: Array<{ kind: 'game' | 'folder'; id: string }>,
+    targetFolderId: string | null,
+  ) {
+    for (const item of items) {
+      if (item.kind === 'game') moveGameToFolder(item.id, targetFolderId)
+      else moveGameFolder(item.id, targetFolderId)
+    }
+  }
+
+  function planGameMoves(
+    payloads: DragPayload[],
+    targetFolderId: string | null,
+  ): {
+    items: Array<{ kind: 'game' | 'folder'; id: string }>
+    conflicts: Array<{ currentName: string; uniqueName: string }>
+  } {
+    const items: Array<{ kind: 'game' | 'folder'; id: string }> = []
+    const conflicts: Array<{ currentName: string; uniqueName: string }> = []
+    for (const payload of payloads) {
+      if (payload.type === 'game') {
+        const game = games.find((g) => g.id === payload.id)
+        if (!game || isGameTrashed(game)) continue
+        if ((game.folderId ?? null) === targetFolderId) continue
+        items.push({ kind: 'game', id: game.id })
+        const uniqueName = uniqueItemName(
+          games,
+          targetFolderId,
+          game.name,
+          isGameTrashed,
+          game.id,
+          'New Game',
+        )
+        if (uniqueName !== game.name) {
+          conflicts.push({ currentName: game.name, uniqueName })
+        }
+        continue
+      }
+      const folder = folders.find((f) => f.id === payload.id)
+      if (!folder || isGameFolderTrashed(folder)) continue
+      if (folder.parentId === targetFolderId) continue
+      if (
+        targetFolderId !== null &&
+        (targetFolderId === folder.id || isFolderInside(scopedFolders, targetFolderId, folder.id))
+      ) {
+        continue
+      }
+      items.push({ kind: 'folder', id: folder.id })
+      const uniqueName = uniqueFolderName(
+        folders,
+        targetFolderId,
+        folder.name,
+        isGameFolderTrashed,
+        folder.id,
+      )
+      if (uniqueName !== folder.name) {
+        conflicts.push({ currentName: folder.name, uniqueName })
+      }
+    }
+    return { items, conflicts }
+  }
+
+  function requestMoveMany(
+    payloads: DragPayload[],
+    targetFolderId: string | null,
+    options?: { notify?: boolean },
+  ) {
+    const notify = options?.notify ?? payloads.length > 1
+    const { items, conflicts } = planGameMoves(payloads, targetFolderId)
+    if (items.length === 0) {
+      if (notify) showToast('error', "Couldn't move the selected items.")
+      return
+    }
+    if (conflicts.length === 0) {
+      applyGameMoves(items, targetFolderId)
+      clearSelection()
+      if (notify) showToast('success', `Moved ${toastItemLabel(items.length)}.`)
+      return
+    }
+    setPendingBulkMove({ items, targetFolderId, conflicts, notify })
+  }
+
+  function handleMassMoveToParent() {
+    if (currentFolderId === null) return
+    const payloads: DragPayload[] = selectedEntries.map((entry) =>
+      entry.kind === 'game'
+        ? { type: 'game' as const, id: entry.item.id }
+        : { type: 'folder' as const, id: entry.item.id },
+    )
+    requestMoveMany(payloads, parentFolderId, { notify: true })
+  }
+
+  function confirmPendingBulkMove() {
+    if (!pendingBulkMove) return
+    const { items, targetFolderId, notify } = pendingBulkMove
+    setPendingBulkMove(null)
+    applyGameMoves(items, targetFolderId)
+    clearSelection()
+    if (notify) showToast('success', `Moved ${toastItemLabel(items.length)}.`)
+  }
+
+  function resolveGameDragItems(primary: DragPayload): DragPayload[] {
+    const kind = primary.type === 'game' ? 'game' : 'folder'
+    const key = pickerSelectionKey(kind, primary.id)
+    if (!selectedKeys.has(key) || selectedEntries.length <= 1) return [primary]
+    return selectedEntries.map((entry) =>
+      entry.kind === 'game'
+        ? { type: 'game' as const, id: entry.item.id }
+        : { type: 'folder' as const, id: entry.item.id },
+    )
+  }
+
+  function getMassActions(): PickerMassAction[] {
+    return [
+      ...(currentFolderId !== null
+        ? [
+            {
+              id: 'move-to-parent',
+              label: 'Move to parent directory',
+              onSelect: handleMassMoveToParent,
+            },
+          ]
+        : []),
+      { id: 'export', label: 'Export', onSelect: handleMassExport },
+      { id: 'delete', label: 'Delete', danger: true, onSelect: handleMassDelete },
+    ]
+  }
+
+  function bulkMenuItems(): ContextMenuItem[] {
+    return getMassActions().map((action) => ({
+      id: action.id,
+      label: action.label,
+      danger: action.danger,
+      onSelect: () => {
+        if (action.disabled) return
+        action.onSelect()
+      },
+    }))
+  }
+
+  function openItemContextMenu(
+    e: MouseEvent,
+    key: string,
+    singleItems: ContextMenuItem[],
+  ) {
+    if (selectedKeys.has(key) && selectedEntries.length > 1) {
+      openMenuFromEvent(e, bulkMenuItems())
+      return
+    }
+    openMenuFromEvent(e, singleItems)
+  }
+
   async function handleImport() {
     try {
       const raw = await pickJsonFile()
@@ -468,6 +753,15 @@ export default function GamesPickerExplorer({
         label: 'Duplicate',
         onSelect: () => onDuplicateFolder(folder),
       },
+      ...(currentFolderId !== null
+        ? [
+            {
+              id: 'move-to-parent',
+              label: 'Move to parent directory',
+              onSelect: () => requestMove({ type: 'folder', id: folder.id }, parentFolderId),
+            },
+          ]
+        : []),
       {
         id: 'export',
         label: 'Export',
@@ -494,6 +788,15 @@ export default function GamesPickerExplorer({
         label: 'Duplicate',
         onSelect: () => onDuplicateGame(game),
       },
+      ...(currentFolderId !== null
+        ? [
+            {
+              id: 'move-to-parent',
+              label: 'Move to parent directory',
+              onSelect: () => requestMove({ type: 'game', id: game.id }, parentFolderId),
+            },
+          ]
+        : []),
       {
         id: 'export',
         label: 'Export',
@@ -573,31 +876,23 @@ export default function GamesPickerExplorer({
     dragGhostRef.current = null
   }
 
-  function setDragData(e: DragEvent, payload: DragPayload, dragImageEl?: HTMLElement | null) {
-    const json = JSON.stringify(payload)
+  function setDragData(e: DragEvent, primary: DragPayload, dragImageEl?: HTMLElement | null) {
+    const items = resolveGameDragItems(primary)
+    const json = JSON.stringify({ items })
     e.dataTransfer.setData(GAMES_DND_MIME, json)
     e.dataTransfer.setData('text/plain', json)
     e.dataTransfer.effectAllowed = 'move'
     clearDragGhost()
-    if (dragImageEl) {
-      const contentEl =
-        dragImageEl.querySelector('.board-picker-board-btn, .board-picker-folder-row__btn') ??
-        dragImageEl
-      const source = contentEl instanceof HTMLElement ? contentEl : dragImageEl
-      const ghost = document.createElement('div')
-      ghost.className = 'board-picker-drag-ghost'
-      ghost.appendChild(source.cloneNode(true))
-      document.body.appendChild(ghost)
-      dragGhostRef.current = ghost
-      const rect = source.getBoundingClientRect()
-      e.dataTransfer.setDragImage(
-        ghost,
-        Math.min(Math.max(e.clientX - rect.left, 0), rect.width),
-        Math.min(Math.max(e.clientY - rect.top, 0), rect.height),
-      )
-    }
-    setActiveDrag(payload)
-    onPickerDragChange?.({ domain: 'games', type: payload.type, id: payload.id })
+    const ghost = createPickerDragGhost({ count: items.length, sourceEl: dragImageEl })
+    dragGhostRef.current = ghost
+    setPickerDragImage(e, ghost, dragImageEl)
+    setActiveDrag({ primary, items })
+    onPickerDragChange?.({
+      domain: 'games',
+      type: primary.type,
+      id: primary.id,
+      items,
+    })
   }
 
   function clearDrag() {
@@ -607,74 +902,29 @@ export default function GamesPickerExplorer({
     onPickerDragChange?.(null)
   }
 
-  function canDropOnFolder(payload: DragPayload | null, targetFolderId: string): boolean {
-    if (!payload) return false
-    if (payload.type === 'game') return true
-    if (payload.id === targetFolderId) return false
-    if (isFolderInside(scopedFolders, targetFolderId, payload.id)) return false
+  function canDropItemsOnFolder(items: DragPayload[], targetFolderId: string): boolean {
+    if (items.length === 0) return false
+    for (const payload of items) {
+      if (payload.type === 'game') continue
+      if (payload.id === targetFolderId) return false
+      if (isFolderInside(scopedFolders, targetFolderId, payload.id)) return false
+    }
     return true
   }
 
-  function canDropOnParent(payload: DragPayload | null): boolean {
-    if (!payload || currentFolderId === null) return false
+  function canDropOnFolder(drag: ActiveGameDrag | null, targetFolderId: string): boolean {
+    if (!drag) return false
+    return canDropItemsOnFolder(drag.items, targetFolderId)
+  }
+
+  function canDropOnParent(drag: ActiveGameDrag | null): boolean {
+    if (!drag || currentFolderId === null) return false
     if (parentFolderId === null) return true
-    return canDropOnFolder(payload, parentFolderId)
+    return canDropItemsOnFolder(drag.items, parentFolderId)
   }
 
   function requestMove(payload: DragPayload, targetFolderId: string | null) {
-    if (payload.type === 'game') {
-      const game = games.find((g) => g.id === payload.id)
-      if (!game || isGameTrashed(game)) return
-      if ((game.folderId ?? null) === targetFolderId) return
-      const uniqueName = uniqueItemName(
-        games,
-        targetFolderId,
-        game.name,
-        isGameTrashed,
-        game.id,
-        'New Game',
-      )
-      if (uniqueName === game.name) {
-        moveGameToFolder(game.id, targetFolderId)
-        return
-      }
-      setPendingMove({
-        kind: 'game',
-        id: game.id,
-        targetFolderId,
-        currentName: game.name,
-        uniqueName,
-      })
-      return
-    }
-
-    const folder = folders.find((f) => f.id === payload.id)
-    if (!folder || isGameFolderTrashed(folder)) return
-    if (folder.parentId === targetFolderId) return
-    if (
-      targetFolderId !== null &&
-      (targetFolderId === folder.id || isFolderInside(scopedFolders, targetFolderId, folder.id))
-    ) {
-      return
-    }
-    const uniqueName = uniqueFolderName(
-      folders,
-      targetFolderId,
-      folder.name,
-      isGameFolderTrashed,
-      folder.id,
-    )
-    if (uniqueName === folder.name) {
-      moveGameFolder(folder.id, targetFolderId)
-      return
-    }
-    setPendingMove({
-      kind: 'folder',
-      id: folder.id,
-      targetFolderId,
-      currentName: folder.name,
-      uniqueName,
-    })
+    requestMoveMany([payload], targetFolderId)
   }
 
   function confirmPendingMove() {
@@ -691,40 +941,38 @@ export default function GamesPickerExplorer({
   function handleDropOnFolder(e: DragEvent, targetFolderId: string) {
     e.preventDefault()
     e.stopPropagation()
-    const payload = activeDrag ?? parseDragPayload(e)
+    const drag = activeDrag ?? parseDragPayload(e)
     clearDrag()
-    if (!payload || !canDropOnFolder(payload, targetFolderId)) return
-    requestMove(payload, targetFolderId)
+    if (!drag || !canDropItemsOnFolder(drag.items, targetFolderId)) return
+    requestMoveMany(drag.items, targetFolderId, { notify: drag.items.length > 1 })
   }
 
   function handleDropOnParent(e: DragEvent) {
     e.preventDefault()
     e.stopPropagation()
-    const payload = activeDrag ?? parseDragPayload(e)
+    const drag = activeDrag ?? parseDragPayload(e)
     clearDrag()
-    if (!payload || !canDropOnParent(payload)) return
-    requestMove(payload, parentFolderId)
+    if (!drag || !canDropOnParent(drag)) return
+    requestMoveMany(drag.items, parentFolderId, { notify: drag.items.length > 1 })
   }
 
   function handleDropOnCurrent(e: DragEvent) {
     e.preventDefault()
-    const payload = activeDrag ?? parseDragPayload(e)
+    const drag = activeDrag ?? parseDragPayload(e)
     clearDrag()
-    if (!payload) return
-    if (payload.type === 'folder') {
-      if (currentFolderId && payload.id === currentFolderId) return
-      if (currentFolderId && isFolderInside(scopedFolders, currentFolderId, payload.id)) return
-    }
-    requestMove(payload, currentFolderId)
+    if (!drag) return
+    if (currentFolderId && !canDropItemsOnFolder(drag.items, currentFolderId)) return
+    requestMoveMany(drag.items, currentFolderId, { notify: drag.items.length > 1 })
   }
 
   function renderGameRow(game: Game) {
     const isEditing = editingGameId === game.id
+    const selected = selectedKeys.has(pickerSelectionKey('game', game.id))
 
     return (
       <div
         key={game.id}
-        className="board-picker-board-row board-picker-explorer-row"
+        className={`board-picker-board-row board-picker-explorer-row${selected ? ' board-picker-explorer-row--selected' : ''}`}
         draggable={!isEditing}
         onDragStart={(e) => {
           const nameEl = e.currentTarget.querySelector('.board-picker-explorer-row__name')
@@ -745,9 +993,14 @@ export default function GamesPickerExplorer({
         }}
         onContextMenu={(e) => {
           if (isEditing) return
-          openMenuFromEvent(e, gameMenuItems(game))
+          openItemContextMenu(
+            e,
+            pickerSelectionKey('game', game.id),
+            gameMenuItems(game),
+          )
         }}
       >
+        {renderRowCheckbox('game', game, `Select ${game.name}`)}
         <div className="board-picker-explorer-row__name">
           {isEditing ? (
             <div className="board-picker-rename flex-1 min-w-0">
@@ -805,7 +1058,12 @@ export default function GamesPickerExplorer({
         </div>
         {renderTypeColumn('game')}
         {renderDateColumns(game.createdAt, game.updatedAt)}
-        {!isEditing && renderRowMenuButton(gameMenuItems(game), 'Game actions', `game-${game.id}`)}
+        {!isEditing &&
+          renderRowMenuButton(
+            selected && selectedEntries.length > 1 ? bulkMenuItems() : gameMenuItems(game),
+            'Game actions',
+            `game-${game.id}`,
+          )}
       </div>
     )
   }
@@ -819,10 +1077,12 @@ export default function GamesPickerExplorer({
       (g) => g.folderId != null && folderIds.has(g.folderId),
     ).length
 
+    const selected = selectedKeys.has(pickerSelectionKey('folder', folder.id))
+
     return (
       <div
         key={folder.id}
-        className={`board-picker-folder-row board-picker-explorer-row${isDragOver ? ' board-picker-folder-row--drag-over' : ''}`}
+        className={`board-picker-folder-row board-picker-explorer-row${isDragOver ? ' board-picker-folder-row--drag-over' : ''}${selected ? ' board-picker-explorer-row--selected' : ''}`}
         draggable={!isEditing}
         onDragStart={(e) => {
           const nameEl = e.currentTarget.querySelector('.board-picker-explorer-row__name')
@@ -849,9 +1109,14 @@ export default function GamesPickerExplorer({
         onDrop={(e) => handleDropOnFolder(e, folder.id)}
         onContextMenu={(e) => {
           if (isEditing) return
-          openMenuFromEvent(e, folderMenuItems(folder))
+          openItemContextMenu(
+            e,
+            pickerSelectionKey('folder', folder.id),
+            folderMenuItems(folder),
+          )
         }}
       >
+        {renderRowCheckbox('folder', folder, `Select ${folder.name}`)}
         <div className="board-picker-explorer-row__name">
           {isEditing ? (
             <div className="board-picker-rename flex-1 min-w-0">
@@ -910,7 +1175,12 @@ export default function GamesPickerExplorer({
         </div>
         {renderTypeColumn('folder')}
         {renderDateColumns(folder.createdAt, folder.updatedAt)}
-        {!isEditing && renderRowMenuButton(folderMenuItems(folder), 'Folder actions', `folder-${folder.id}`)}
+        {!isEditing &&
+          renderRowMenuButton(
+            selected && selectedEntries.length > 1 ? bulkMenuItems() : folderMenuItems(folder),
+            'Folder actions',
+            `folder-${folder.id}`,
+          )}
       </div>
     )
   }
@@ -919,6 +1189,7 @@ export default function GamesPickerExplorer({
   const currentDragOver = dragOverTarget === 'current'
   const parentDragOver = dragOverTarget === 'parent'
   const atRoot = currentFolderId === null
+  const massActions = getMassActions()
 
   return (
     <>
@@ -1008,6 +1279,14 @@ export default function GamesPickerExplorer({
       >
         {!isEmpty && (
           <div className="board-picker-explorer-header">
+            <div className="board-picker-explorer-header__check">
+              <PickerCheckbox
+                checked={allVisibleSelected}
+                indeterminate={someVisibleSelected}
+                onChange={toggleSelectAll}
+                ariaLabel="Select all items in this folder"
+              />
+            </div>
             {renderSortHeader('name', 'Name', 'board-picker-explorer-header__name')}
             {renderSortHeader('type', 'Type', 'board-picker-explorer-header__type')}
             {renderSortHeader('createdAt', 'Created at', 'board-picker-explorer-header__date')}
@@ -1024,6 +1303,9 @@ export default function GamesPickerExplorer({
           </div>
         )}
       </div>
+      {selectedEntries.length > 0 && (
+        <PickerMassActionBar count={selectedEntries.length} actions={massActions} />
+      )}
       {menu && (
         <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={closeMenu} />
       )}
@@ -1059,6 +1341,15 @@ export default function GamesPickerExplorer({
           confirmLabel="Move"
           onConfirm={confirmPendingMove}
           onCancel={() => setPendingMove(null)}
+        />
+      )}
+      {pendingBulkMove && (
+        <ConfirmModal
+          title="Duplicate name"
+          message={pickerRenameConflictMessage(pendingBulkMove.conflicts)}
+          confirmLabel="Move"
+          onConfirm={confirmPendingBulkMove}
+          onCancel={() => setPendingBulkMove(null)}
         />
       )}
     </>
