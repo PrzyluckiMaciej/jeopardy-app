@@ -520,6 +520,11 @@ export default function BoardPickerExplorer({
         label: 'New Folder',
         onSelect: () => createNewFolder(),
       },
+      {
+        id: 'import',
+        label: 'Import',
+        onSelect: () => void handleImport(),
+      },
     ]
   }
 
