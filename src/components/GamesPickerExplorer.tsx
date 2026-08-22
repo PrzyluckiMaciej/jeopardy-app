@@ -1439,6 +1439,7 @@ export default function GamesPickerExplorer({
 
   return (
     <>
+      <div className="board-picker-explorer-pane">
       <div className="board-picker-path-bar">
         <button
           type="button"
@@ -1550,6 +1551,7 @@ export default function GamesPickerExplorer({
             No saved games
           </div>
         )}
+      </div>
       </div>
       {selectedEntries.length > 0 && (
         <PickerMassActionBar count={selectedEntries.length} actions={massActions} />

@@ -1576,6 +1576,15 @@ body.board-picker-pointer-dragging * {
   color: var(--white);
   transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
+.board-picker-board-btn:has(.board-picker-board-btn__text) {
+  align-items: flex-start;
+}
+.board-picker-board-btn:has(.board-picker-board-btn__text) > .board-picker-board-order {
+  align-self: center;
+}
+.board-picker-board-btn:has(.board-picker-board-btn__text) > .board-picker-object-icon {
+  margin-top: 0.2em;
+}
 .board-picker-board-btn__text {
   display: flex;
   flex-direction: column;
@@ -1772,8 +1781,20 @@ body.board-picker-pointer-dragging * {
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-width: 0;
   min-height: 0;
   padding-left: var(--space-xs);
+}
+/* Shared horizontal scroll so path bar (Add Item) stays aligned with explorer columns */
+.board-picker-explorer-pane {
+  --picker-explorer-min-width: calc(1.5rem + 8rem + 8.5rem + 10.5rem + 10.5rem + 1.75rem + 50px);
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 .board-picker-boards__scroll {
   flex: 1;
@@ -1787,8 +1808,15 @@ body.board-picker-pointer-dragging * {
 .board-picker-boards__scroll.board-picker-explorer {
   gap: 0;
   align-items: stretch;
-  /* Symmetric inset so the column bar lines up with the path bar / Add Item button */
-  padding-right: 2px;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  min-width: var(--picker-explorer-min-width);
+  box-sizing: border-box;
+  /* Horizontal scroll lives on .board-picker-explorer-pane */
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 0;
 }
 .board-picker-boards__scroll.board-picker-explorer > .board-picker-empty {
   align-self: stretch;
@@ -1807,6 +1835,9 @@ body.board-picker-pointer-dragging * {
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+  min-width: var(--picker-explorer-min-width, 100%);
+  width: 100%;
+  box-sizing: border-box;
   margin-bottom: var(--space-sm);
 }
 .board-picker-path-back {
@@ -1992,15 +2023,14 @@ body.board-picker-pointer-dragging * {
   align-items: center;
   column-gap: 10px;
   box-sizing: border-box;
-  /* Fill the explorer; grow with columns when they overflow so the menu stays in the background */
   width: 100%;
-  min-width: max-content;
+  min-width: 0;
 }
 .board-picker-explorer-header {
   position: sticky;
   top: 0;
   z-index: 1;
-  padding: 4px 6px 6px 8px;
+  padding: 4px 0 6px 8px;
   margin-bottom: 2px;
   border-bottom: 1px solid var(--border-default);
   background: var(--navy-mid);
@@ -2044,7 +2074,7 @@ body.board-picker-pointer-dragging * {
   margin-bottom: 0;
 }
 .board-picker-board-row.board-picker-explorer-row {
-  padding: 6px 6px 6px 8px;
+  padding: 6px 0 6px 8px;
   gap: 0;
   column-gap: 10px;
   border-radius: var(--radius-lg);
@@ -2138,7 +2168,7 @@ body.board-picker-pointer-dragging * {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  min-width: 0;
+  min-width: 1.75rem;
 }
 .board-picker-row-menu-btn {
   display: flex;
@@ -2220,7 +2250,7 @@ body.board-picker-pointer-dragging * {
   grid-template-columns: subgrid;
   grid-column: 1 / -1;
   align-items: center;
-  min-width: 0;
+  min-width: 38.5rem;
 }
 .board-picker-add-board-header {
   position: sticky;
@@ -2240,34 +2270,43 @@ body.board-picker-pointer-dragging * {
   background: rgba(255, 255, 255, 0.04);
 }
 .board-picker-add-board-row__name {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 6px;
+  row-gap: 2px;
+  align-items: center;
   min-width: 0;
 }
+.board-picker-add-board-row__name > .board-picker-object-icon {
+  grid-column: 1;
+  grid-row: 1;
+}
 .board-picker-add-board-row__text {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
+  display: contents;
+}
+.board-picker-add-board-row__title {
+  grid-column: 2;
+  grid-row: 1;
   min-width: 0;
-  flex: 1;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 .board-picker-add-board-row__path {
-  flex: 0 1 auto;
+  grid-column: 2;
+  grid-row: 2;
   min-width: 0;
-  width: 100%;
   font-family: 'Barlow Condensed', sans-serif;
   font-size: 0.8125rem;
   font-weight: 600;
   letter-spacing: 0.01em;
   color: #6b7db3;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .board-picker-add-board-row__action {
   display: flex;
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 .board-picker-folder-row {
   display: grid;
@@ -2276,8 +2315,8 @@ body.board-picker-pointer-dragging * {
   column-gap: 10px;
   box-sizing: border-box;
   width: 100%;
-  min-width: max-content;
-  padding: 6px 6px 6px 8px;
+  min-width: 0;
+  padding: 6px 0 6px 8px;
   border-radius: var(--radius-lg);
   border: 1px solid transparent;
   cursor: grab;
@@ -4297,7 +4336,8 @@ body.board-picker-pointer-dragging * {
     bottom: 0;
     z-index: 46;
     width: min(18.5rem, 86vw);
-    padding: max(20px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(20px, env(safe-area-inset-bottom, 0px)) 16px;
+    /* Clear elevated topbar; panel itself goes to top:0 so there’s no visible gap */
+    padding: calc(max(8px, env(safe-area-inset-top, 0px)) + 3.75rem) max(16px, env(safe-area-inset-right, 0px)) max(20px, env(safe-area-inset-bottom, 0px)) 16px;
     background: var(--navy-mid);
     border-left: 1px solid var(--navy-light);
     box-shadow: -8px 0 28px rgba(0, 0, 0, 0.35);
@@ -4438,33 +4478,6 @@ body.board-picker-pointer-dragging * {
   .question-overlay-backdrop .question-overlay-main {
     flex: 1 1 0;
     min-height: 0;
-  }
-  .board-picker-add-board-list {
-    display: flex;
-    flex-direction: column;
-    overflow-x: visible;
-  }
-  .board-picker-add-board-header {
-    display: none;
-  }
-  .board-picker-add-board-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-    grid-column: unset;
-    grid-template-columns: unset;
-  }
-  .board-picker-add-board-row__name {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-  .board-picker-add-board-row .board-picker-explorer-row__type,
-  .board-picker-add-board-row .board-picker-explorer-row__date {
-    display: none;
-  }
-  .board-picker-add-board-row__action {
-    flex-shrink: 0;
   }
   .question-overlay-header {
     flex-wrap: wrap;

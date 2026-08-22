@@ -1952,6 +1952,7 @@ export default function BoardPickerExplorer({
 
   return (
     <>
+      <div className="board-picker-explorer-pane">
       <div className="board-picker-path-bar">
         <button
           type="button"
@@ -2069,6 +2070,7 @@ export default function BoardPickerExplorer({
             {isTrash ? 'Trash is empty' : 'No saved boards'}
           </div>
         )}
+      </div>
       </div>
       {selectedEntries.length > 0 && (
         <PickerMassActionBar count={selectedEntries.length} actions={massActions} />

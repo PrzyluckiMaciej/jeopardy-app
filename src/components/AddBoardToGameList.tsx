@@ -121,7 +121,7 @@ export default function AddBoardToGameList({ boards, folders, onAdd }: Props) {
                     <LayoutGrid size={14} className="board-picker-object-icon board-picker-object-icon--board flex-shrink-0" />
                   )}
                   <span className="board-picker-add-board-row__text">
-                    <span className="font-condensed font-bold">{board.name}</span>
+                    <span className="board-picker-add-board-row__title font-condensed font-bold">{board.name}</span>
                     <span className="board-picker-add-board-row__path" title={path}>
                       {path}
                     </span>
