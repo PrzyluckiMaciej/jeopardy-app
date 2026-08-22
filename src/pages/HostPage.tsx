@@ -24,6 +24,7 @@ import { duplicateGame } from '../lib/duplicateGame'
 import { duplicateGameFolder } from '../lib/duplicateGameFolder'
 import { collectFolderSubtree } from '../lib/folderSubtree'
 import { pickerRenameConflictMessage, type PickerRestoreItem } from '../lib/pickerSelection'
+import { showToast, toastItemLabel } from '../store/toastStore'
 import {
   canDropPickerOnNav,
   pickerNavDragItems,
@@ -930,6 +931,14 @@ export default function HostPage() {
     }
   }
 
+  function notifyRestoreMany(items: PickerRestoreItem[]) {
+    if (items.length === 0) {
+      showToast('error', 'Nothing to restore.')
+      return
+    }
+    showToast('success', `Restored ${toastItemLabel(items.length)}.`)
+  }
+
   function restoreConflictForItem(
     item: PickerRestoreItem,
   ): { currentName: string; uniqueName: string } | null {
@@ -1014,6 +1023,10 @@ export default function HostPage() {
   function handleRestoreMany(items: PickerRestoreItem[]) {
     const rank = { folder: 0, gameFolder: 0, board: 1, game: 1 }
     const sorted = [...items].sort((a, b) => rank[a.kind] - rank[b.kind])
+    if (sorted.length === 0) {
+      showToast('error', 'Nothing to restore.')
+      return
+    }
     const conflicts: Array<{ currentName: string; uniqueName: string }> = []
     for (const item of sorted) {
       const conflict = restoreConflictForItem(item)
@@ -1023,6 +1036,7 @@ export default function HostPage() {
     }
     if (conflicts.length === 0) {
       applyRestoreItems(sorted)
+      notifyRestoreMany(sorted)
       return
     }
     setPendingRestoreMany({ items: sorted, conflicts })
@@ -1033,6 +1047,7 @@ export default function HostPage() {
     const { items } = pendingRestoreMany
     setPendingRestoreMany(null)
     applyRestoreItems(items)
+    notifyRestoreMany(items)
   }
 
   function isPickerNavDragTrashed(payload: PickerNavDragPayload): boolean {
@@ -1087,21 +1102,36 @@ export default function HostPage() {
     const items = pickerNavDragItems(payload)
 
     if (target === 'trash') {
+      let trashed = 0
       for (const item of items) {
         if (payload.domain === 'boards') {
           if (item.type === 'board') {
             handleTrashBoard(item.id)
+            trashed += 1
           } else if (item.type === 'folder') {
             const folder = state.folders.find((f) => f.id === item.id)
-            if (folder) handleTrashFolder(folder)
+            if (folder) {
+              handleTrashFolder(folder)
+              trashed += 1
+            }
           }
         } else if (item.type === 'game') {
           const game = state.games.find((g) => g.id === item.id)
-          if (game) handleTrashGame(game)
+          if (game) {
+            handleTrashGame(game)
+            trashed += 1
+          }
         } else if (item.type === 'folder') {
           const folder = state.gameFolders.find((f) => f.id === item.id)
-          if (folder) handleTrashGameFolder(folder)
+          if (folder) {
+            handleTrashGameFolder(folder)
+            trashed += 1
+          }
         }
+      }
+      if (items.length > 1) {
+        if (trashed > 0) showToast('success', `Moved ${toastItemLabel(trashed)} to trash.`)
+        else showToast('error', "Couldn't move the selected items to trash.")
       }
     } else if (target === 'boards' && payload.domain === 'boards') {
       const restoreItems: PickerRestoreItem[] = []
@@ -1699,15 +1729,33 @@ export default function HostPage() {
 
   function handleAddToGameConfirm(gameId: string) {
     if (!addToGameTarget) return
-    addBoardsToGame(gameId, addToGameTarget.boardIds)
+    const { boardIds } = addToGameTarget
+    addBoardsToGame(gameId, boardIds)
     setAddToGameTarget(null)
+    if (boardIds.length === 0) {
+      showToast('error', 'No boards to add to a game.')
+      return
+    }
+    showToast(
+      'success',
+      `Added ${toastItemLabel(boardIds.length, 'board', 'boards')} to game.`,
+    )
   }
 
   function handleAddToGameCreateAndConfirm(name: string) {
     if (!addToGameTarget) return
+    const { boardIds } = addToGameTarget
     const gameId = boardStore.createGame(name)
-    addBoardsToGame(gameId, addToGameTarget.boardIds)
+    addBoardsToGame(gameId, boardIds)
     setAddToGameTarget(null)
+    if (boardIds.length === 0) {
+      showToast('error', 'No boards to add to a game.')
+      return
+    }
+    showToast(
+      'success',
+      `Added ${toastItemLabel(boardIds.length, 'board', 'boards')} to game.`,
+    )
   }
 
   const board = activeBoard ?? state.board

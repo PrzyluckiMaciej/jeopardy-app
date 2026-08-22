@@ -43,6 +43,7 @@ import {
   pickerSelectionKey,
   type PickerRestoreItem,
 } from '../lib/pickerSelection'
+import { showToast, toastItemLabel } from '../store/toastStore'
 import AddItemButton from './AddItemButton'
 import ConfirmModal from './ConfirmModal'
 import ContextMenu, { type ContextMenuItem } from './ContextMenu'
@@ -216,6 +217,7 @@ export default function BoardPickerExplorer({
     items: Array<{ kind: 'board' | 'folder'; id: string }>
     targetFolderId: string | null
     conflicts: Array<{ currentName: string; uniqueName: string }>
+    notify: boolean
   } | null>(null)
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
   const [internalRenameFolderId, setInternalRenameFolderId] = useState<string | null>(null)
@@ -573,7 +575,10 @@ export default function BoardPickerExplorer({
       (entry): entry is { kind: 'board'; item: Board } | { kind: 'folder'; item: BoardFolder } =>
         entry.kind === 'board' || entry.kind === 'folder',
     )
-    if (items.length === 0) return
+    if (items.length === 0) {
+      showToast('error', 'Nothing to export.')
+      return
+    }
     void runTransfer('Exporting…', async (signal, onProgress) => {
       const total = items.length
       for (let i = 0; i < items.length; i += 1) {
@@ -593,6 +598,12 @@ export default function BoardPickerExplorer({
         }
       }
       onProgress({ done: total, total, label: 'Done' })
+    }).then((result) => {
+      if (result === 'ok') {
+        showToast('success', `Exported ${toastItemLabel(items.length)}.`)
+      } else if (result === 'error') {
+        showToast('error', 'Export failed.')
+      }
     })
   }
 
@@ -616,21 +627,35 @@ export default function BoardPickerExplorer({
 
   function handleMassAddToGame() {
     const boardIds = collectSelectedBoardIds()
-    if (boardIds.length === 0) return
+    if (boardIds.length === 0) {
+      showToast('error', 'No boards to add to a game.')
+      return
+    }
     const label = boardIds.length === 1 ? '1 board' : `${boardIds.length} boards`
     onRequestAddToGame(boardIds, label)
   }
 
   function handleMassDelete() {
+    const count = selectedEntries.filter(
+      (entry) => entry.kind === 'board' || entry.kind === 'folder',
+    ).length
+    if (count === 0) {
+      showToast('error', 'Nothing to delete.')
+      return
+    }
     for (const entry of selectedEntries) {
       if (entry.kind === 'board') onDeleteBoard(entry.item)
       else if (entry.kind === 'folder') onRequestDeleteFolder(entry.item)
     }
     clearSelection()
+    showToast('success', `Moved ${toastItemLabel(count)} to trash.`)
   }
 
   function handleMassRestore() {
-    if (selectedEntries.length === 0) return
+    if (selectedEntries.length === 0) {
+      showToast('error', 'Nothing to restore.')
+      return
+    }
     onRestoreMany?.(
       selectedEntries.map((entry) => ({ kind: entry.kind, id: entry.item.id })),
     )
@@ -638,6 +663,11 @@ export default function BoardPickerExplorer({
   }
 
   function handleMassPermanentDelete() {
+    const count = selectedEntries.length
+    if (count === 0) {
+      showToast('error', 'Nothing to delete.')
+      return
+    }
     for (const entry of selectedEntries) {
       if (entry.kind === 'board') onPermanentDeleteBoard?.(entry.item)
       else if (entry.kind === 'folder') onPermanentDeleteFolder?.(entry.item)
@@ -645,6 +675,7 @@ export default function BoardPickerExplorer({
       else onPermanentDeleteGameFolder?.(entry.item)
     }
     clearSelection()
+    showToast('success', `Permanently deleted ${toastItemLabel(count)}.`)
   }
 
   function applyBoardMoves(items: Array<{ kind: 'board' | 'folder'; id: string }>, targetFolderId: string | null) {
@@ -705,15 +736,24 @@ export default function BoardPickerExplorer({
     return { items, conflicts }
   }
 
-  function requestMoveMany(payloads: DragPayload[], targetFolderId: string | null) {
+  function requestMoveMany(
+    payloads: DragPayload[],
+    targetFolderId: string | null,
+    options?: { notify?: boolean },
+  ) {
+    const notify = options?.notify ?? payloads.length > 1
     const { items, conflicts } = planBoardMoves(payloads, targetFolderId)
-    if (items.length === 0) return
+    if (items.length === 0) {
+      if (notify) showToast('error', "Couldn't move the selected items.")
+      return
+    }
     if (conflicts.length === 0) {
       applyBoardMoves(items, targetFolderId)
       clearSelection()
+      if (notify) showToast('success', `Moved ${toastItemLabel(items.length)}.`)
       return
     }
-    setPendingBulkMove({ items, targetFolderId, conflicts })
+    setPendingBulkMove({ items, targetFolderId, conflicts, notify })
   }
 
   function handleMassMoveToParent() {
@@ -723,15 +763,16 @@ export default function BoardPickerExplorer({
       if (entry.kind === 'board') payloads.push({ type: 'board', id: entry.item.id })
       else if (entry.kind === 'folder') payloads.push({ type: 'folder', id: entry.item.id })
     }
-    requestMoveMany(payloads, parentFolderId)
+    requestMoveMany(payloads, parentFolderId, { notify: true })
   }
 
   function confirmPendingBulkMove() {
     if (!pendingBulkMove) return
-    const { items, targetFolderId } = pendingBulkMove
+    const { items, targetFolderId, notify } = pendingBulkMove
     setPendingBulkMove(null)
     applyBoardMoves(items, targetFolderId)
     clearSelection()
+    if (notify) showToast('success', `Moved ${toastItemLabel(items.length)}.`)
   }
 
   function resolveBoardDragItems(primary: DragPayload): DragPayload[] {
@@ -1208,7 +1249,7 @@ export default function BoardPickerExplorer({
     const drag = activeDrag ?? parseDragPayload(e)
     clearDrag()
     if (!drag || !canDropItemsOnFolder(drag.items, targetFolderId)) return
-    requestMoveMany(drag.items, targetFolderId)
+    requestMoveMany(drag.items, targetFolderId, { notify: drag.items.length > 1 })
   }
 
   function handleDropOnParent(e: DragEvent) {
@@ -1221,7 +1262,7 @@ export default function BoardPickerExplorer({
     const drag = activeDrag ?? parseDragPayload(e)
     clearDrag()
     if (!drag || !canDropOnParent(drag)) return
-    requestMoveMany(drag.items, parentFolderId)
+    requestMoveMany(drag.items, parentFolderId, { notify: drag.items.length > 1 })
   }
 
   function handleDropOnCurrent(e: DragEvent) {
@@ -1236,7 +1277,7 @@ export default function BoardPickerExplorer({
     if (currentFolderId) {
       if (!canDropItemsOnFolder(drag.items, currentFolderId)) return
     }
-    requestMoveMany(drag.items, currentFolderId)
+    requestMoveMany(drag.items, currentFolderId, { notify: drag.items.length > 1 })
   }
 
   function renderBoardRow(board: Board) {

@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import LandingPage from './pages/LandingPage'
+import ToastHost from './components/ToastHost'
 
 const HostPage = lazy(() => import('./pages/HostPage'))
 const PlayerPage = lazy(() => import('./pages/PlayerPage'))
@@ -16,6 +17,7 @@ function PageLoader() {
 export default function App() {
   return (
     <BrowserRouter>
+      <ToastHost />
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={<LandingPage />} />

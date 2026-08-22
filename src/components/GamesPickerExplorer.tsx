@@ -33,6 +33,7 @@ import {
   useTransferJob,
 } from '../lib/transfer'
 import { pickerRenameConflictMessage, pickerSelectionKey } from '../lib/pickerSelection'
+import { showToast, toastItemLabel } from '../store/toastStore'
 import AddItemButton from './AddItemButton'
 import ConfirmModal from './ConfirmModal'
 import ContextMenu, { type ContextMenuItem } from './ContextMenu'
@@ -172,6 +173,7 @@ export default function GamesPickerExplorer({
     items: Array<{ kind: 'game' | 'folder'; id: string }>
     targetFolderId: string | null
     conflicts: Array<{ currentName: string; uniqueName: string }>
+    notify: boolean
   } | null>(null)
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
   const [internalRenameFolderId, setInternalRenameFolderId] = useState<string | null>(null)
@@ -490,12 +492,16 @@ export default function GamesPickerExplorer({
   }
 
   function handleMassExport() {
-    if (selectedEntries.length === 0) return
+    if (selectedEntries.length === 0) {
+      showToast('error', 'Nothing to export.')
+      return
+    }
+    const items = [...selectedEntries]
     void runTransfer('Exporting…', async (signal, onProgress) => {
-      const total = selectedEntries.length
-      for (let i = 0; i < selectedEntries.length; i += 1) {
+      const total = items.length
+      for (let i = 0; i < items.length; i += 1) {
         checkTransferAbort(signal)
-        const entry = selectedEntries[i]
+        const entry = items[i]
         onProgress({ done: i, total, label: `Exporting ${entry.item.name}` })
         if (entry.kind === 'game') {
           const envelope = await exportGameItem(
@@ -514,15 +520,27 @@ export default function GamesPickerExplorer({
         }
       }
       onProgress({ done: total, total, label: 'Done' })
+    }).then((result) => {
+      if (result === 'ok') {
+        showToast('success', `Exported ${toastItemLabel(items.length)}.`)
+      } else if (result === 'error') {
+        showToast('error', 'Export failed.')
+      }
     })
   }
 
   function handleMassDelete() {
+    const count = selectedEntries.length
+    if (count === 0) {
+      showToast('error', 'Nothing to delete.')
+      return
+    }
     for (const entry of selectedEntries) {
       if (entry.kind === 'game') onDeleteGame(entry.item)
       else onRequestDeleteFolder(entry.item)
     }
     clearSelection()
+    showToast('success', `Moved ${toastItemLabel(count)} to trash.`)
   }
 
   function applyGameMoves(
@@ -587,15 +605,24 @@ export default function GamesPickerExplorer({
     return { items, conflicts }
   }
 
-  function requestMoveMany(payloads: DragPayload[], targetFolderId: string | null) {
+  function requestMoveMany(
+    payloads: DragPayload[],
+    targetFolderId: string | null,
+    options?: { notify?: boolean },
+  ) {
+    const notify = options?.notify ?? payloads.length > 1
     const { items, conflicts } = planGameMoves(payloads, targetFolderId)
-    if (items.length === 0) return
+    if (items.length === 0) {
+      if (notify) showToast('error', "Couldn't move the selected items.")
+      return
+    }
     if (conflicts.length === 0) {
       applyGameMoves(items, targetFolderId)
       clearSelection()
+      if (notify) showToast('success', `Moved ${toastItemLabel(items.length)}.`)
       return
     }
-    setPendingBulkMove({ items, targetFolderId, conflicts })
+    setPendingBulkMove({ items, targetFolderId, conflicts, notify })
   }
 
   function handleMassMoveToParent() {
@@ -605,15 +632,16 @@ export default function GamesPickerExplorer({
         ? { type: 'game' as const, id: entry.item.id }
         : { type: 'folder' as const, id: entry.item.id },
     )
-    requestMoveMany(payloads, parentFolderId)
+    requestMoveMany(payloads, parentFolderId, { notify: true })
   }
 
   function confirmPendingBulkMove() {
     if (!pendingBulkMove) return
-    const { items, targetFolderId } = pendingBulkMove
+    const { items, targetFolderId, notify } = pendingBulkMove
     setPendingBulkMove(null)
     applyGameMoves(items, targetFolderId)
     clearSelection()
+    if (notify) showToast('success', `Moved ${toastItemLabel(items.length)}.`)
   }
 
   function resolveGameDragItems(primary: DragPayload): DragPayload[] {
@@ -929,7 +957,7 @@ export default function GamesPickerExplorer({
     const drag = activeDrag ?? parseDragPayload(e)
     clearDrag()
     if (!drag || !canDropItemsOnFolder(drag.items, targetFolderId)) return
-    requestMoveMany(drag.items, targetFolderId)
+    requestMoveMany(drag.items, targetFolderId, { notify: drag.items.length > 1 })
   }
 
   function handleDropOnParent(e: DragEvent) {
@@ -938,7 +966,7 @@ export default function GamesPickerExplorer({
     const drag = activeDrag ?? parseDragPayload(e)
     clearDrag()
     if (!drag || !canDropOnParent(drag)) return
-    requestMoveMany(drag.items, parentFolderId)
+    requestMoveMany(drag.items, parentFolderId, { notify: drag.items.length > 1 })
   }
 
   function handleDropOnCurrent(e: DragEvent) {
@@ -947,7 +975,7 @@ export default function GamesPickerExplorer({
     clearDrag()
     if (!drag) return
     if (currentFolderId && !canDropItemsOnFolder(drag.items, currentFolderId)) return
-    requestMoveMany(drag.items, currentFolderId)
+    requestMoveMany(drag.items, currentFolderId, { notify: drag.items.length > 1 })
   }
 
   function renderGameRow(game: Game) {
