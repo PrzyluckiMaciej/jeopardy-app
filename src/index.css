@@ -1759,7 +1759,9 @@ body.board-picker-reordering * {
 }
 .board-picker-boards__scroll.board-picker-explorer {
   gap: 0;
-  align-items: flex-start;
+  align-items: stretch;
+  /* Symmetric inset so the column bar lines up with the path bar / Add Item button */
+  padding-right: 2px;
 }
 .board-picker-boards__scroll.board-picker-explorer > .board-picker-empty {
   align-self: stretch;
@@ -1963,9 +1965,9 @@ body.board-picker-reordering * {
   align-items: center;
   column-gap: 10px;
   box-sizing: border-box;
-  /* Grow with the grid so the menu column stays inside the background */
-  width: max-content;
-  min-width: 100%;
+  /* Fill the explorer; grow with columns when they overflow so the menu stays in the background */
+  width: 100%;
+  min-width: max-content;
 }
 .board-picker-explorer-header {
   position: sticky;
@@ -2235,8 +2237,8 @@ body.board-picker-reordering * {
   align-items: center;
   column-gap: 10px;
   box-sizing: border-box;
-  width: max-content;
-  min-width: 100%;
+  width: 100%;
+  min-width: max-content;
   padding: 6px 6px 6px 8px;
   border-radius: var(--radius-lg);
   border: 1px solid transparent;
