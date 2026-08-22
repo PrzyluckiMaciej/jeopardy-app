@@ -17,6 +17,7 @@ import {
   GAMES_DND_MIME,
   type PickerNavDragPayload,
 } from '../lib/pickerDnD'
+import { createPickerDragGhost, setPickerDragImage } from '../lib/pickerDragGhost'
 import { formatBoardTimestamp, isFinalBoard } from '../lib/utils'
 import {
   isBoardTrashed,
@@ -1144,24 +1145,11 @@ export default function BoardPickerExplorer({
     dragGhostRef.current = null
   }
 
-  function applyDragImage(e: DragEvent, dragImageEl?: HTMLElement | null) {
+  function applyDragImage(e: DragEvent, dragImageEl: HTMLElement | null | undefined, count: number) {
     clearDragGhost()
-    if (!dragImageEl) return
-    const contentEl =
-      dragImageEl.querySelector('.board-picker-board-btn, .board-picker-folder-row__btn') ??
-      dragImageEl
-    const source = contentEl instanceof HTMLElement ? contentEl : dragImageEl
-    const ghost = document.createElement('div')
-    ghost.className = 'board-picker-drag-ghost'
-    ghost.appendChild(source.cloneNode(true))
-    document.body.appendChild(ghost)
+    const ghost = createPickerDragGhost({ count, sourceEl: dragImageEl })
     dragGhostRef.current = ghost
-    const rect = source.getBoundingClientRect()
-    e.dataTransfer.setDragImage(
-      ghost,
-      Math.min(Math.max(e.clientX - rect.left, 0), rect.width),
-      Math.min(Math.max(e.clientY - rect.top, 0), rect.height),
-    )
+    setPickerDragImage(e, ghost, dragImageEl)
   }
 
   function setDragData(e: DragEvent, primary: DragPayload, dragImageEl?: HTMLElement | null) {
@@ -1170,7 +1158,7 @@ export default function BoardPickerExplorer({
     e.dataTransfer.setData(BOARDS_DND_MIME, json)
     e.dataTransfer.setData('text/plain', json)
     e.dataTransfer.effectAllowed = 'move'
-    applyDragImage(e, dragImageEl)
+    applyDragImage(e, dragImageEl, items.length)
     setActiveDrag({ primary, items })
     onPickerDragChange?.({
       domain: 'boards',
@@ -1186,7 +1174,7 @@ export default function BoardPickerExplorer({
     e.dataTransfer.setData(GAMES_DND_MIME, json)
     e.dataTransfer.setData('text/plain', json)
     e.dataTransfer.effectAllowed = 'move'
-    applyDragImage(e, dragImageEl)
+    applyDragImage(e, dragImageEl, items.length)
     setActiveDrag(null)
     onPickerDragChange?.({
       domain: 'games',

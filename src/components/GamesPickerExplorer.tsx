@@ -14,6 +14,7 @@ import {
   type PickerSortKey,
 } from '../lib/pickerItemType'
 import { GAMES_DND_MIME, type PickerNavDragPayload } from '../lib/pickerDnD'
+import { createPickerDragGhost, setPickerDragImage } from '../lib/pickerDragGhost'
 import {
   isGameFolderTrashed,
   isGameTrashed,
@@ -882,23 +883,9 @@ export default function GamesPickerExplorer({
     e.dataTransfer.setData('text/plain', json)
     e.dataTransfer.effectAllowed = 'move'
     clearDragGhost()
-    if (dragImageEl) {
-      const contentEl =
-        dragImageEl.querySelector('.board-picker-board-btn, .board-picker-folder-row__btn') ??
-        dragImageEl
-      const source = contentEl instanceof HTMLElement ? contentEl : dragImageEl
-      const ghost = document.createElement('div')
-      ghost.className = 'board-picker-drag-ghost'
-      ghost.appendChild(source.cloneNode(true))
-      document.body.appendChild(ghost)
-      dragGhostRef.current = ghost
-      const rect = source.getBoundingClientRect()
-      e.dataTransfer.setDragImage(
-        ghost,
-        Math.min(Math.max(e.clientX - rect.left, 0), rect.width),
-        Math.min(Math.max(e.clientY - rect.top, 0), rect.height),
-      )
-    }
+    const ghost = createPickerDragGhost({ count: items.length, sourceEl: dragImageEl })
+    dragGhostRef.current = ghost
+    setPickerDragImage(e, ghost, dragImageEl)
     setActiveDrag({ primary, items })
     onPickerDragChange?.({
       domain: 'games',

@@ -2602,13 +2602,40 @@ body.board-picker-reordering * {
   pointer-events: none;
   color: var(--white);
 }
-.board-picker-drag-ghost:not(.board-picker-drag-ghost--pointer),
-.board-picker-drag-ghost:not(.board-picker-drag-ghost--pointer) * {
+.board-picker-drag-ghost:not(.board-picker-drag-ghost--pointer):not(.board-picker-drag-ghost--multi),
+.board-picker-drag-ghost:not(.board-picker-drag-ghost--pointer):not(.board-picker-drag-ghost--multi) * {
   background: transparent !important;
   background-color: transparent !important;
   box-shadow: none !important;
   border: none !important;
   border-radius: 0 !important;
+}
+.board-picker-drag-ghost--multi {
+  align-items: center;
+  gap: 8px;
+  max-width: none;
+  padding: 8px 12px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(212, 160, 23, 0.55);
+  background: var(--bg-surface) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
+  color: var(--gold-bright);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+}
+.board-picker-drag-ghost--multi .board-picker-drag-ghost__icon {
+  flex-shrink: 0;
+  color: var(--gold);
+}
+.board-picker-drag-ghost--multi .board-picker-drag-ghost__count {
+  min-width: 1.25rem;
+  text-align: center;
+  color: var(--white);
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 .board-picker-drag-ghost--pointer {
   top: 0;
@@ -2631,8 +2658,8 @@ body.board-picker-reordering * {
   border: 1px solid var(--gold);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
-.board-picker-drag-ghost:not(.board-picker-drag-ghost--pointer) .board-picker-board-btn,
-.board-picker-drag-ghost:not(.board-picker-drag-ghost--pointer) .board-picker-folder-row__btn {
+.board-picker-drag-ghost:not(.board-picker-drag-ghost--pointer):not(.board-picker-drag-ghost--multi) .board-picker-board-btn,
+.board-picker-drag-ghost:not(.board-picker-drag-ghost--pointer):not(.board-picker-drag-ghost--multi) .board-picker-folder-row__btn {
   width: auto;
   max-width: 16rem;
   padding: 2px 0;
