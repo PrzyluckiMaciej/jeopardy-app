@@ -125,6 +125,8 @@ export default function HostPage() {
   /** Active library/trash drag for Boards/Games/Trash nav drop targets. */
   const [pickerNavDrag, setPickerNavDrag] = useState<PickerNavDragPayload | null>(null)
   const [pickerNavDragOver, setPickerNavDragOver] = useState<PickerNavDropTarget | null>(null)
+  const pickerNavDragRef = useRef<PickerNavDragPayload | null>(null)
+  pickerNavDragRef.current = pickerNavDrag
   /** Folder to reopen in Games explorer after leaving game detail via Back. */
   const [returnGamesFolderId, setReturnGamesFolderId] = useState<string | null>(null)
   /** Folder shown when Games explorer mounts (null = Games root). */
@@ -155,6 +157,8 @@ export default function HostPage() {
   const [mobilePlayersOpen, setMobilePlayersOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [mobileNavExiting, setMobileNavExiting] = useState(false)
+  const [pickerHelpOpen, setPickerHelpOpen] = useState(false)
+  const pickerHelpRef = useRef<HTMLButtonElement | null>(null)
   const [showExitConfirm, setShowExitConfirm] = useState(false)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [pendingRestore, setPendingRestore] = useState<PendingRestore | null>(null)
@@ -1091,8 +1095,12 @@ export default function HostPage() {
   function handlePickerNavDrop(e: ReactDragEvent, target: PickerNavDropTarget) {
     e.preventDefault()
     e.stopPropagation()
+    commitPickerNavDrop(target)
+  }
+
+  function commitPickerNavDrop(target: PickerNavDropTarget) {
     setPickerNavDragOver(null)
-    const payload = pickerNavDrag
+    const payload = pickerNavDragRef.current
     if (!payload || !canDropPickerOnNav(target, payload, { isTrashed: isPickerNavDragTrashed })) {
       setPickerNavDrag(null)
       return
@@ -1717,6 +1725,27 @@ export default function HostPage() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [mobileNavOpen, mobileNavExiting]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    setPickerHelpOpen(false)
+  }, [pickerNav])
+
+  useEffect(() => {
+    if (!pickerHelpOpen) return
+    function onPointerDown(e: PointerEvent) {
+      if (pickerHelpRef.current?.contains(e.target as Node)) return
+      setPickerHelpOpen(false)
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setPickerHelpOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [pickerHelpOpen])
+
   function handleRequestAddToGame(boardIds: string[], label: string) {
     setAddToGameTarget({ boardIds, label })
   }
@@ -1935,7 +1964,7 @@ export default function HostPage() {
   return (
     <div className="app-page h-screen flex flex-col overflow-hidden page-fade-in" style={{ background: 'var(--navy)' }}>
       {/* Top bar */}
-      <header className="host-topbar">
+      <header className={`host-topbar${mobileNavOpen ? ' host-topbar--nav-open' : ''}`}>
         <button
           type="button"
           className="host-topbar__logo"
@@ -2205,6 +2234,15 @@ export default function HostPage() {
 
                   {/* Scoreboard — pinned below board, collapsible on mobile */}
                   {!editing && (
+                    <>
+                    {mobilePlayersOpen && (
+                      <button
+                        type="button"
+                        className="mobile-players-backdrop"
+                        aria-label="Close player list"
+                        onClick={() => setMobilePlayersOpen(false)}
+                      />
+                    )}
                     <div className="flex-shrink-0 relative z-20 overflow-visible">
                       <button
                         className="mobile-players-toggle"
@@ -2249,6 +2287,7 @@ export default function HostPage() {
                         </div>
                       </div>
                     </div>
+                    </>
                   )}
                 </div>
               </div>
@@ -2289,6 +2328,7 @@ export default function HostPage() {
                   <button
                     type="button"
                     className={`board-picker-nav-item flex-shrink-0${pickerIsAll ? ' board-picker-nav-item--active' : ''}${pickerNavDragOver === 'boards' ? ' board-picker-nav-item--drag-over' : ''}`}
+                    data-picker-nav-drop="boards"
                     onClick={() => setPickerNav('all')}
                     onDragOver={(e) => handlePickerNavDragOver(e, 'boards')}
                     onDragLeave={(e) => handlePickerNavDragLeave(e, 'boards')}
@@ -2304,6 +2344,7 @@ export default function HostPage() {
                   <button
                     type="button"
                     className={`board-picker-nav-item flex-shrink-0${gamesNavActive ? ' board-picker-nav-item--active' : ''}${pickerNavDragOver === 'games' ? ' board-picker-nav-item--drag-over' : ''}`}
+                    data-picker-nav-drop="games"
                     onClick={() => openGamesExplorer(null)}
                     onDragOver={(e) => handlePickerNavDragOver(e, 'games')}
                     onDragLeave={(e) => handlePickerNavDragLeave(e, 'games')}
@@ -2319,6 +2360,7 @@ export default function HostPage() {
                   <button
                     type="button"
                     className={`board-picker-nav-item flex-shrink-0${pickerIsTrash ? ' board-picker-nav-item--active' : ''}${pickerNavDragOver === 'trash' ? ' board-picker-nav-item--drag-over' : ''}`}
+                    data-picker-nav-drop="trash"
                     onClick={() => setPickerNav('trash')}
                     onContextMenu={openTrashNavMenu}
                     onDragOver={(e) => handlePickerNavDragOver(e, 'trash')}
@@ -2348,8 +2390,10 @@ export default function HostPage() {
                           : 'Boards'}
                   </span>
                   {(pickerIsAll || pickerIsGames || pickerIsTrash) && (
-                    <span
-                      className="board-picker-help"
+                    <button
+                      type="button"
+                      ref={pickerHelpRef}
+                      className={`board-picker-help${pickerHelpOpen ? ' board-picker-help--open' : ''}`}
                       data-tooltip={
                         pickerIsTrash
                           ? 'Select items for mass restore or permanent delete. Drag items onto Boards or Games to restore them. Right-click an item to restore it or delete it permanently. Right-click Trash to empty it.'
@@ -2364,10 +2408,11 @@ export default function HostPage() {
                             ? 'Select items for mass move, export, or delete. Drag items onto Trash to move them there. Click a folder to open it. Right-click empty space or a folder to create items, or a game/folder to rename, duplicate, or delete.'
                             : 'Select items for mass move, add to game, export, or delete. Drag items onto Trash to move them there. Click a folder to open it. Right-click empty space or a folder to create items, or a board/folder to edit, rename, duplicate, or delete.'
                       }
-                      tabIndex={0}
+                      aria-expanded={pickerHelpOpen}
+                      onClick={() => setPickerHelpOpen((open) => !open)}
                     >
                       <CircleHelp size={18} aria-hidden />
-                    </span>
+                    </button>
                   )}
                 </div>
                 {pickerIsAll || pickerIsTrash ? (
@@ -2404,6 +2449,14 @@ export default function HostPage() {
                       setPickerNavDrag(payload)
                       if (!payload) setPickerNavDragOver(null)
                     }}
+                    onPickerNavHover={(target) => {
+                      if (target && canDropPickerOnNav(target, pickerNavDragRef.current, { isTrashed: isPickerNavDragTrashed })) {
+                        setPickerNavDragOver(target)
+                      } else {
+                        setPickerNavDragOver(null)
+                      }
+                    }}
+                    onPickerNavDrop={commitPickerNavDrop}
                   />
                 ) : pickerIsGames ? (
                   <GamesPickerExplorer
@@ -2424,6 +2477,14 @@ export default function HostPage() {
                       setPickerNavDrag(payload)
                       if (!payload) setPickerNavDragOver(null)
                     }}
+                    onPickerNavHover={(target) => {
+                      if (target && canDropPickerOnNav(target, pickerNavDragRef.current, { isTrashed: isPickerNavDragTrashed })) {
+                        setPickerNavDragOver(target)
+                      } else {
+                        setPickerNavDragOver(null)
+                      }
+                    }}
+                    onPickerNavDrop={commitPickerNavDrop}
                   />
                 ) : (
                 <>
@@ -2565,9 +2626,11 @@ export default function HostPage() {
                             ) : (
                               <LayoutGrid size={14} className="board-picker-object-icon board-picker-object-icon--board" />
                             )}
-                            <span className="font-condensed font-bold truncate">{b.name}</span>
-                            <span className="add-to-game-dropdown__path truncate" title={boardPath}>
-                              {boardPath}
+                            <span className="board-picker-board-btn__text">
+                              <span className="font-condensed font-bold">{b.name}</span>
+                              <span className="add-to-game-dropdown__path" title={boardPath}>
+                                {boardPath}
+                              </span>
                             </span>
                           </button>
                         )}

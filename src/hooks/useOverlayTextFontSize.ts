@@ -110,6 +110,8 @@ function getMobileOverlayViewportHeight(main: HTMLElement): number {
   const headerH = header instanceof HTMLElement ? header.getBoundingClientRect().height : 52
   const dock = document.querySelector('.player-action-zone[data-mobile-dock]')
   const dockH = dock instanceof HTMLElement ? dock.getBoundingClientRect().height : 0
+  const sidebar = root?.querySelector('.question-overlay-sidebar')
+  const sidebarH = sidebar instanceof HTMLElement ? sidebar.getBoundingClientRect().height : 0
   const layout = main.closest('.question-overlay-layout')
   const layoutStyles = layout instanceof HTMLElement ? getComputedStyle(layout) : null
   const layoutPad = layoutStyles
@@ -117,7 +119,7 @@ function getMobileOverlayViewportHeight(main: HTMLElement): number {
     : 24
   const mainStyles = getComputedStyle(main)
   const mainPad = parsePx(mainStyles.paddingTop) + parsePx(mainStyles.paddingBottom)
-  return Math.max(0, viewportH - headerH - dockH - layoutPad - mainPad - 12)
+  return Math.max(0, viewportH - headerH - dockH - sidebarH - layoutPad - mainPad - 12)
 }
 
 function getContainerHeight(container: HTMLElement): number {
