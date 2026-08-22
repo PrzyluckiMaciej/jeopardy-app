@@ -437,6 +437,11 @@ export default function GamesPickerExplorer({
         label: 'New Folder',
         onSelect: () => createNewFolder(),
       },
+      {
+        id: 'import',
+        label: 'Import',
+        onSelect: () => void handleImport(),
+      },
     ]
   }
 
