@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { ArrowLeft, Check, ChevronDown, ChevronUp, EllipsisVertical, Folder, Layers, LayoutGrid, Trophy } from 'lucide-react'
 import type { Board, BoardFolder, Game, GameFolder } from '../types'
 import { buildPathString, isFolderInside, resolvePath } from '../lib/folderPath'
@@ -16,8 +16,15 @@ import {
   BOARDS_DND_MIME,
   GAMES_DND_MIME,
   type PickerNavDragPayload,
+  type PickerNavDropTarget,
 } from '../lib/pickerDnD'
 import { createPickerDragGhost, setPickerDragImage } from '../lib/pickerDragGhost'
+import {
+  hitTestPickerPointerDrop,
+  isPickerLongPressIgnoredTarget,
+  PICKER_LONG_PRESS_MOVE_CANCEL_PX,
+  PICKER_LONG_PRESS_MS,
+} from '../lib/pickerLongPressDrag'
 import { formatBoardTimestamp, isFinalBoard } from '../lib/utils'
 import {
   isBoardTrashed,
@@ -140,6 +147,10 @@ interface Props {
   onRenameBoardIdChange?: (id: string | null) => void
   /** Notifies HostPage of the active drag for nav-tab drop targets. */
   onPickerDragChange?: (payload: PickerNavDragPayload | null) => void
+  /** Pointer long-press: highlight a nav drop target. */
+  onPickerNavHover?: (target: PickerNavDropTarget | null) => void
+  /** Pointer long-press: commit drop onto a nav tab. */
+  onPickerNavDrop?: (target: PickerNavDropTarget) => void
 }
 
 function parseDragPayload(e: DragEvent): ActiveBoardDrag | null {
@@ -197,6 +208,8 @@ export default function BoardPickerExplorer({
   renameBoardId: controlledRenameBoardId,
   onRenameBoardIdChange,
   onPickerDragChange,
+  onPickerNavHover,
+  onPickerNavDrop,
 }: Props) {
   const isTrash = mode === 'trash'
   const moveBoardToFolder = useBoardStore((s) => s.moveBoardToFolder)
@@ -235,6 +248,15 @@ export default function BoardPickerExplorer({
   const [sortKey, setSortKey] = useState<SortKey>('type')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const dragGhostRef = useRef<HTMLElement | null>(null)
+  const activeDragRef = useRef<ActiveBoardDrag | null>(null)
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longPressOriginRef = useRef({ x: 0, y: 0 })
+  const longPressActiveRef = useRef(false)
+  const longPressPointerIdRef = useRef<number | null>(null)
+  const longPressGhostRef = useRef<HTMLElement | null>(null)
+  const longPressOffsetRef = useRef({ x: 0, y: 0 })
+  const suppressClickRef = useRef(false)
+  const pointerDragKindRef = useRef<'boards' | 'games' | null>(null)
 
   const scopedFolders = useMemo(
     () => folders.filter((f) => (isTrash ? isFolderTrashed(f) : !isFolderTrashed(f))),
@@ -1160,6 +1182,7 @@ export default function BoardPickerExplorer({
     e.dataTransfer.effectAllowed = 'move'
     applyDragImage(e, dragImageEl, items.length)
     setActiveDrag({ primary, items })
+    activeDragRef.current = { primary, items }
     onPickerDragChange?.({
       domain: 'boards',
       type: primary.type,
@@ -1176,6 +1199,7 @@ export default function BoardPickerExplorer({
     e.dataTransfer.effectAllowed = 'move'
     applyDragImage(e, dragImageEl, items.length)
     setActiveDrag(null)
+    activeDragRef.current = null
     onPickerDragChange?.({
       domain: 'games',
       type: primary.type,
@@ -1187,9 +1211,287 @@ export default function BoardPickerExplorer({
   function clearDrag() {
     clearDragGhost()
     setActiveDrag(null)
+    activeDragRef.current = null
     setDragOverTarget(null)
     onPickerDragChange?.(null)
   }
+
+  function clearLongPressTimer() {
+    if (longPressTimerRef.current != null) {
+      clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
+  }
+
+  function clearLongPressGhost() {
+    longPressGhostRef.current?.remove()
+    longPressGhostRef.current = null
+    document.body.classList.remove('board-picker-pointer-dragging')
+  }
+
+  function resetLongPressState() {
+    clearLongPressTimer()
+    clearLongPressGhost()
+    longPressActiveRef.current = false
+    longPressPointerIdRef.current = null
+    pointerDragKindRef.current = null
+  }
+
+  function updatePointerDropHighlight(clientX: number, clientY: number) {
+    const hit = hitTestPickerPointerDrop(clientX, clientY, longPressGhostRef.current)
+    const drag = activeDragRef.current
+    if (hit?.kind === 'folder') {
+      if (drag && canDropItemsOnFolder(drag.items, hit.id)) {
+        setDragOverTarget(`folder:${hit.id}`)
+      } else {
+        setDragOverTarget(null)
+      }
+      onPickerNavHover?.(null)
+      return
+    }
+    if (hit?.kind === 'parent') {
+      if (drag && canDropOnParent(drag)) setDragOverTarget('parent')
+      else setDragOverTarget(null)
+      onPickerNavHover?.(null)
+      return
+    }
+    if (hit?.kind === 'list') {
+      setDragOverTarget('current')
+      onPickerNavHover?.(null)
+      return
+    }
+    if (hit?.kind === 'nav') {
+      setDragOverTarget(null)
+      onPickerNavHover?.(hit.target)
+      return
+    }
+    setDragOverTarget(null)
+    onPickerNavHover?.(null)
+  }
+
+  function activateBoardPointerDrag(
+    pointerId: number,
+    clientX: number,
+    clientY: number,
+    row: HTMLElement,
+    primary: DragPayload,
+  ) {
+    const items = resolveBoardDragItems(primary)
+    const nameEl = row.querySelector('.board-picker-explorer-row__name')
+    const sourceEl = nameEl instanceof HTMLElement ? nameEl : row
+    const rect = sourceEl.getBoundingClientRect()
+
+    clearLongPressGhost()
+    const ghost = createPickerDragGhost({ count: items.length, sourceEl })
+    ghost.classList.add('board-picker-drag-ghost--pointer')
+    ghost.style.width = `${rect.width}px`
+    ghost.style.transform = `translate(${rect.left}px, ${rect.top}px)`
+    document.body.appendChild(ghost)
+    longPressGhostRef.current = ghost
+    longPressOffsetRef.current = { x: clientX - rect.left, y: clientY - rect.top }
+    longPressActiveRef.current = true
+    longPressPointerIdRef.current = pointerId
+    suppressClickRef.current = true
+    pointerDragKindRef.current = 'boards'
+    document.body.classList.add('board-picker-pointer-dragging')
+
+    const drag = { primary, items }
+    activeDragRef.current = drag
+    setActiveDrag(drag)
+    onPickerDragChange?.({
+      domain: 'boards',
+      type: primary.type,
+      id: primary.id,
+      items,
+    })
+
+    try {
+      row.setPointerCapture(pointerId)
+    } catch {
+      /* already captured */
+    }
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      navigator.vibrate(12)
+    }
+  }
+
+  function activateGamesPointerDrag(
+    pointerId: number,
+    clientX: number,
+    clientY: number,
+    row: HTMLElement,
+    primary: GamesDragPayload,
+  ) {
+    const items = resolveGamesDragItems(primary)
+    const nameEl = row.querySelector('.board-picker-explorer-row__name')
+    const sourceEl = nameEl instanceof HTMLElement ? nameEl : row
+    const rect = sourceEl.getBoundingClientRect()
+
+    clearLongPressGhost()
+    const ghost = createPickerDragGhost({ count: items.length, sourceEl })
+    ghost.classList.add('board-picker-drag-ghost--pointer')
+    ghost.style.width = `${rect.width}px`
+    ghost.style.transform = `translate(${rect.left}px, ${rect.top}px)`
+    document.body.appendChild(ghost)
+    longPressGhostRef.current = ghost
+    longPressOffsetRef.current = { x: clientX - rect.left, y: clientY - rect.top }
+    longPressActiveRef.current = true
+    longPressPointerIdRef.current = pointerId
+    suppressClickRef.current = true
+    pointerDragKindRef.current = 'games'
+    document.body.classList.add('board-picker-pointer-dragging')
+
+    activeDragRef.current = null
+    setActiveDrag(null)
+    onPickerDragChange?.({
+      domain: 'games',
+      type: primary.type,
+      id: primary.id,
+      items,
+    })
+
+    try {
+      row.setPointerCapture(pointerId)
+    } catch {
+      /* already captured */
+    }
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      navigator.vibrate(12)
+    }
+  }
+
+  function handleExplorerRowPointerDown(
+    e: ReactPointerEvent<HTMLElement>,
+    options:
+      | { domain: 'boards'; primary: DragPayload; disabled?: boolean }
+      | { domain: 'games'; primary: GamesDragPayload; disabled?: boolean },
+  ) {
+    if (options.disabled || e.pointerType !== 'touch' || e.button !== 0) return
+    if (isPickerLongPressIgnoredTarget(e.target)) return
+
+    const row = e.currentTarget
+    longPressOriginRef.current = { x: e.clientX, y: e.clientY }
+    clearLongPressTimer()
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTimerRef.current = null
+      if (options.domain === 'boards') {
+        activateBoardPointerDrag(e.pointerId, e.clientX, e.clientY, row, options.primary)
+      } else {
+        activateGamesPointerDrag(e.pointerId, e.clientX, e.clientY, row, options.primary)
+      }
+    }, PICKER_LONG_PRESS_MS)
+  }
+
+  function handleExplorerRowPointerMove(e: ReactPointerEvent<HTMLElement>) {
+    if (
+      longPressPointerIdRef.current != null &&
+      e.pointerId !== longPressPointerIdRef.current &&
+      longPressActiveRef.current
+    ) {
+      return
+    }
+
+    if (!longPressActiveRef.current) {
+      if (longPressTimerRef.current == null) return
+      const origin = longPressOriginRef.current
+      if (Math.hypot(e.clientX - origin.x, e.clientY - origin.y) > PICKER_LONG_PRESS_MOVE_CANCEL_PX) {
+        clearLongPressTimer()
+      }
+      return
+    }
+
+    e.preventDefault()
+    const ghost = longPressGhostRef.current
+    if (ghost) {
+      const { x, y } = longPressOffsetRef.current
+      ghost.style.transform = `translate(${e.clientX - x}px, ${e.clientY - y}px)`
+    }
+    updatePointerDropHighlight(e.clientX, e.clientY)
+  }
+
+  function handleExplorerRowPointerUp(e: ReactPointerEvent<HTMLElement>) {
+    if (longPressTimerRef.current != null) {
+      clearLongPressTimer()
+      return
+    }
+    if (!longPressActiveRef.current) return
+    if (
+      longPressPointerIdRef.current != null &&
+      e.pointerId !== longPressPointerIdRef.current
+    ) {
+      return
+    }
+
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    } catch {
+      /* already released */
+    }
+
+    const hit = hitTestPickerPointerDrop(e.clientX, e.clientY, longPressGhostRef.current)
+    const drag = activeDragRef.current
+    const kind = pointerDragKindRef.current
+    resetLongPressState()
+    setDragOverTarget(null)
+    onPickerNavHover?.(null)
+
+    if (kind === 'boards' && drag) {
+      if (hit?.kind === 'folder' && canDropItemsOnFolder(drag.items, hit.id)) {
+        requestMoveMany(drag.items, hit.id, { notify: drag.items.length > 1 })
+      } else if (hit?.kind === 'parent' && canDropOnParent(drag)) {
+        requestMoveMany(drag.items, parentFolderId, { notify: drag.items.length > 1 })
+      } else if (hit?.kind === 'list' && !isTrash) {
+        if (!currentFolderId || canDropItemsOnFolder(drag.items, currentFolderId)) {
+          requestMoveMany(drag.items, currentFolderId, { notify: drag.items.length > 1 })
+        }
+      } else if (hit?.kind === 'nav') {
+        onPickerNavDrop?.(hit.target)
+      }
+    } else if (kind === 'games' && hit?.kind === 'nav') {
+      onPickerNavDrop?.(hit.target)
+    }
+
+    clearDrag()
+  }
+
+  function handleExplorerRowPointerCancel(e: ReactPointerEvent<HTMLElement>) {
+    if (
+      longPressPointerIdRef.current != null &&
+      e.pointerId !== longPressPointerIdRef.current
+    ) {
+      return
+    }
+    resetLongPressState()
+    setDragOverTarget(null)
+    onPickerNavHover?.(null)
+    clearDrag()
+  }
+
+  useEffect(() => {
+    function onClickCapture(ev: globalThis.MouseEvent) {
+      if (!suppressClickRef.current) return
+      ev.preventDefault()
+      ev.stopPropagation()
+      suppressClickRef.current = false
+    }
+    document.addEventListener('click', onClickCapture, true)
+    return () => document.removeEventListener('click', onClickCapture, true)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current != null) {
+        clearTimeout(longPressTimerRef.current)
+        longPressTimerRef.current = null
+      }
+      longPressGhostRef.current?.remove()
+      longPressGhostRef.current = null
+      document.body.classList.remove('board-picker-pointer-dragging')
+      longPressActiveRef.current = false
+      longPressPointerIdRef.current = null
+      pointerDragKindRef.current = null
+    }
+  }, [])
 
   function canDropItemsOnFolder(items: DragPayload[], targetFolderId: string): boolean {
     if (isTrash || items.length === 0) return false
@@ -1287,6 +1589,16 @@ export default function BoardPickerExplorer({
           )
         }}
         onDragEnd={clearDrag}
+        onPointerDown={(e) =>
+          handleExplorerRowPointerDown(e, {
+            domain: 'boards',
+            primary: { type: 'board', id: board.id },
+            disabled: isEditing,
+          })
+        }
+        onPointerMove={handleExplorerRowPointerMove}
+        onPointerUp={handleExplorerRowPointerUp}
+        onPointerCancel={handleExplorerRowPointerCancel}
         onDragOver={(e) => {
           e.stopPropagation()
         }}
@@ -1397,6 +1709,7 @@ export default function BoardPickerExplorer({
       <div
         key={folder.id}
         className={`board-picker-folder-row board-picker-explorer-row${isDragOver ? ' board-picker-folder-row--drag-over' : ''}${selected ? ' board-picker-explorer-row--selected' : ''}`}
+        data-picker-drop-folder={isTrash || isEditing ? undefined : folder.id}
         draggable={!isEditing}
         onDragStart={(e) => {
           if (isEditing) return
@@ -1408,6 +1721,16 @@ export default function BoardPickerExplorer({
           )
         }}
         onDragEnd={clearDrag}
+        onPointerDown={(e) =>
+          handleExplorerRowPointerDown(e, {
+            domain: 'boards',
+            primary: { type: 'folder', id: folder.id },
+            disabled: isEditing,
+          })
+        }
+        onPointerMove={handleExplorerRowPointerMove}
+        onPointerUp={handleExplorerRowPointerUp}
+        onPointerCancel={handleExplorerRowPointerCancel}
         onDragOver={(e) => {
           if (isTrash) return
           e.preventDefault()
@@ -1517,6 +1840,15 @@ export default function BoardPickerExplorer({
           )
         }}
         onDragEnd={clearDrag}
+        onPointerDown={(e) =>
+          handleExplorerRowPointerDown(e, {
+            domain: 'games',
+            primary: { type: 'game', id: game.id },
+          })
+        }
+        onPointerMove={handleExplorerRowPointerMove}
+        onPointerUp={handleExplorerRowPointerUp}
+        onPointerCancel={handleExplorerRowPointerCancel}
         onDragOver={(e) => {
           e.stopPropagation()
         }}
@@ -1573,6 +1905,15 @@ export default function BoardPickerExplorer({
           )
         }}
         onDragEnd={clearDrag}
+        onPointerDown={(e) =>
+          handleExplorerRowPointerDown(e, {
+            domain: 'games',
+            primary: { type: 'folder', id: folder.id },
+          })
+        }
+        onPointerMove={handleExplorerRowPointerMove}
+        onPointerUp={handleExplorerRowPointerUp}
+        onPointerCancel={handleExplorerRowPointerCancel}
         onDragOver={(e) => {
           e.stopPropagation()
         }}
@@ -1620,6 +1961,7 @@ export default function BoardPickerExplorer({
 
   return (
     <>
+      <div className="board-picker-explorer-pane">
       <div className="board-picker-path-bar">
         <button
           type="button"
@@ -1628,6 +1970,7 @@ export default function BoardPickerExplorer({
           disabled={atRoot}
           aria-label="Go to parent folder"
           title={activeDrag ? undefined : 'Back'}
+          data-picker-drop-parent={!isTrash && !atRoot ? '' : undefined}
           data-tooltip={
             !isTrash && !atRoot && activeDrag
               ? 'This item will be placed in the parent folder'
@@ -1693,6 +2036,7 @@ export default function BoardPickerExplorer({
       </div>
       <div
         className={`board-picker-boards__scroll board-picker-explorer${currentDragOver ? ' board-picker-explorer--drag-over' : ''}`}
+        data-picker-drop-list={!isTrash ? '' : undefined}
         onContextMenu={openEmptyMenu}
         onDragOver={(e) => {
           if (isTrash) return
@@ -1735,6 +2079,7 @@ export default function BoardPickerExplorer({
             {isTrash ? 'Trash is empty' : 'No saved boards'}
           </div>
         )}
+      </div>
       </div>
       {selectedEntries.length > 0 && (
         <PickerMassActionBar count={selectedEntries.length} actions={massActions} />
